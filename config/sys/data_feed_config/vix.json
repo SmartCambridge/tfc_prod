@@ -1,0 +1,5 @@
+{
+  "feed_id": "vix",
+  "feed_name": "Cambridge region bus location data",
+  "feed_description": "Feed containing latitude / longitude bus position for Cambridge region buses every 30 seconds"
+}

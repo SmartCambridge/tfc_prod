@@ -1,0 +1,24 @@
+{ "zone_list":
+  [ 
+      { "zone_id": "madingley_road_in" },
+      { "zone_id": "madingley_road_out" },
+      { "zone_id": "histon_road_out" },      
+      { "zone_id": "newmarket_road_in" },
+      { "zone_id": "huntingdon_road_in" },   
+      { "zone_id": "newmarket_road_out" },
+      { "zone_id": "huntingdon_road_out" },  
+      { "zone_id": "the_backs_north" },
+      { "zone_id": "east_road_in" },    
+      { "zone_id": "madingley_road_in" },    
+      { "zone_id": "the_backs_south" },
+      { "zone_id": "east_road_out" },   
+      { "zone_id": "madingley_road_out" },   
+      { "zone_id": "trumpington_road_in" },
+      { "zone_id": "hills_road_in" },   
+      { "zone_id": "trumpington_road_out" },
+      { "zone_id": "hills_road_out" },  
+      { "zone_id": "milton_road_in" },
+      { "zone_id": "histon_road_in" },  
+      { "zone_id": "milton_road_out" }
+  ]
+}

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Rita Status</title>
+
+<style>
+body {
+   font-family: Tahoma, Verdana, Segoe, sans-serif;
+   background-image: url("images/background_blur.png");
+
+}  
+
+img {
+   vertical-align: middle;
+}
+
+a:link { text-decoration: none; }
+a:visited { text-decoration:none; border-bottom:1px dotted #ddbfdc}
+a:focus { color: #0072cf; outline: thin dotted; border-bottom:0 }
+a:hover { text-decoration:underline; border-bottom:0 }
+a:hover, a:active { outline: none; }
+a:active { text-decoration:none; border-bottom:0}
+
+.header_title {
+   color: #A0A0A0;
+}
+
+p {
+   color: #A0A0A0;
+}
+
+.status_area_heading {
+  color: #A0A0A0;
+  font-size: 150%;
+}
+
+.status_area {
+  display: inline-block;
+  /* width: 100px; */
+  /* height: 60px; */
+  border-radius: 8px;
+  text-align: center;
+  vertical-align: middle;
+  margin: 10px;
+  padding: 5px;
+}
+
+.module_area {
+  display: inline-block;
+}
+
+</style>
+<script>
+// Default constants for status timeouts for module from green->amber, and amber->red
+// Note these threshold values can also be sent in the EB_SYSTEM_STATUS message
+// i.e. if the console hasn't received an 'UP' status message in 35 seconds, it will treat the
+// local status of that module as 'amber'
+      
+var STATUS_AMBER_SECONDS_DEFAULT = 35;
+var STATUS_RED_SECONDS_DEFAULT = 65;
+
+var API_CONSOLE_STATUS = '/api/console/status'; // http url to retrieve status as json
+      
+var status_areas; // div on page to hold status areas for each module
+
+// init() called on page load
+function init()
+{
+  // pre-cache page elements to be written to as status messages arrive
+  module_area_others = document.getElementById('module_area_others');
+
+  clock = document.getElementById('clock');
+
+  // get status from /api/console/status
+  get_status_then_display();
+
+} // end init()
+
+function format_time(t)
+{
+      var hours = t.getHours();
+      var mins = t.getMinutes();
+      var secs = t.getSeconds();
+      hours = hours < 10 ? '0'+hours : hours;
+      mins = mins < 10 ? '0'+mins : mins;
+      secs = secs < 10 ? '0'+secs : secs;
+      return hours + ':' + mins + ':' + secs;
+}
+
+function format_status(module_name, module_id, t)
+{
+    return module_name+"<br/>"+module_id+"<br/>"+format_time(t);
+}
+                    
+// We have just received a message on the EB_SYSTEM_STATUS address
+// so update the appropriate 'status_area' on the page
+function display_status(status)
+{
+    var module_area = document.getElementById('module_area_'+status.module_name);
+    if (module_area == null)
+    {
+        module_area = document.createElement('DIV');
+        module_area.setAttribute('class', 'module_area');
+        module_area.setAttribute('id', 'module_area_'+status.module_name);
+        module_area_others.appendChild(module_area);
+    }
+		    
+      // create a new 'status_el' page element
+      var status_el = document.createElement('DIV');
+      status_el.setAttribute('class','status_area');
+  
+      // add this status area to 'module_area_<name>' document element
+      module_area.appendChild(status_el);
+    
+    // Set the "status_amber_seconds" and "status_red_seconds" properties for current module
+    // either obtaining these values from the status message, or using the defaults on this page
+    var status_amber_seconds = STATUS_AMBER_SECONDS_DEFAULT;
+    if (status.hasOwnProperty("status_amber_seconds"))
+      {
+        status_amber_seconds = status.status_amber_seconds;
+      }
+    var status_red_seconds = STATUS_RED_SECONDS_DEFAULT;
+    if (status.hasOwnProperty("status_red_seconds"))
+      {
+        status_red_seconds = status.status_red_seconds;
+      }
+
+    status_el.innerHTML = status.module_name+'<br/>'+
+                status.module_id+'<br/>'+
+                (new Date(status.ts*1000)).toLocaleTimeString();
+
+    var seconds_since_ts = (new Date()).getTime()/1000 - status.ts;
+    //console.log('seconds_since_ts '+seconds_since_ts);
+                    
+    if (seconds_since_ts > status_red_seconds)
+      {
+        status_el.setAttribute("style", "background-color: red; color: black");
+      }
+    else if (seconds_since_ts > status_amber_seconds)
+      {
+        status_el.setAttribute("style", "background-color: yellow; color: black");
+      }
+    else
+      {
+        status_el.setAttribute("style", "background-color: green; color: white");
+      }
+} // end display_status()
+
+// general http GET function
+// retrieves /api/console/status        
+// 
+var call_tfc_api = function(url, callback) {
+            var xhr = new XMLHttpRequest();
+            try {
+                // here is where we GET the /console/status content
+                xhr.open('get', url, true);
+                xhr.responseType = 'text';
+                xhr.onload = function() {
+                  console.log('call_tfc_api onload');
+                  var status = xhr.status;
+                  if (status == 200) {
+                    console.log('call_tfc_api status 200');
+                    callback(null, xhr.responseText);
+                  } else {
+                    callback(status);
+                  }
+                };
+                console.log('call_tfc_api sending');
+                xhr.send();
+            }
+            catch (ex)
+            {
+              console.log('Exception in send()');
+            }
+        };
+
+// Update all the module status areas, called (in init) every 3 seconds
+function get_status_then_display()
+  {
+    // first an ASYNCHRONOUS get of the status data from the server
+    call_tfc_api( API_CONSOLE_STATUS, function (err, data) {
+                  if (err != null)
+                      {
+                        console.log( 'get_status failed '+err);
+                      }
+                  else
+                      {
+                        console.log( ' GET /console/status succeeded');
+                        //console.log('data='+data);
+                        var data_obj = JSON.parse(data);
+                        //console.log('data module_name='+data_obj.module_name);
+                        var status_array = data_obj.status;
+                        for (var i=0; i < status_array.length; i++)
+                          {
+                            //console.log("Updating "+JSON.stringify(status_array[i]));
+                            display_status(status_array[i]);
+                          }
+                      }
+                });
+  }
+</script>
+
+</head>
+  <body onload="init()">
+<h1 class="header_title">
+<a href="/"><img src="images/smart_cambridge_logo_rounded.png"/></a>
+Rita System Status
+</h1>
+<div id="status_areas">
+  <div id="module_area_feedhandler">
+    <div class="status_area_heading">FeedHandler - Rita is receiving real-time data from these sources</div>
+  </div>
+  <div id="module_area_zone">
+    <div class="status_area_heading">Zone - Rita is monitoring these zones</div>
+  </div>
+  <div id="module_area_others">
+    <div class="status_area_heading">Additional Modules - Rita is using these other system components</div>
+  </div>
+</div>
+</body>
+</html>

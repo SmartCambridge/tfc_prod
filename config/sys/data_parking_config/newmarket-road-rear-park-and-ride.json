@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "newmarket-road-rear-park-and-ride",
+    "parking_name": "P&R Newmarket Road Rear",
+    "parking_type": "park_and_ride",
+    "latitude": 52.2140,
+    "longitude": 0.1828,
+    "capacity": 614
+}
+

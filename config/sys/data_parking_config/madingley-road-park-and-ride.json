@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "madingley-road-park-and-ride",
+    "parking_name": "P&R Madingley Road",
+    "parking_type": "park_and_ride",
+    "latitude": 52.2143,
+    "longitude": 0.0832,
+    "capacity": 930
+}
+

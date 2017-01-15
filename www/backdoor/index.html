@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>backdoor::smartCAMBRIDGE</title>
+<style>
+body {
+   font-family: Tahoma, Verdana, Segoe, sans-serif;
+   background-image: url("images/background_blur.png");
+   font-size: 120%;
+}  
+
+img {
+   vertical-align: middle;
+}
+
+a:link { text-decoration: none; color: #505050; }
+a:visited { text-decoration:none; border-bottom:1px dotted #ddbfdc; color: #505050; }
+a:focus { color: #0072cf; outline: thin dotted; border-bottom:0 }
+a:hover { text-decoration:underline; border-bottom:0 }
+a:hover, a:active { outline: none; }
+a:active { text-decoration:none; border-bottom:0}
+
+.header_title {
+   color: #C0C0C0;
+}
+
+p {
+   color: #C0C0C0;
+}
+
+.cam_list_header {
+    border-bottom: 1px solid #e4e4e4;
+    line-height: 25px;
+    text-rendering: optimizelegibility;
+    margin: 0 0 10px 0;
+    vertical-align: baseline;
+    font-style: normal;
+    color: #C0C0C0;
+}
+
+.backdoor_wrapper {
+    text-align: center;
+}
+
+.backdoor_button {
+    display: inline-block;
+    font-size: 200%;
+    border:2px solid;
+    border-radius:12px;
+    padding: 5px 20px;
+    background-color: white;
+    margin: 0 auto;
+}
+
+
+</style>
+</head>
+<body>
+<h1 class="header_title">
+<a href="/"><img src="images/smart_cambridge_logo_rounded.png"/></a>
+smartCAMBRIDGE Platform (the back door)
+</h1>
+<p>This is the technical 'backdoor' to the smartCAMBRIDGE real-time data system known as "Rita".</p>
+<p>Here is where you can browse the real-time data (and historical archive data) relating to transport in
+  our region. The platform is very much a work-in-progress, and will in due course serve web pages and 'apps'
+  very much designed for the local traveller. In the meantime these pages provide a technical insight into
+  what is going on under the covers.
+</p>
+
+<p><i>If sometimes these links are not working, relax and come back later... this 
+state-of-the-art platform is undergoing continual development, helping Cambridge become
+ the Smart City of the Future.</i>
+</p>
+
+        <div class="cam_list_header">
+            <h2>System Management</h2>
+        </div>
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="system_status.html">View System Status</a>
+          </div>
+        </div>
+        
+        <div class="cam_list_header">
+            <h2>Zones</h2>
+        </div>
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="zones.html">Browse Traffic Zones</a>
+          </div>
+        </div>
+        
+        <div class="cam_list_header">
+            <h2>Raw Data</h2>
+        </div>
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="databrowser.html">Browse Raw Data</a>
+          </div>
+        </div>
+</body>
+</html>

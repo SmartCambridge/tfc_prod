@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_local",
+    "parking_id": "grafton-west-car-park",
+    "parking_name": "Grafton West",
+    "parking_type": "car_park",
+    "latitude": 52.2073,
+    "longitude": 0.1307,
+    "capacity": 280
+}
+

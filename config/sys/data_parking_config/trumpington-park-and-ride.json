@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "trumpington-park-and-ride",
+    "parking_name": "P&R Trumpington",
+    "parking_type": "park_and_ride",
+    "latitude": 52.1678,
+    "longitude": 0.1077,
+    "capacity": 1340
+}
+

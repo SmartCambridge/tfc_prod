@@ -1,0 +1,7 @@
+.bus-tooltip.leaflet-tooltip-right {
+    margin-left: 16px;
+}
+
+.bus-tooltip.leaflet-tooltip-left {
+    margin-left: -16px;
+}

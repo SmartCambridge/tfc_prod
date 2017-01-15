@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Zones::smartCAMBRIDGE</title>
+<style>
+body {
+   font-family: Tahoma, Verdana, Segoe, sans-serif;
+   background-image: url("images/background_blur.png");
+
+}  
+
+img {
+   vertical-align: middle;
+}
+
+a:link { text-decoration: none; color: #A0A0A0; }
+a:visited { text-decoration:none; border-bottom:1px dotted #ddbfdc; color: #A0A0A0; }
+a:focus { color: #0072cf; outline: thin dotted; border-bottom:0 }
+a:hover { text-decoration:underline; border-bottom:0 }
+a:hover, a:active { outline: none; }
+a:active { text-decoration:none; border-bottom:0}
+
+.header_title {
+   color: #A0A0A0;
+}
+
+p {
+   color: #A0A0A0;
+}
+
+.cam_list_header {
+    border-bottom: 1px solid #e4e4e4;
+    line-height: 25px;
+    text-rendering: optimizelegibility;
+    margin: 0 0 10px 0;
+    vertical-align: baseline;
+    font-style: normal;
+    color: #A0A0A0;
+}
+
+.sys_management_block {
+    text-align: center;
+}
+
+.zone_block {
+    text-align: center;
+}
+
+.service_blocks {
+    /* display: inline-block; */
+}
+
+.service_block {
+    width: 290px;
+    border:2px solid;
+    border-radius:12px;
+    padding: 5px 5px;
+    display: inline-block;
+    background-color: white;
+    margin: 2px;
+}
+
+.service_header {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.service_block a:link {
+  color: blue;
+}
+
+.service_block a:visited {
+  color: blue;
+}
+
+.service_block a:hover
+{ 
+    background-color:yellow;
+    text-decoration: none;
+}
+
+.service_header img {
+    vertical-align: middle;
+}
+
+.service_item_container {
+    text-align: center;
+}
+
+.service_item_left {
+    float: left;
+}  
+
+.service_item_center {
+    display: inline-block;
+    margin:0 auto;
+}  
+
+.service_item_right {
+    float: right;
+}  
+
+.service_title {
+    display: inline;
+    vertical-align: middle; 
+    padding: 0px; 
+    margin: 0px; 
+}  
+
+</style>
+</head>
+<body>
+<h1 class="header_title">
+<a href="/"><img src="images/smart_cambridge_logo_rounded.png"/></a>
+<a href=".">backdoor</a>::Zones
+</h1>
+        <div class='cam_list_header'>
+          <h2>Zones</h2>
+          <p>Rita is monitoring bus movements in each of the Zones listed here, and can show an up-to-date graph of journey times across
+            each of the zones. The map link will show the area being monitored (e.g. <a href="dataserver/map/zone/madingley_road_in">this area</a>)
+            and for that zone the journey times (in seconds) between the green 'start line' and red 'finish line' can be seen
+            <a href="http://tfc-app2.cl.cam.ac.uk/backdoor/dataserver/plot/zone/madingley_road_in">here</a>
+          </p>
+        </div>
+        <div class='zone_block'>
+            <!-- MADINGLEY_ROAD_IN -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/madingley_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="Madingley Road In">
+                        <div class='service_title'><b>Madingley Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/madingley_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/madingley_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/madingley_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- MADINGLEY_ROAD_OUT -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/madingley_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="Madingley Road In">
+                        <div class='service_title'><b>Madingley Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/madingley_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/madingley_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/madingley_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class='zone_block'>
+            <!-- HILLS_ROAD_IN -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/hills_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="Hills Road In">
+                        <div class='service_title'><b>Hills Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/hills_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/hills_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/hills_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- HILLS_ROAD_OUT -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/hills_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="Hills Road Out">
+                        <div class='service_title'><b>Hills Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/hills_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/hills_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/hills_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class='zone_block'>
+            <!-- HISTON_ROAD_IN -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/histon_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="Histon Road In">
+                        <div class='service_title'><b>Histon Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/histon_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/histon_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/histon_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- HISTON_ROAD_OUT -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/histon_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="Histon Road Out">
+                        <div class='service_title'><b>Histon Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/histon_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/histon_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/histon_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class='zone_block'>
+            <!-- trumpington_road_in -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/trumpington_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="trumpington_road_in">
+                        <div class='service_title'><b>Trumpington Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/trumpington_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/trumpington_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/trumpington_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- trumpington_road_out -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/trumpington_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="trumpington_road_out">
+                        <div class='service_title'><b>Trumpington Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/trumpington_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/trumpington_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/trumpington_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class='zone_block'>
+            <!-- milton_road_in -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/milton_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="milton_road_in">
+                        <div class='service_title'><b>Milton Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/milton_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/milton_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/milton_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- milton_road_out -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/milton_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="milton_road_out">
+                        <div class='service_title'><b>Milton Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/milton_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/milton_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/milton_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class='zone_block'>
+
+            <!-- newmarket_road_in -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/newmarket_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="newmarket_road_in">
+                        <div class='service_title'><b>Newmarket Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/newmarket_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/newmarket_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/newmarket_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- newmarket_road_out -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/newmarket_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="newmarket_road_out">
+                        <div class='service_title'><b>Newmarket Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/newmarket_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/newmarket_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/newmarket_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class='zone_block'>
+            <!-- east_road_in -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/east_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="east_road_in">
+                        <div class='service_title'><b>East Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/east_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/east_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/east_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- east_road_out -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/east_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="east_road_out">
+                        <div class='service_title'><b>East Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/east_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/east_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/east_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <div class='zone_block'>
+            <!-- huntingdon_road_in -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/huntingdon_road_in" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="huntingdon_road_in">
+                        <div class='service_title'><b>Huntingdon Road In</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/huntingdon_road_in" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/huntingdon_road_in/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/huntingdon_road_in" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+            <!-- huntingdon_road_out -->
+            <div class='service_block'>
+                <div class='service_header'>
+                    <a href="/backdoor/dataserver/plot/zone/huntingdon_road_out" target="_blank">
+                        <img src="images/computer.png" alt="computer icon" title="huntingdon_road_out">
+                        <div class='service_title'><b>Huntingdon Road Out</b></div>
+                    </a>
+                </div>
+                <div class='service_item_container'>
+                    <div class='service_item_left'><a href="/backdoor/dataserver/map/zone/huntingdon_road_out" target="_blank">Map</a></div>
+                    <div class='service_item_center'><a class="external-link" href="/backdoor/rita/zone/huntingdon_road_out/plot" target="_blank" title="plot">Realtime</a></div>
+                    <div class='service_item_right'><a class="external-link" href="/backdoor/dataserver/plot/zone/huntingdon_road_out" target="_blank" title="plot">Journey Times</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+</body>
+</html>

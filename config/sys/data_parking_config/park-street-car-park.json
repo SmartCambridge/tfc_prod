@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_local",
+    "parking_id": "park-street-car-park",
+    "parking_name": "Park Street",
+    "parking_type": "car_park",
+    "latitude": 52.2092,
+    "longitude": 0.1192,
+    "capacity": 375
+}
+
