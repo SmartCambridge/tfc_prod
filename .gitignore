@@ -24,6 +24,9 @@ test-tmp
 *[#]*[#]
 *[#]*
 .vertx
+
 tfc_monitor/send_to_*
 tfc_monitor/monitor.d/send_to_*
+
+monit/monitrc
 
