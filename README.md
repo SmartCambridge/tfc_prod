@@ -349,3 +349,68 @@ git clone https://github.com/ijl20/tfc_web.git
 ```
 ### See tfc_web/README.md
 
+### Configure https access
+
+Get the certificate bundle.crt and private.key files (e.g. ```tfc-app1_bundle.crt, tfc_app1_cl_cam_ac_uk.key```)
+
+Create the nginx directory to hold the certificates and copy the certificate files
+```
+sudo mkdir /etc/nginx/ssl
+sudo cp tfc-app1_bundle.crt /etc/nginx/ssl
+sudo cp tfc_app1_cl_cam_ac_uk.key /etc/nginx/ssl
+sudo chmod 600 /etc/nginx/ssl/*
+sudo chmod 700 /etc/nginx/ssl
+```
+Copy the tfc_prod_ssl.conf nginx config file to /etc/nginx/sites-available, and link
+```
+sudo cp tfc_prod/nginx/sites-available/tfc_prod_ssl.conf /etc/nginx/sites-available/
+cd /etc/nginx/sites-enabled/
+sudo ln -s ../sites-available/tfc_prod_ssl.conf tfc_prod_ssl.conf
+```
+Restart nginx
+```
+sudo service nginx restart
+```
+Test by browsing to a locally served nginx test page:
+```
+https://tfc-app3.cl.cam.ac.uk/test_proxy
+```
+
+### Configure email (for Monit alerts)
+
+Get the ```ssmtp.conf``` file.
+
+Install/configure ssmtp:
+```
+sudo apt install ssmtp
+sudo cp ssmtp.conf /etc/ssmtp
+```
+Test by sending an email:
+```
+ssmtp foo@cam.ac.uk
+To: foo@cam.ac.uk
+From: bah@cam.ac.uk
+Subject: test email from ssmtp
+
+hello world?
+
+```
+Note blank lines above, and finish email with CTRL-D.
+
+### Install/configure Monit
+Get the ```monitrc``` file
+Note the monitrc file contains
+1 The email address alerts will be sent to (and from)
+2 The username/password for the web access
+
+```
+sudo apt install monit
+sudo cp monitrc /etc/monit
+sudo service monit restart
+```
+Note that monitrc contains the email address Alerts should be sent to, so check that.
+An alert should be set as soon as Monit is restarted (testfile does not exist) so check your inbox.
+Final test by visiting the local monit web page (note the username/password from monitrc):
+```
+https://tfc-appZ.cl.cam.ac.uk/system/monitor/
+```

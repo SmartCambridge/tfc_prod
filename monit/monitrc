@@ -158,7 +158,7 @@
   set httpd port 2812
       use address localhost
       allow localhost
-      allow admin:temptest
+      allow admin:tfcmonit
       
 ###############################################################################
 ## Services
