@@ -1,0 +1,9 @@
+{
+    "StationID" : "1135",
+    "FeedID" :   "cam_aq",
+    "Name" : "Northwest Cambridge - Huntingdon Road",
+    "Latitude":     52.221,
+    "Longitude":  0.0913,
+    "Description": "Research trial multi-sensor station, on Huntingdon Road Northwest Cambridge near new University primary school.",
+    "Sensortypes" : [ "CO" ]
+}
