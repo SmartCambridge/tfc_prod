@@ -1,9 +1,0 @@
-{
-    "StationID" : "1134",
-    "FeedID" :   "cam_aq",
-    "Name" : "Northwest Cambridge - M11",
-    "Latitude":     52.22,
-    "Longitude":  0.0821,
-    "Description": "Research trial multi-sensor station, Northwest Cambridge near M11 motorway.",
-    "Sensortypes" : [ "CO" ]
-}

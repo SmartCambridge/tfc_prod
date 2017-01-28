@@ -1,0 +1,21 @@
+{
+    "Latitude": 52.176,
+    "Name": "Clincal School",
+    "Longitude": 0.1419,
+    "FeedID": "cam_aq",
+    "StationID": "S-1148",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ]
+}

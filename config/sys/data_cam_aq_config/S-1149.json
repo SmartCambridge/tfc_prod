@@ -1,0 +1,21 @@
+{
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "FeedID": "cam_aq",
+    "Latitude": 52.176,
+    "Name": "Adden Bus Stn",
+    "Longitude": 0.145,
+    "StationID": "S-1149"
+}

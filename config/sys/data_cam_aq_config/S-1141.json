@@ -1,0 +1,21 @@
+{
+    "Latitude": 52.179,
+    "FeedID": "cam_aq",
+    "Name": "Hills-Long",
+    "Longitude": 0.1425,
+    "StationID": "S-1141",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "Latitude": 52.199,
+    "FeedID": "cam_aq",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "StationID": "S-1150",
+    "Name": "Gonville Place",
+    "Longitude": 0.1276
+}

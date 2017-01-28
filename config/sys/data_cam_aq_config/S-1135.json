@@ -1,0 +1,22 @@
+{
+    "Latitude": 52.221,
+    "FeedID": "cam_aq",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "Name": "NWC-Huntingdon Rd",
+    "StationID": "S-1135",
+    "Longitude": 0.0913,
+    "Description": "North West Cambridge near new school"
+}

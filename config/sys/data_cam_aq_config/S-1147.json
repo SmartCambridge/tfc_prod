@@ -1,0 +1,21 @@
+{
+    "Longitude": 0.1484,
+    "FeedID": "cam_aq",
+    "StationID": "S-1147",
+    "Name": "Hills-RedCross",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "Latitude": 52.174
+}

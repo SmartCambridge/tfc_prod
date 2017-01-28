@@ -1,0 +1,21 @@
+{
+    "FeedID": "cam_aq",
+    "Longitude": 0.1336,
+    "Name": "Hills-Brooklands",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "StationID": "S-1136",
+    "Latitude": 52.192
+}

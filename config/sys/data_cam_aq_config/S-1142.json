@@ -1,0 +1,21 @@
+{
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "Longitude": 0.1316,
+    "FeedID": "cam_aq",
+    "Name": "Flying Pig",
+    "Latitude": 52.194,
+    "StationID": "S-1142"
+}
