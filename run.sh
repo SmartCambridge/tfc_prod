@@ -32,22 +32,25 @@
 
 # start vix modules
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedhandler.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/feedhandler.vix.err &
+# If an argument has been given, use tfc<argument>.jar, e.g. ./run.sh _2017-03-31, and this will use tfc_2017-03-31.jar
+# Otherwise run.sh will simply use tfc.jar
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster >/dev/null 2>>/var/log/tfc_prod/console.AOB.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedhandler.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/feedhandler.vix.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.dataserver.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/dataserver.vix.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster >/dev/null 2>>/var/log/tfc_prod/console.AOB.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.park_local_rss" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.park_local_rss.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.dataserver.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/dataserver.vix.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.zone_cambridge" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.zone_cambridge.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.park_local_rss" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.park_local_rss.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.feed_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.feed_json.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.zone_cambridge" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.zone_cambridge.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.cam.to_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.cam.to_json.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.feed_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.feed_json.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rita.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/rita.vix.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.cam.to_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.cam.to_json.err &
 
-nohup java -cp tfc_2016-11-12.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.staticserver.A" -cluster >/dev/null 2>>/var/log/tfc_prod/staticserver.A.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rita.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/rita.vix.err &
+
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.staticserver.A" -cluster >/dev/null 2>>/var/log/tfc_prod/staticserver.A.err &
 
 

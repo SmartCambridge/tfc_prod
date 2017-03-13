@@ -39,6 +39,11 @@ ln -s /mnt/sdb1/tfc/cam_park_local /media/tfc/cam_park_local
 mkdir /mnt/sdb1/tfc/cam_park_rss
 ln -s /mnt/sdb1/tfc/cam_park_rss /media/tfc/cam_park_rss
 
+# set up 'tfc/cam_aq' directory
+
+mkdir /mnt/sdb1/tfc/cam_aq
+ln -s /mnt/sdb1/tfc/cam_aq /media/tfc/cam_aq
+
 # copy data into tfc/sys
 
 cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys

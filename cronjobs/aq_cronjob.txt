@@ -1,0 +1,1 @@
+05,35 * * * * /home/tfc_prod/tfc_prod/tools/get_aq.sh >>/var/log/tfc_prod/get_aq.log
