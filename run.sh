@@ -49,8 +49,12 @@ nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_serve
 
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.cam.to_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.cam.to_json.err &
 
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rita.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/rita.vix.err &
+# 2017-03-13 rita.vix replaced with zonemanager.cambridge.vix
+#nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rita.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/rita.vix.err &
 
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.staticserver.A" -cluster >/dev/null 2>>/var/log/tfc_prod/staticserver.A.err &
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.cambridge.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.cambridge.vix.err &
+
+# 2017-03-13 staticserver replaced with tfc_web
+#nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.staticserver.A" -cluster >/dev/null 2>>/var/log/tfc_prod/staticserver.A.err &
 
 
