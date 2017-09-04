@@ -220,20 +220,39 @@ PENDING
 sudo adduser tfc_prod
 ```
 
+### Install git
+```
+sudo apt install git
+```
+
 ### Get latest tfc_prod build
 
-This location is temporary, and requires ijl20 password...
 ```
 su tfc_prod
 cd ~
 
+git clone https://github.com/ijl20/tfc_prod.git
+```
+
+Alternatively, copy directly from tfc-app2.cl.cam.ac.uk:
+
+This requires access to the tfc_prod account on that server.
+```
 rsync -chavzP --stats tfc_prod@tfc-app2.cl.cam.ac.uk:tfc_prod /home/tfc_prod
 ```
 Check with
 ```
 ll tfc_prod
 ```
-and you should see the latest jar files etc.
+
+### Add the tfc_server JAR file to the tfc_prod directory
+
+Ideally, install the tfc_server source [https://github.com/ijl20/tfc_server](https://github.com/ijl20/tfc_server)
+
+Run ```mvn clean package``` in the tfc_server directory to create the fat jar.
+
+Copy the fat jar file (such as ~/tfc_server/target/tfc_server-1.0-SNAPSHOT-fat.jar) to (say) ~/tfc_prod/tfc_2017-09-27.jar.
+
 
 ### Create data directory links
 
@@ -332,17 +351,16 @@ wget -O- "http://<hostname>/local_rule"
 Also browse to ```http://localhost```
 
 ### Test run Rita Console
+
 ```
 java -cp tfc.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster -cluster-port 10081 >/dev/null 2>>/var/log/tfc_prod/tfc_console.A.err &
 ```
+
 Test by browsing to ```http://localhost:8081/console``` and ```http://localhost/backdoor/console```.
+(Note for localhost you may use the remote server name if necessary).
 
 ## Install tfc_web
 
-### Install git
-```
-sudo apt install git
-```
 ### Download tfc_web
 ```
 git clone https://github.com/ijl20/tfc_web.git
@@ -378,7 +396,7 @@ https://tfc-app3.cl.cam.ac.uk/test_proxy
 
 ### Configure email (for Monit alerts)
 
-Get the ```ssmtp.conf``` file.
+Get the ```ssmtp.conf``` file (from tfc_prod@tfc-app2.cl.cam.ac.uk:~/tfc_prod/ssmtp/ssmtp.conf)
 
 Install/configure ssmtp:
 ```
@@ -398,10 +416,10 @@ hello world?
 Note blank lines above, and finish email with CTRL-D.
 
 ### Install/configure Monit
-Get the ```monitrc``` file
+Get the ```monitrc``` file  (from tfc_prod@tfc-app2.cl.cam.ac.uk:~/tfc_prod/monit/monitrc)
 Note the monitrc file contains
-1 The email address alerts will be sent to (and from)
-2 The username/password for the web access
+1. The email address alerts will be sent to (and from)
+2. The username/password for the web access
 
 ```
 sudo apt install monit
