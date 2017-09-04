@@ -1,0 +1,7 @@
+dev_eui 763953fab342fbd8
+dev_addr 17850013
+NetSKey ddc2512407aeccd0d10d8b6592b0e194
+AppSKey d7e769dbad847cfce331159a188f6636
+
+(Cambridge Sensor Network app_eui 601f7ef69e8612a2
+
