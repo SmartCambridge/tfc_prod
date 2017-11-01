@@ -1,50 +1,28 @@
 #!/bin/bash
 
-# run.sh - run a working set of Rita modules in 'production' mode
+# run.sh - run a working set of Adaptive City Platform modules in 'production' mode
 #
-# These modules configured to use
-#
-# feedhandler.vix:
-#   /media/tfc/vix/data_bin
-#   /media/tfc/vix/data_cache
-#   /media/tfc/vix/data_monitor
-#
-# msgfiler.vix.zone_cambridge:
-#   /media/tfc/vix/data_bin_json
-#   /media/tfc/vix/data_monitor_json
-#   /media/tfc/vix/data_zone
-#
-# dataserver.vix READS:
-#   /media/tfc/vix/data_*
-#   /media/tfc/vix/data_zone_config (for zone app config files)
-#
-# feedmaker.cam:
-#   /media/tfc/cam/cam_park_local/data_bin
-#   /media/tfc/cam/cam_park_local/data_monitor
-#   /media/tfc/cam/cam_park_rss/data_bin
-#   /media/tfc/cam/cam_park_rss/data_monitor
-#
-# msgfiler.cam_to_json (for feed_id = cam_park_local & cam_park_rss):
-#   /media/tfc/cam/{{feed_id}}/data_bin_json/{{filepath}}
-#   /media/tfc/cam/{{feed_id}}/data_monitor_json
-#   /media/tfc/cam/{{feed_id}}/data_park/{{ts|yyyy}}/{{ts|MM}}/{{ts|dd}}
-#
+# tfc_prod/tools/ps.sh gives:
+# tfc_prod  59221   tfc_2017-09-12.jar                        service:uk.ac.cam.tfc_server.console.A
+# tfc_prod  3049    tfc_2017-10-19.jar                        service:uk.ac.cam.tfc_server.dataserver.vix
+# tfc_prod  142583  tfc_2017-09-13.jar                        service:uk.ac.cam.tfc_server.everynet_feed.A
+# tfc_prod  67289   tfc_2017-09-12.jar                        service:uk.ac.cam.tfc_server.feedhandler.vix
+# tfc_prod  62992   tfc_2017-10-11.jar                        service:uk.ac.cam.tfc_server.feedmaker.A
+# tfc_prod  175782  tfc_2017-10-04.jar                        service:uk.ac.cam.tfc_server.feedmaker.park_local_rss
+# tfc_prod  114335  tfc_2017-10-31.jar                        service:uk.ac.cam.tfc_server.feedmaker.vix2
+# tfc_prod  139322  tfc_2017-09-13.jar                        service:uk.ac.cam.tfc_server.httpmsg.A
+# tfc_prod  176468  tfc_2017-10-04.jar                        service:uk.ac.cam.tfc_server.msgfiler.cam.to_json
+# tfc_prod  107869  tfc_2017-10-31.jar                        service:uk.ac.cam.tfc_server.msgfiler.cloudamber.sirivm
+# tfc_prod  114504  tfc_2017-10-31.jar                        service:uk.ac.cam.tfc_server.msgfiler.vix2
+# tfc_prod  66457   tfc_2017-09-12.jar                        service:uk.ac.cam.tfc_server.msgfiler.vix.feed_json
+# tfc_prod  66238   tfc_2017-09-12.jar                        service:uk.ac.cam.tfc_server.msgfiler.vix.zone_cambridge
+# tfc_prod  88504   postgresql-42.1.3.jar:tfc_2017-09-21.jar  service:uk.ac.cam.tfc_server.msgrouter.A
+# tfc_prod  72216   tfc_2017-10-11c.jar                       service:uk.ac.cam.tfc_server.msgrouter.cloudamber.sirivm
+# tfc_prod  67050   tfc_2017-09-12.jar                        service:uk.ac.cam.tfc_server.zonemanager.cambridge.vix
+# tfc_prod  68260   tfc_2017-10-20.jar                        service:uk.ac.cam.tfc_server.zonemanager.cloudamber.sirivm
+# tfc_prod  114894  tfc_2017-10-31.jar                        service:uk.ac.cam.tfc_server.zonemanager.vix2
 
-# Sample 'ps aux | grep vertx' output (from tfc-app2):
-#
-#tfc_prod  59221  0.3  2.7 14192096 891560 pts/9 Sl   Sep12  40:15 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.console.A -cluster
-#tfc_prod  65814  0.2  0.9 14174680 308288 pts/9 Sl   Sep12  29:51 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.dataserver.vix -cluster
-#tfc_prod  65975  0.2  1.4 14191060 488692 pts/9 Sl   Sep12  30:41 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.feedmaker.park_local_rss -cluster
-#tfc_prod  66238  0.2  0.9 14203412 296388 pts/9 Sl   Sep12  30:05 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.msgfiler.vix.zone_cambridge -cluster
-#tfc_prod  66457  0.2  0.8 14188140 272940 pts/9 Sl   Sep12  36:32 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.msgfiler.vix.feed_json -cluster
-#tfc_prod  66675  0.2  0.9 14202384 324468 pts/9 Sl   Sep12  29:22 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.msgfiler.cam.to_json -cluster
-#tfc_prod  67050  0.6  2.2 14217148 747416 pts/9 Sl   Sep12  77:30 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.zonemanager.cambridge.vix -cluster
-#tfc_prod  67289  0.2  0.8 14176736 275768 pts/9 Sl   Sep12  32:06 java -cp tfc_2017-09-12.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.feedhandler.vix -cluster
-#ijl20     78007  0.0  0.0  14232  1024 pts/10   S+   09:16   0:00 grep --color=auto vertx
-#ijl20    129822  0.0  0.8 12770108 272116 ?     Sl   Apr18 203:32 java -cp target/tfc_server-1.0-SNAPSHOT-fat.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.feedmaker.test.cloudamber_siri_vm
-#tfc_prod 138572  0.2  2.3 14213188 756000 pts/9 Sl   Sep13  27:05 java -cp postgresql-42.1.3.jar:tfc_2017-09-13.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.msgrouter.A -cluster
-#tfc_prod 139322  0.2  1.5 14167672 518136 pts/9 Sl   Sep13  26:27 java -cp tfc_2017-09-13.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.httpmsg.A -cluster
-#tfc_prod 142583  0.2  1.9 14167488 649336 pts/9 Sl   Sep13  24:54 java -cp tfc_2017-09-13.jar io.vertx.core.Launcher run service:uk.ac.cam.tfc_server.everynet_feed.A -cluster
+# NOTE sirivm 'downstream' sites will run "feedmaker.eventbus" rather than "feedmaker.cloudamber.sirivm"
 
 # start vix modules
 
@@ -126,4 +104,10 @@ nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_serve
 if [ "$HOSTNAME" = tfc-app2 ]; then
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.cloudamber.sirivm.err & disown
 fi
+
+# FEEDMAKER.EVENTBUS for forwarded SiriVM eventbus messages
+if [ "$HOSTNAME" = tfc-app3 ] || [ "$HOSTNAME" = tfc-app4 ]; then
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.eventbus" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.eventbus.err & disown
+fi
+
 
