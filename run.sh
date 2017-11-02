@@ -92,7 +92,7 @@ nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_serve
 # #############################################################################################
 
 # SIRIVM FEEDMAKER FOR CLOUDAMBER SIRIVM DATA
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.cloudamber.sirivm.err & disown
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.A" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.A.err & disown
 
 # SIRIVM ZONEMANAGER FOR CLOUDAMBER SIRIVM DATA
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.cloudamber.sirivm.err & disown
