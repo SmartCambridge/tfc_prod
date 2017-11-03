@@ -29,6 +29,12 @@
 # If an argument has been given, use tfc<argument>.jar, e.g. ./run.sh _2017-03-31, and this will use tfc_2017-03-31.jar
 # Otherwise run.sh will simply use tfc.jar
 
+# Find the directory this script is being run from, because that will contain the JAR files
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+cd $SCRIPT_DIR
+
 # CONSOLE
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster >/dev/null 2>>/var/log/tfc_prod/console.A.err & disown
 
@@ -105,7 +111,7 @@ if [ "$HOSTNAME" = tfc-app2 ]; then
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.cloudamber.sirivm.err & disown
 fi
 
-# FEEDMAKER.EVENTBUS for forwarded SiriVM eventbus messages
+# FEEDMAKER.EVENTBUS for forwarded SiriVM eventbus messages (tfc-app3 and tfc-app4 only)
 if [ "$HOSTNAME" = tfc-app3 ] || [ "$HOSTNAME" = tfc-app4 ]; then
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.eventbus" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.eventbus.err & disown
 fi
