@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+
+<head>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+    <title>RTMonitor v0.05</title>
+<!--
+RELEASE INFO:
+    2017-11-11 initial version to connect websocket to vertx rtmonitor
+-->	
+<style type="text/css">
+html {
+    height: 100%;
+}
+
+body {
+    font-family: sans-serif;
+    height: 100%;
+}
+
+.header_img {
+    vertical-align: middle;
+}
+</style>
+
+<!-- WebSockets library to connect to RTMonitor -->
+<script src="sockjs.min.js"></script>
+
+<script>
+
+var console_div;
+
+function init()
+{
+    console_div = document.getElementById('console_div');
+}
+
+function subscribe(method)
+{
+    var sock;
+    if (method=="port")
+    {
+        sock = new SockJS('http://localhost:8099/test/rtmonitor/sirivm');
+    }
+    else
+    {
+        sock = new SockJS('http://localhost/test/test/rtmonitor/sirivm');
+    }
+
+    sock.onopen = function() {
+                console.log('open');
+                sock.send('{"test": "test"}');
+                };
+
+    sock.onmessage = function(e) {
+                console.log('message', e.data);
+                    sock.close();
+                };
+
+    sock.onclose = function() {
+                    console.log('close');
+                };
+}
+</script>
+ 
+</head>
+
+<body onload='init()'>
+  <h1>RTMonitor <span id='heading'></span></h1>
+
+<button onclick="subscribe('port')">Subscribe on port 8099</button>
+<button onclick="subscribe('nginx')">Subscribe localhost/test</button>  
+  
+<div id="console_div">Initializing...</div>
+  
+</body>
+</html>
