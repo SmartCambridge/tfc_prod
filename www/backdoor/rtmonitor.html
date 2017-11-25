@@ -4,9 +4,11 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTMonitor v0.05</title>
+    <title>RTMonitor v0.11</title>
 <!--
 RELEASE INFO:
+    2017-11-25 supports connect, close, subscribe, request with filters '=' and 'inside'
+    2017-11-14 page working for connect, subscribe, close
     2017-11-11 initial version to connect websocket to vertx rtmonitor
 -->	
 <style type="text/css">
@@ -19,60 +21,606 @@ body {
     height: 100%;
 }
 
-.header_img {
-    vertical-align: middle;
+textarea {
+    font-size: x-small;
+    width: 80%;
 }
+
+#map {
+	display: inline-block;
+	width: 68%;
+    height: 80%;
+} 
+
+#console_div {
+    margin-top: 10px;
+}
+
+.top-aligned {
+    vertical-align: top;
+}
+
+.control_box {
+    padding: 6px;
+}
+
+.control_div {
+    display: inline-block;
+    width: 30%;
+}
+
+.bus-popup {
+    font-size: small;
+}
+
+.log_record {
+}
+
+.log_msg {
+    display: inline-block;
+    margin-left: 1em;
+}
+
+.log_ts {
+    display: inline-block;
+}
+
+.log_record_odd {
+    background-color: lightblue;
+}
+
+.log_record_even {
+    background-color: lightgray;
+}
+
+.log_error {
+    color: red;
+}
+
 </style>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"></script>
+<link rel="stylesheet" href="/static_web/map.css" />
+<script type="text/javascript" src="/static_web/js/MovingMarker.js"></script>
 
 <!-- WebSockets library to connect to RTMonitor -->
 <script src="sockjs.min.js"></script>
 
 <script>
 
-var console_div;
+var LOG_TRUNCATE = 10; // we'll limit the log to this many characters
 
-function init()
+var log_record_odd = true; // binary toggle for alternate log background colors
+
+var log_append = false;
+
+function log(msg)
 {
-    console_div = document.getElementById('console_div');
+    // create HH:MM:SS timestamp for this log record
+    var ts = get_hh_mm_ss(new Date());
+
+    // create outermost log record element
+    var new_log_record = document.createElement('div');
+
+    // create timestamp element
+    var ts_element = document.createElement('div');
+    ts_element.classList.add('log_ts');
+    ts_element.innerHTML = ts;
+    new_log_record.appendChild(ts_element);
+
+    // create msg element
+    var msg_element = document.createElement('div');
+    msg_element.classList.add('log_msg');
+    msg_element.innerHTML = msg;
+    new_log_record.appendChild(msg_element);
+
+    new_log_record.classList.add('log_record');
+    // set the log background color and toggle odd/even flag
+    new_log_record.classList.add(log_record_odd ? 'log_record_odd' : 'log_record_even');
+    log_record_odd = !log_record_odd;
+
+    // if log is full then drop the oldest msg
+    if (console_div.childElementCount == LOG_TRUNCATE)
+    {
+        console.log('log hit limit '+LOG_TRUNCATE);
+        if (log_append)
+        {
+            console.log('log removing firstChild');
+            console_div.removeChild(console_div.firstChild);
+        }
+        else
+        {
+            console.log('log removing lastChild '+console_div.lastChild.tagName);
+            console_div.removeChild(console_div.lastChild);
+        }
+        console.log('log record count after removeChild: '+console_div.childElementCount)
+    }
+    if (log_append)
+    {
+        console_div.appendChild(new_log_record);
+    }
+    else
+    {
+        console_div.insertBefore(new_log_record, console_div.firstChild);
+    }
+    console.log('log record count: '+console_div.childElementCount)
 }
 
-function subscribe(method)
+// reverse the order of the messages in the log
+function log_reverse()
 {
-    var sock;
+    for (var i=0;i<console_div.childNodes.length;i++) 
+      console_div.insertBefore(console_div.childNodes[i], console_div.firstChild);
+}
+
+// ***************************************************************************************************
+// *******************  WebSocket code    ************************************************************
+// ***************************************************************************************************
+
+var sock; // the page's WebSocket
+
+function sock_connect(method)
+{
+    // for testing (e.g. on laptop) we can us local port directly
     if (method=="port")
     {
         sock = new SockJS('http://localhost:8099/test/rtmonitor/sirivm');
     }
     else
     {
-        sock = new SockJS('http://localhost/test/test/rtmonitor/sirivm');
+        sock = new SockJS('http://tfc-app2.cl.cam.ac.uk/test/rtmonitor/sirivm');
     }
 
     sock.onopen = function() {
-                console.log('open');
-                sock.send('{"test": "test"}');
+                log('socket open');
+                sock.send('{ "msg_type": "rt_connect" }');
                 };
 
     sock.onmessage = function(e) {
-                console.log('message', e.data);
-                    sock.close();
+                var json_msg = JSON.parse(e.data);
+                if (json_msg.msg_type != null && json_msg.msg_type == "rt_nok")
+                {
+                    log('<span class="log_error">'+e.data+'</span>');
+                    return;
+                }
+                log('Received: '+ e.data)
+                handle_records(e.data);
                 };
 
     sock.onclose = function() {
-                    console.log('close');
+                    log('socket closed');
                 };
 }
+
+function sock_close()
+{
+    log('closing socket...');
+    sock.close();
+}
+
+function sock_send(input_name)
+{
+    var msg = document.getElementById(input_name).value;
+   
+    sock_send_str(msg);
+}
+
+function sock_send_str(msg)
+{
+    if (sock == null)
+    {
+	log('<span style="color: red;">Socket not yet connected</span>');
+	return;
+    }
+    if (sock.readyState == sock.CONNECTING)
+    {
+	log('<span style="color: red;">Socket connecting...</span>');
+	return;
+    }
+    if (sock.readyState == sock.CLOSING)
+    {
+	log('<span style="color: red;">Socket closing...</span>');
+	return;
+    }
+    if (sock.readyState == sock.CLOSED)
+    {
+	log('<span style="color: red;">Socket closed</span>');
+	return;
+    }
+    log('sending (readyState '+sock.readyState+'): '+"'"+msg+"'");
+    sock.send(msg);
+}
+
+// ***************************************************************************************************
+// *******************  Page and map code ************************************************************
+// ***************************************************************************************************
+var console_div;
+
+// display options
+
+var breadcrumbs = false;
+
+// Constants
+
+var MAP_CENTER = [52.205, 0.119];
+var MAP_SCALE = 13;
+
+// Globals
+
+var map;
+var vehicle_journey = "ea-20-7-A-y08-1-11-T0";
+var info_map;
+var urlparams = new URLSearchParams(window.location.search);
+var debug = urlparams.has('debug');
+var mapbounds;
+
+var buses = [];
+
+var crumbs = []; // array to hold breadcrumbs as they are drawn
+
+var busIcon = L.icon({
+    iconUrl: '/static_web/images/bus-logo.png',
+    iconSize: [30, 30]
+});
+
+var oldBusIcon = L.icon({
+    iconUrl: '/static_web/images/bus-logo.png',
+    iconSize: [15, 15]
+});
+
+// User 'draw polygon' global vars
+var poly_draw = false; // true when user is drawing polygon
+var poly_markers = [];
+var poly_line; // open line around polygon
+var poly_close; // line between poly last point and start, closing polygon
+
+// *********************************************************************************
+// *********************************************************************************
+// ********************  INIT RUN ON PAGE LOAD  ************************************
+// *********************************************************************************
+// *********************************************************************************
+function init()
+{
+    // initialize log 'console'
+    console_div = document.getElementById('console_div');
+
+    // initialize map
+
+    var map_options = { preferCanvas: true };
+
+    map = L.map('map', map_options)
+            .setView(MAP_CENTER, MAP_SCALE);
+
+    map.on('click',map_click);
+
+    info_map = L.control();
+
+    info_map.onAdd = function (map) {
+        // create a div with a class "info"
+        this._div = L.DomUtil.create('div', 'leaflet-control-attribution leaflet-control');
+        this.update();
+        return this._div;
+    };
+
+    // method that we will use to update the control based on feature properties passed
+    info_map.update = function (info_text) {
+        this._div.innerHTML = info_text;
+    };
+
+    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+    info_map.addTo(map);
+
+    mapbounds = map.getBounds();
+
+    // initialize clock
+
+    update_clock();
+    setInterval(update_clock, 1000);
+
+    // initialize UI checkboxes
+
+    document.getElementById('log_append').checked = false;
+    document.getElementById('breadcrumbs').checked = false;
+} // end init()            
+
+// *********************************************************************************
+// ************* Bus update code ***************************************************
+// *********************************************************************************
+function bus_content(bus)
+{
+    var time = new Date();
+    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
+                   ("0" + time.getMinutes()).slice(-2) + ":" + 
+                   ("0" + time.getSeconds()).slice(-2);
+    return time_str +
+                        '<br/>' + bus['VehicleRef'] + 
+			'<br/>Line "' + bus['PublishedLineName'] +'"'+
+                        '<br/>Delay: ' + bus['Delay'];
+}
+
+function handle_records(websock_data) {
+    var json = JSON.parse(websock_data);
+    info_map.update(new Date(json['ts']*1000));
+    var content = '';
+    console.log('handle_records'+json['request_data'].length);
+    for (var i = 0; i < json['request_data'].length; i++) {
+	    var bus = json['request_data'][i];
+        var bus_position = [bus["Latitude"], bus["Longitude"]];
+        if (breadcrumbs)
+        {
+            var crumb = L.circleMarker(bus_position, { color: 'blue', radius: 1 }).addTo(map);
+            crumbs.push(crumb);
+        }
+        var existing_bus_index = buses.findIndex(b => b['VehicleRef'] === bus['VehicleRef']);
+	    if (existing_bus_index > -1) 
+	    {
+	        content = bus_content(bus);
+		// existing bus
+		if (bus['RecordedAtTime'] !== buses[existing_bus_index]['RecordedAtTime']) {
+		    bus['marker'] = buses[existing_bus_index]['marker'];
+		    bus['marker'].moveTo(bus_position, [1000] ); 
+		    bus['marker'].resume();
+		    buses.splice(existing_bus_index, 1); // remove old entry
+		    bus['marker'].setTooltipContent(content);
+		    bus['marker'].setPopupContent(content);
+		    buses.push(bus); // update entry for this bus
+		}
+	    }
+	    else 
+	    {
+		// new bus, create marker
+        log('{New '+bus['VehicleRef']+'} ');
+		bus['marker'] = L.Marker.movingMarker([[bus["Latitude"], bus["Longitude"]], 
+                                               [bus["Latitude"], bus["Longitude"]]],
+                                              [1000],
+                                              {icon: busIcon});
+	    content = bus_content(bus);
+		bus['marker']
+			.addTo(map)
+            .bindPopup(content, { className: "bus-popup"})
+			.bindTooltip(content, {
+							    // permanent: true,
+						            className: "bus-tooltip",
+							    interactive: true
+						      })
+			.on('click', function()
+					{
+			  		  console.log("marker click handler");
+			  		})
+			.start();
+		buses.push(bus); // update entry for this bus
+	    }
+    }
+} // end function handle_records
+
+// update realtime clock on page
+
+function update_clock()
+{
+    document.getElementById('clock').innerHTML = get_hh_mm_ss(new Date());
+}
+
+// return provided JS Date() as HH:MM:SS
+function get_hh_mm_ss(datetime)
+{
+    var hh = ('0'+datetime.getHours()).slice(-2);
+    var mm = ('0'+datetime.getMinutes()).slice(-2);
+    var ss = ('0'+datetime.getSeconds()).slice(-2);
+    return hh+':'+mm+':'+ss;
+}
+
+// ****************************************************************************************
+// *************** User interaction functions *********************************************
+// ****************************************************************************************
+// toggle the 'breadcrumbs' function that draws a dot every time a bus position is received
+function click_breadcrumbs()
+{
+    breadcrumbs = document.getElementById("breadcrumbs").checked == true;
+}
+
+function click_log_append()
+{
+    var prev_log_append = log_append;
+    log_append = document.getElementById("log_append").checked == true;
+    if (prev_log_append != log_append)
+    {
+        log_reverse();
+    }
+}
+
+// remove all markers from map and reset 'buses' array
+function clear_markers()
+{
+    console.log('clear_markers');
+    for (var i=0; i<buses.length; i++)
+    {
+        if (buses[i]['marker'])
+        {
+            map.removeLayer(buses[i]['marker']);
+        }
+    }
+    buses = [];
+}
+
+// remove all crumbs from map
+function clear_crumbs()
+{
+    console.log('clear_crumbs');
+    for (var i=0; i<crumbs.length; i++)
+    {
+        map.removeLayer(crumbs[i]);
+    }
+    crumbs = [];
+}
+
+function marker_to_pos(marker)
+{
+    var lat_lng = marker.getLatLng();
+    return '{  "lat": '+lat_lng.lat+', "lng": '+lat_lng.lng+' }';
+}
+
+// issue a request to server for the latest message
+function request_latest_msg()
+{
+    sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_msg" ] }');
+}
+
+// issue a request to server for the latest records
+function request_latest_records()
+{
+    sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_records" ] }');
+}
+
+// issue a subscription to server for all records
+function subscribe_all()
+{
+    sock_send_str('{ "msg_type": "rt_subscribe", "request_id": "A" }');
+}
+
+function map_click(e)
+{
+    if (poly_draw)
+    {
+        var marker = new L.marker(e.latlng); 
+        if (poly_markers.length == 0)
+        {
+            marker.addTo(map);
+            poly_start = marker;
+        }
+        poly_line.addLatLng(marker.getLatLng());
+        poly_markers.push(marker);
+        var rt_string = '';
+        rt_string += '{ "msg_type": "rt_request",\n';
+        rt_string += '  "request_id": "A",\n';
+        rt_string += '  "options": [ "latest_records" ],\n';
+        if ( poly_markers.length > 2)
+        {
+            // add polygon closing line (and remove previous closing line)
+            if (poly_close != null)
+            {
+                map.removeLayer(poly_close);
+            }
+            poly_close = L.polyline([], {dashArray: '10,5', color: 'red'}).addTo(map);
+            poly_close.addLatLng(marker.getLatLng());
+            poly_close.addLatLng(poly_markers[0].getLatLng());
+
+            // update user scratchpad with filter text
+
+            rt_string += '  "filters": [\n';
+            rt_string += '     { "test": "inside",\n';
+            rt_string += '       "lat_key": "Latitude",\n';
+            rt_string += '       "lng_key": "Longitude",\n';
+            rt_string += '       "points": [\n';
+            for (var i=0; i<poly_markers.length; i++)
+            {
+                rt_string += marker_to_pos(poly_markers[i]);
+                if (i < poly_markers.length - 1)
+                    rt_string += ',\n';
+            }
+            rt_string += '                 ]\n';
+            rt_string += '             } ]\n';
+            rt_string += '}';
+        }
+        document.getElementById('rt_scratchpad').value = rt_string;
+    }
+}
+
+// Draw a polygon for the 'inside' filter test
+function draw_poly()
+{
+    var el = document.getElementById('draw_poly');
+    poly_draw = !poly_draw;
+    el.value = poly_draw ? "Clear Polygon" : "Draw Polygon";
+    if (poly_draw)
+    {
+        poly_line = L.polyline([], {color: 'red'}).addTo(map);
+    }
+    else
+    {
+        if (poly_line != null)
+        {
+            map.removeLayer(poly_line);
+        }
+
+        if (poly_close != null)
+        {
+            map.removeLayer(poly_close);
+        }
+
+        for (var i=0; i<poly_markers.length; i++)
+        {
+            map.removeLayer(poly_markers[i]);
+        }
+        poly_markers = [];
+    }
+}
+
 </script>
  
 </head>
 
 <body onload='init()'>
-  <h1>RTMonitor <span id='heading'></span></h1>
+<h1>RTMonitor <span id='clock'></span></h1>
 
-<button onclick="subscribe('port')">Subscribe on port 8099</button>
-<button onclick="subscribe('nginx')">Subscribe localhost/test</button>  
-  
-<div id="console_div">Initializing...</div>
+<div class="top-aligned control_div">
+<div class="control_box">
+    <button onclick="sock_connect('nginx')"
+        title="Connect socket to server and send rt_connect msg"
+        >Connect</button>  
+    <button onclick="sock_close()"
+        title="Close socket connection to server"
+        >Close</button><br/> 
+    <button onclick="request_latest_msg()"
+        title="Get the latest eventbus message from the server"
+        >Request msg</button>
+    <button onclick="request_latest_records()"
+        title="Get all the latest data records accumulated on the server"
+        >Request records</button>
+    <button onclick="subscribe_all()"
+        title="Get a 'push' real-time subscription to all the data records as they arrive"
+        >Subscribe All</button><br/>
+    <input type="button" id="draw_poly" onclick="draw_poly()" value="Draw Polygon"
+        title="Draw a polygon on the map to create an API 'inside' filter in scratchpad"
+        ></input>
+    <input type="button" id="clear_markers" onclick="clear_markers()" value="Clear icons"
+        title="Remove any bus icons that have been drawn on the map"
+        ></input>
+    <input type="button" id="clear_crumbs" onclick="clear_crumbs()" value="Clear breadcrumbs"
+        title="Remove any breadcrumbs that have been drawn on the map"
+        ></input>
+</div>
+<div>Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
+Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
+</div>
+
+<h4>Realtime API scratchpad:</h4>
+
+<div class="control_box">
+<button class="top-aligned" onclick="sock_send('rt_scratchpad')">Send:</button>
+<textarea rows="10" cols="60" id="rt_scratchpad">
+{ "msg_type": "rt_subscribe",
+  "request_id": "A",
+  "filters" : [
+                {"test": "=",
+		 "key": "VehicleRef",
+                 "value": "ABC"
+                }
+              ]
+}
+</textarea>
+</div>
+
+</div> <!-- end of control_div -->
+
+<!-- MAP -->
+<div class="top-aligned" id="map"></div>
+
+<!-- CONSOLE LOG -->
+<div id="console_div"></div>
   
 </body>
 </html>
