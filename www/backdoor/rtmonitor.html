@@ -4,10 +4,11 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTMonitor v0.11</title>
+    <title>RTMonitor v0.13</title>
 <!--
 RELEASE INFO:
     2017-11-25 supports connect, close, subscribe, request with filters '=' and 'inside'
+                console log using divs, draw polygon, clear icons
     2017-11-14 page working for connect, subscribe, close
     2017-11-11 initial version to connect websocket to vertx rtmonitor
 -->	
@@ -21,9 +22,10 @@ body {
     height: 100%;
 }
 
-textarea {
+#rt_scratchpad {
     font-size: x-small;
-    width: 80%;
+    width: 95%;
+    height: 60%;
 }
 
 #map {
@@ -44,9 +46,15 @@ textarea {
     padding: 6px;
 }
 
+.scratchpad_box {
+    width: 100%;
+    height: 90%;
+}
+
 .control_div {
     display: inline-block;
     width: 30%;
+    height: 80%;
 }
 
 .bus-popup {
@@ -89,7 +97,7 @@ textarea {
 
 <script>
 
-var LOG_TRUNCATE = 10; // we'll limit the log to this many characters
+var LOG_TRUNCATE = 10; // we'll limit the log to this many messages
 
 var log_record_odd = true; // binary toggle for alternate log background colors
 
@@ -123,18 +131,18 @@ function log(msg)
     // if log is full then drop the oldest msg
     if (console_div.childElementCount == LOG_TRUNCATE)
     {
-        console.log('log hit limit '+LOG_TRUNCATE);
+        //console.log('log hit limit '+LOG_TRUNCATE);
         if (log_append)
         {
-            console.log('log removing firstChild');
+            //console.log('log removing firstChild');
             console_div.removeChild(console_div.firstChild);
         }
         else
         {
-            console.log('log removing lastChild '+console_div.lastChild.tagName);
+            //console.log('log removing lastChild '+console_div.lastChild.tagName);
             console_div.removeChild(console_div.lastChild);
         }
-        console.log('log record count after removeChild: '+console_div.childElementCount)
+        //console.log('log record count after removeChild: '+console_div.childElementCount)
     }
     if (log_append)
     {
@@ -144,7 +152,7 @@ function log(msg)
     {
         console_div.insertBefore(new_log_record, console_div.firstChild);
     }
-    console.log('log record count: '+console_div.childElementCount)
+    //console.log('log record count: '+console_div.childElementCount)
 }
 
 // reverse the order of the messages in the log
@@ -173,29 +181,29 @@ function sock_connect(method)
     }
 
     sock.onopen = function() {
-                log('socket open');
-                sock.send('{ "msg_type": "rt_connect" }');
+                log('** socket open');
+                sock_send_str('{ "msg_type": "rt_connect" }');
                 };
 
     sock.onmessage = function(e) {
                 var json_msg = JSON.parse(e.data);
                 if (json_msg.msg_type != null && json_msg.msg_type == "rt_nok")
                 {
-                    log('<span class="log_error">'+e.data+'</span>');
+                    log('<span class="log_error">** '+e.data+'</span>');
                     return;
                 }
-                log('Received: '+ e.data)
+                log(e.data)
                 handle_records(e.data);
                 };
 
     sock.onclose = function() {
-                    log('socket closed');
+                    log('** socket closed');
                 };
 }
 
 function sock_close()
 {
-    log('closing socket...');
+    log('** closing socket...');
     sock.close();
 }
 
@@ -210,25 +218,30 @@ function sock_send_str(msg)
 {
     if (sock == null)
     {
-	log('<span style="color: red;">Socket not yet connected</span>');
-	return;
+	    log('<span style="color: red;">Socket not yet connected</span>');
+	    return;
     }
-    if (sock.readyState == sock.CONNECTING)
+    if (sock.readyState == SockJS.CONNECTING)
     {
-	log('<span style="color: red;">Socket connecting...</span>');
-	return;
+	    log('<span style="color: red;">Socket connecting...</span>');
+  	    return;
     }
-    if (sock.readyState == sock.CLOSING)
+    if (sock.readyState == SockJS.CLOSING)
     {
-	log('<span style="color: red;">Socket closing...</span>');
-	return;
+	    log('<span style="color: red;">Socket closing...</span>');
+	    return;
     }
-    if (sock.readyState == sock.CLOSED)
+    if (sock.readyState == SockJS.CLOSED)
     {
-	log('<span style="color: red;">Socket closed</span>');
-	return;
+	    log('<span style="color: red;">Socket closed</span>');
+	    return;
     }
-    log('sending (readyState '+sock.readyState+'): '+"'"+msg+"'");
+
+    log('sending: '+msg);
+
+    // write msg into scratchpad textarea
+    document.getElementById('rt_scratchpad').value = msg;
+
     sock.send(msg);
 }
 
@@ -246,16 +259,22 @@ var breadcrumbs = false;
 var MAP_CENTER = [52.205, 0.119];
 var MAP_SCALE = 13;
 
+var OLD_TIMER_INTERVAL = 30; // watchdog timer interval (s) checking for old data records
+var OLD_DATA_RECORD = 60; // time (s) threshold where a data record is considered 'old'
+
 // Globals
 
 var map;
 var vehicle_journey = "ea-20-7-A-y08-1-11-T0";
-var info_map;
 var urlparams = new URLSearchParams(window.location.search);
 var debug = urlparams.has('debug');
 var mapbounds;
 
-var buses = [];
+var data_records = {};
+var record_index = 'VehicleRef';  // data record property that is primary key
+var record_ts = 'RecordedAtTime'; // data record property containing timestamp
+var record_ts_format = 'ISO8601'; // data record timestamp format
+                                  // 'ISO8601' = iso-format string
 
 var crumbs = []; // array to hold breadcrumbs as they are drawn
 
@@ -266,7 +285,7 @@ var busIcon = L.icon({
 
 var oldBusIcon = L.icon({
     iconUrl: '/static_web/images/bus-logo.png',
-    iconSize: [15, 15]
+    iconSize: [20, 20]
 });
 
 // User 'draw polygon' global vars
@@ -294,25 +313,9 @@ function init()
 
     map.on('click',map_click);
 
-    info_map = L.control();
-
-    info_map.onAdd = function (map) {
-        // create a div with a class "info"
-        this._div = L.DomUtil.create('div', 'leaflet-control-attribution leaflet-control');
-        this.update();
-        return this._div;
-    };
-
-    // method that we will use to update the control based on feature properties passed
-    info_map.update = function (info_text) {
-        this._div.innerHTML = info_text;
-    };
-
     L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
-
-    info_map.addTo(map);
 
     mapbounds = map.getBounds();
 
@@ -325,12 +328,18 @@ function init()
 
     document.getElementById('log_append').checked = false;
     document.getElementById('breadcrumbs').checked = false;
+
+    // watchdog timer checking for 'old' data records
+
+    setInterval(check_old_records, OLD_TIMER_INTERVAL*1000);
+
 } // end init()            
 
 // *********************************************************************************
 // ************* Bus update code ***************************************************
 // *********************************************************************************
-function bus_content(bus)
+
+function bus_tooltip_content(bus)
 {
     var time = new Date();
     var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
@@ -342,66 +351,169 @@ function bus_content(bus)
                         '<br/>Delay: ' + bus['Delay'];
 }
 
+function bus_popup_content(bus)
+{
+    var time = new Date();
+    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
+                   ("0" + time.getMinutes()).slice(-2) + ":" + 
+                   ("0" + time.getSeconds()).slice(-2);
+    var record_key = bus[record_index];
+    return time_str +
+        '<br/>' + record_key + 
+		'<br/>Line "' + bus['PublishedLineName'] +'"'+
+        '<br/>Delay: ' + bus['Delay']+
+        '<br/><a href="#" onclick="click_more('+"'"+record_key+"'"+')">more</a>';
+}
+
+// user has clicked on 'more' in the bus popup
+function bus_more_content(record_key)
+{
+    var data_record = data_records[record_key];
+    var content = JSON.stringify(data_record.msg).replace(/,/g,', ');
+    content +=
+        '<br/><a href="#" onclick="click_less('+"'"+record_key+"'"+')">less</a>';
+    return content;
+}
+
+function update_bus(bus)
+{
+		// existing bus
+
+        var record_key = bus[record_index];
+
+		if (bus['RecordedAtTime'] !== data_records[record_key].msg['RecordedAtTime'])
+        {
+            var position = [bus['Latitude'], bus['Longitude']];
+		    bus['marker'] = data_records[record_key]['marker'];
+		    bus['marker'].moveTo(position, [1000] ); 
+		    bus['marker'].resume();
+		    bus['marker'].setTooltipContent(bus_tooltip_content(bus));
+		    bus['marker'].setPopupContent(bus_popup_content(bus));
+		    data_records[record_key].msg = bus; // update entry for this bus
+            add_breadcrumb(position);
+		}
+}
+
+function create_bus(bus)
+{
+    // new bus, create marker
+    log(' ** New '+bus['VehicleRef']);
+
+    var record_key = bus[record_index];
+
+    var data_record = {};
+
+    data_record['marker'] = L.Marker.movingMarker([[bus['Latitude'], bus['Longitude']], 
+                                                   [bus['Latitude'], bus['Longitude']]],
+                                                  [1000],
+                                                  {icon: busIcon});
+    data_record['marker']
+        .addTo(map)
+        .bindPopup(bus_popup_content(bus), { className: "bus-popup"})
+        .bindTooltip(bus_tooltip_content(bus), {
+                            // permanent: true,
+                            className: "bus-tooltip",
+                            interactive: true
+                          })
+        .on('click', function()
+                {
+                  //console.log("marker click handler");
+                })
+        .start();
+
+    data_record.msg = bus;
+    data_records[record_key] = data_record;
+}
+
+function add_breadcrumb(pos)
+{
+    if (breadcrumbs)
+    {
+        var crumb = L.circleMarker(pos, { color: 'blue', radius: 1 }).addTo(map);
+        crumbs.push(crumb);
+    }
+}
+
 function handle_records(websock_data) {
     var json = JSON.parse(websock_data);
-    info_map.update(new Date(json['ts']*1000));
-    var content = '';
-    console.log('handle_records'+json['request_data'].length);
-    for (var i = 0; i < json['request_data'].length; i++) {
+    //console.log('handle_records'+json['request_data'].length);
+    for (var i = 0; i < json['request_data'].length; i++) 
+    {
 	    var bus = json['request_data'][i];
-        var bus_position = [bus["Latitude"], bus["Longitude"]];
-        if (breadcrumbs)
-        {
-            var crumb = L.circleMarker(bus_position, { color: 'blue', radius: 1 }).addTo(map);
-            crumbs.push(crumb);
-        }
-        var existing_bus_index = buses.findIndex(b => b['VehicleRef'] === bus['VehicleRef']);
-	    if (existing_bus_index > -1) 
+
+        var record_key = bus[record_index];
+
+	    if (data_records.hasOwnProperty(record_key)) 
 	    {
-	        content = bus_content(bus);
-		// existing bus
-		if (bus['RecordedAtTime'] !== buses[existing_bus_index]['RecordedAtTime']) {
-		    bus['marker'] = buses[existing_bus_index]['marker'];
-		    bus['marker'].moveTo(bus_position, [1000] ); 
-		    bus['marker'].resume();
-		    buses.splice(existing_bus_index, 1); // remove old entry
-		    bus['marker'].setTooltipContent(content);
-		    bus['marker'].setPopupContent(content);
-		    buses.push(bus); // update entry for this bus
-		}
+            update_bus(bus);
 	    }
 	    else 
 	    {
-		// new bus, create marker
-        log('{New '+bus['VehicleRef']+'} ');
-		bus['marker'] = L.Marker.movingMarker([[bus["Latitude"], bus["Longitude"]], 
-                                               [bus["Latitude"], bus["Longitude"]]],
-                                              [1000],
-                                              {icon: busIcon});
-	    content = bus_content(bus);
-		bus['marker']
-			.addTo(map)
-            .bindPopup(content, { className: "bus-popup"})
-			.bindTooltip(content, {
-							    // permanent: true,
-						            className: "bus-tooltip",
-							    interactive: true
-						      })
-			.on('click', function()
-					{
-			  		  console.log("marker click handler");
-			  		})
-			.start();
-		buses.push(bus); // update entry for this bus
+            create_bus(bus);
 	    }
     }
 } // end function handle_records
 
 // update realtime clock on page
-
+// called via intervalTimer in init()
 function update_clock()
 {
     document.getElementById('clock').innerHTML = get_hh_mm_ss(new Date());
+}
+
+// watchdog function to flag 'old' data records
+// records are stored in 'data_records' object
+function check_old_records()
+{
+    //console.log('checking for old data records..,');
+
+    // do nothing if timestamp format not recognised
+    switch (record_ts_format)
+    {
+        case 'ISO8601':
+            break;
+
+        default:
+            return;
+    }
+
+    var now = new Date();
+
+    for (key in data_records)
+    {
+        var data_timestamp; // will hold Date from data_record
+
+        var data_record = data_records[key];
+
+        switch (record_ts_format)
+        {
+            case 'ISO8601':
+                data_timestamp = new Date(data_record.msg[record_ts]);
+                break;
+
+            default:
+                return;
+        }
+
+        var diff_seconds = (now - data_timestamp) / 1000;
+        //console.log(key+' '+data_record.msg[record_ts]+' '+diff_seconds);
+        if (diff_seconds > OLD_DATA_RECORD)
+        {
+            // skip if this data record is already flagged as old
+            if (data_record.old != null && data_record.old)
+            {
+                continue;
+            }
+            //console.log('OLD DATA FOR '+key+' ('+diff_seconds+')');
+            data_record.marker.setIcon(oldBusIcon);
+        }
+        else
+        {
+            // reset the 'old' flag on this data record
+            data_record.old = false;
+            data_record.marker.setIcon(busIcon);
+        }
+    }
 }
 
 // return provided JS Date() as HH:MM:SS
@@ -416,12 +528,14 @@ function get_hh_mm_ss(datetime)
 // ****************************************************************************************
 // *************** User interaction functions *********************************************
 // ****************************************************************************************
+
 // toggle the 'breadcrumbs' function that draws a dot every time a bus position is received
 function click_breadcrumbs()
 {
     breadcrumbs = document.getElementById("breadcrumbs").checked == true;
 }
 
+// switch the console log between newest msg on top vs newest on bottom
 function click_log_append()
 {
     var prev_log_append = log_append;
@@ -432,29 +546,34 @@ function click_log_append()
     }
 }
 
-// remove all markers from map and reset 'buses' array
+// remove all markers from map and reset 'data_records' array
 function clear_markers()
 {
-    console.log('clear_markers');
-    for (var i=0; i<buses.length; i++)
+    //console.log('clear_markers');
+    for (record_key in data_records)
     {
-        if (buses[i]['marker'])
+        if (data_records[record_key]['marker'])
         {
-            map.removeLayer(buses[i]['marker']);
+            map.removeLayer(data_records[record_key]['marker']);
         }
     }
-    buses = [];
+    data_records = {};
 }
 
 // remove all crumbs from map
 function clear_crumbs()
 {
-    console.log('clear_crumbs');
     for (var i=0; i<crumbs.length; i++)
     {
         map.removeLayer(crumbs[i]);
     }
     crumbs = [];
+}
+
+// empty textarea e.g. scratchpad
+function clear_textarea(element_id)
+{
+    document.getElementById(element_id).value='';
 }
 
 function marker_to_pos(marker)
@@ -559,6 +678,20 @@ function draw_poly()
     }
 }
 
+// user clicked on 'more' in bus popup                          
+function click_more(record_key)
+{
+    var data_record = data_records[record_key];
+    data_record.marker.setPopupContent(bus_more_content(record_key));
+}
+
+// user clicked on 'less' in bus popup
+function click_less(record_key)
+{
+    var data_record = data_records[record_key];
+    data_record.marker.setPopupContent(bus_popup_content(data_record.msg));
+}
+
 </script>
  
 </head>
@@ -599,9 +732,13 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
 
 <h4>Realtime API scratchpad:</h4>
 
-<div class="control_box">
-<button class="top-aligned" onclick="sock_send('rt_scratchpad')">Send:</button>
-<textarea rows="10" cols="60" id="rt_scratchpad">
+<div class="scratchpad_box">
+<div class="button_box">
+  <button class="verticle_button" onclick="sock_send('rt_scratchpad')">Send:</button>
+  <button class="verticle_button" onclick="clear_textarea('rt_scratchpad')">Clear</button>
+</div>
+
+<textarea rows="25" cols="70" id="rt_scratchpad">
 { "msg_type": "rt_subscribe",
   "request_id": "A",
   "filters" : [
@@ -619,7 +756,7 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
 <!-- MAP -->
 <div class="top-aligned" id="map"></div>
 
-<!-- CONSOLE LOG -->
+<!-- console log -->
 <div id="console_div"></div>
   
 </body>
