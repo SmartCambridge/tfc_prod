@@ -97,162 +97,16 @@ body {
 
 <script>
 
-var LOG_TRUNCATE = 10; // we'll limit the log to this many messages
-
-var log_record_odd = true; // binary toggle for alternate log background colors
-
-var log_append = false;
-
-function log(msg)
-{
-    // create HH:MM:SS timestamp for this log record
-    var ts = get_hh_mm_ss(new Date());
-
-    // create outermost log record element
-    var new_log_record = document.createElement('div');
-
-    // create timestamp element
-    var ts_element = document.createElement('div');
-    ts_element.classList.add('log_ts');
-    ts_element.innerHTML = ts;
-    new_log_record.appendChild(ts_element);
-
-    // create msg element
-    var msg_element = document.createElement('div');
-    msg_element.classList.add('log_msg');
-    msg_element.innerHTML = msg;
-    new_log_record.appendChild(msg_element);
-
-    new_log_record.classList.add('log_record');
-    // set the log background color and toggle odd/even flag
-    new_log_record.classList.add(log_record_odd ? 'log_record_odd' : 'log_record_even');
-    log_record_odd = !log_record_odd;
-
-    // if log is full then drop the oldest msg
-    if (console_div.childElementCount == LOG_TRUNCATE)
-    {
-        //console.log('log hit limit '+LOG_TRUNCATE);
-        if (log_append)
-        {
-            //console.log('log removing firstChild');
-            console_div.removeChild(console_div.firstChild);
-        }
-        else
-        {
-            //console.log('log removing lastChild '+console_div.lastChild.tagName);
-            console_div.removeChild(console_div.lastChild);
-        }
-        //console.log('log record count after removeChild: '+console_div.childElementCount)
-    }
-    if (log_append)
-    {
-        console_div.appendChild(new_log_record);
-    }
-    else
-    {
-        console_div.insertBefore(new_log_record, console_div.firstChild);
-    }
-    //console.log('log record count: '+console_div.childElementCount)
-}
-
-// reverse the order of the messages in the log
-function log_reverse()
-{
-    for (var i=0;i<console_div.childNodes.length;i++) 
-      console_div.insertBefore(console_div.childNodes[i], console_div.firstChild);
-}
-
-// ***************************************************************************************************
-// *******************  WebSocket code    ************************************************************
-// ***************************************************************************************************
-
-var sock; // the page's WebSocket
-
-function sock_connect(method)
-{
-    // for testing (e.g. on laptop) we can us local port directly
-    if (method=="port")
-    {
-        sock = new SockJS('http://localhost:8099/test/rtmonitor/sirivm');
-    }
-    else
-    {
-        sock = new SockJS('http://tfc-app2.cl.cam.ac.uk/test/rtmonitor/sirivm');
-    }
-
-    sock.onopen = function() {
-                log('** socket open');
-                sock_send_str('{ "msg_type": "rt_connect" }');
-                };
-
-    sock.onmessage = function(e) {
-                var json_msg = JSON.parse(e.data);
-                if (json_msg.msg_type != null && json_msg.msg_type == "rt_nok")
-                {
-                    log('<span class="log_error">** '+e.data+'</span>');
-                    return;
-                }
-                log(e.data)
-                handle_records(e.data);
-                };
-
-    sock.onclose = function() {
-                    log('** socket closed');
-                };
-}
-
-function sock_close()
-{
-    log('** closing socket...');
-    sock.close();
-}
-
-function sock_send(input_name)
-{
-    var msg = document.getElementById(input_name).value;
-   
-    sock_send_str(msg);
-}
-
-function sock_send_str(msg)
-{
-    if (sock == null)
-    {
-	    log('<span style="color: red;">Socket not yet connected</span>');
-	    return;
-    }
-    if (sock.readyState == SockJS.CONNECTING)
-    {
-	    log('<span style="color: red;">Socket connecting...</span>');
-  	    return;
-    }
-    if (sock.readyState == SockJS.CLOSING)
-    {
-	    log('<span style="color: red;">Socket closing...</span>');
-	    return;
-    }
-    if (sock.readyState == SockJS.CLOSED)
-    {
-	    log('<span style="color: red;">Socket closed</span>');
-	    return;
-    }
-
-    log('sending: '+msg);
-
-    // write msg into scratchpad textarea
-    document.getElementById('rt_scratchpad').value = msg;
-
-    sock.send(msg);
-}
-
-// ***************************************************************************************************
-// *******************  Page and map code ************************************************************
-// ***************************************************************************************************
+// ***************************************************************************
+// *******************  Page and map code ************************************
+// ***************************************************************************
 var console_div;
 
 // display options
 
-var breadcrumbs = false;
+var breadcrumbs = false; // location 'breadcrumbs' will be dropped as things move
+
+var map_only = false; // page is in "only display map" mode
 
 // Constants
 
@@ -270,6 +124,7 @@ var urlparams = new URLSearchParams(window.location.search);
 var debug = urlparams.has('debug');
 var mapbounds;
 
+// Here we define the 'data records' of the incoming websocket feed
 var data_records = {};
 var record_index = 'VehicleRef';  // data record property that is primary key
 var record_ts = 'RecordedAtTime'; // data record property containing timestamp
@@ -333,6 +188,14 @@ function init()
 
     setInterval(check_old_records, OLD_TIMER_INTERVAL*1000);
 
+    // listener to detect 'keydown' while in map_only mode
+    document.onkeydown = function(evt) {
+            evt = evt || window.event;
+            if (map_only)
+            {
+                page_normal();
+            }
+    };
 } // end init()            
 
 // *********************************************************************************
@@ -525,6 +388,158 @@ function get_hh_mm_ss(datetime)
     return hh+':'+mm+':'+ss;
 }
 
+// ***************************************************************************
+// *******************  Logging code      ************************************
+// ***************************************************************************
+
+var LOG_TRUNCATE = 10; // we'll limit the log to this many messages
+
+var log_record_odd = true; // binary toggle for alternate log background colors
+
+var log_append = false;
+
+function log(msg)
+{
+    // create HH:MM:SS timestamp for this log record
+    var ts = get_hh_mm_ss(new Date());
+
+    // create outermost log record element
+    var new_log_record = document.createElement('div');
+
+    // create timestamp element
+    var ts_element = document.createElement('div');
+    ts_element.classList.add('log_ts');
+    ts_element.innerHTML = ts;
+    new_log_record.appendChild(ts_element);
+
+    // create msg element
+    var msg_element = document.createElement('div');
+    msg_element.classList.add('log_msg');
+    msg_element.innerHTML = msg;
+    new_log_record.appendChild(msg_element);
+
+    new_log_record.classList.add('log_record');
+    // set the log background color and toggle odd/even flag
+    new_log_record.classList.add(log_record_odd ? 'log_record_odd' : 'log_record_even');
+    log_record_odd = !log_record_odd;
+
+    // if log is full then drop the oldest msg
+    if (console_div.childElementCount == LOG_TRUNCATE)
+    {
+        //console.log('log hit limit '+LOG_TRUNCATE);
+        if (log_append)
+        {
+            //console.log('log removing firstChild');
+            console_div.removeChild(console_div.firstChild);
+        }
+        else
+        {
+            //console.log('log removing lastChild '+console_div.lastChild.tagName);
+            console_div.removeChild(console_div.lastChild);
+        }
+        //console.log('log record count after removeChild: '+console_div.childElementCount)
+    }
+    if (log_append)
+    {
+        console_div.appendChild(new_log_record);
+    }
+    else
+    {
+        console_div.insertBefore(new_log_record, console_div.firstChild);
+    }
+    //console.log('log record count: '+console_div.childElementCount)
+}
+
+// reverse the order of the messages in the log
+function log_reverse()
+{
+    for (var i=0;i<console_div.childNodes.length;i++) 
+      console_div.insertBefore(console_div.childNodes[i], console_div.firstChild);
+}
+
+// ***************************************************************************
+// *******************  WebSocket code    ************************************
+// ***************************************************************************
+
+var sock; // the page's WebSocket
+
+function sock_connect(method)
+{
+    // for testing (e.g. on laptop) we can us local port directly
+    if (method=="port")
+    {
+        sock = new SockJS('http://localhost:8099/test/rtmonitor/sirivm');
+    }
+    else
+    {
+        sock = new SockJS('http://tfc-app2.cl.cam.ac.uk/test/rtmonitor/sirivm');
+    }
+
+    sock.onopen = function() {
+                log('** socket open');
+                sock_send_str('{ "msg_type": "rt_connect" }');
+                };
+
+    sock.onmessage = function(e) {
+                var json_msg = JSON.parse(e.data);
+                if (json_msg.msg_type != null && json_msg.msg_type == "rt_nok")
+                {
+                    log('<span class="log_error">** '+e.data+'</span>');
+                    return;
+                }
+                log(e.data)
+                handle_records(e.data);
+                };
+
+    sock.onclose = function() {
+                    log('** socket closed');
+                };
+}
+
+function sock_close()
+{
+    log('** closing socket...');
+    sock.close();
+}
+
+function sock_send(input_name)
+{
+    var msg = document.getElementById(input_name).value;
+   
+    sock_send_str(msg);
+}
+
+function sock_send_str(msg)
+{
+    if (sock == null)
+    {
+	    log('<span style="color: red;">Socket not yet connected</span>');
+	    return;
+    }
+    if (sock.readyState == SockJS.CONNECTING)
+    {
+	    log('<span style="color: red;">Socket connecting...</span>');
+  	    return;
+    }
+    if (sock.readyState == SockJS.CLOSING)
+    {
+	    log('<span style="color: red;">Socket closing...</span>');
+	    return;
+    }
+    if (sock.readyState == SockJS.CLOSED)
+    {
+	    log('<span style="color: red;">Socket closed</span>');
+	    return;
+    }
+
+    log('sending: '+msg);
+
+    // write msg into scratchpad textarea
+    document.getElementById('rt_scratchpad').value = msg;
+
+    sock.send(msg);
+}
+
 // ****************************************************************************************
 // *************** User interaction functions *********************************************
 // ****************************************************************************************
@@ -692,14 +707,36 @@ function click_less(record_key)
     data_record.marker.setPopupContent(bus_popup_content(data_record.msg));
 }
 
+// user has clicked to only show the map
+function page_map()
+{
+    map_only = true;
+    document.getElementById('control_div').style.display = 'none';
+    document.getElementById('map').style.width = '99%';
+    document.getElementById('map').style.height = '99%';
+    map.invalidateSize();
+}
+
+// User has 'escaped' from map_only mode
+function page_normal()
+{
+    map_only = false;
+    document.getElementById('control_div').style.display = '';
+    document.getElementById('map').style.width = '68%';
+    document.getElementById('map').style.height = '80%';
+    map.invalidateSize();
+}
+
 </script>
  
 </head>
 
 <body onload='init()'>
-<h1>RTMonitor <span id='clock'></span></h1>
 
-<div class="top-aligned control_div">
+<div id="control_div" class="top-aligned control_div">
+<h1>RTMonitor <span id='clock'></span></h1>
+<div><a href="#" onclick="page_map()">only show map</a>
+</div>
 <div class="control_box">
     <button onclick="sock_connect('nginx')"
         title="Connect socket to server and send rt_connect msg"
