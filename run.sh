@@ -116,4 +116,10 @@ if [ "$HOSTNAME" = tfc-app3 ] || [ "$HOSTNAME" = tfc-app4 ]; then
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.eventbus" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.eventbus.err & disown
 fi
 
+# #############################################################################################
+# ################   RTMONITOR                    #############################################
+# #############################################################################################
+
+# RTMONITOR.SIRIVM
+nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rtmonitor.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/rtmonitor.sirivm.err & disown
 
