@@ -4,7 +4,7 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTMonitor v0.14</title>
+    <title>RTMonitor v0.15</title>
 <!--
 RELEASE INFO:
     2017-11-26 generalized from buses, latest full data in popup, icon resize on old data,
@@ -102,15 +102,9 @@ body {
 // ***************************************************************************
 // *******************  Page and map code ************************************
 // ***************************************************************************
-var console_div;
-
-// display options
-
-var breadcrumbs = false; // location 'breadcrumbs' will be dropped as things move
-
-var map_only = false; // page is in "only display map" mode
-
 // Constants
+
+var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
 var MAP_CENTER = [52.205, 0.119];
 var MAP_SCALE = 13;
@@ -125,6 +119,14 @@ var vehicle_journey = "ea-20-7-A-y08-1-11-T0";
 var urlparams = new URLSearchParams(window.location.search);
 var debug = urlparams.has('debug');
 var mapbounds;
+
+var console_div;
+
+// display options
+
+var breadcrumbs = false; // location 'breadcrumbs' will be dropped as things move
+
+var map_only = false; // page is in "only display map" mode
 
 // Here we define the 'data records' of the incoming websocket feed
 var data_records = {};
@@ -484,7 +486,7 @@ function sock_connect(method)
     }
     else
     {
-        sock = new SockJS('http://tfc-app2.cl.cam.ac.uk/test/rtmonitor/sirivm');
+        sock = new SockJS(RTMONITOR_URI);
     }
 
     sock.onopen = function() {
