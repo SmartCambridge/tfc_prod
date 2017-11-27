@@ -4,9 +4,11 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTMonitor v0.13</title>
+    <title>RTMonitor v0.14</title>
 <!--
 RELEASE INFO:
+    2017-11-26 generalized from buses, latest full data in popup, icon resize on old data,
+               map can go fullscreen
     2017-11-25 supports connect, close, subscribe, request with filters '=' and 'inside'
                 console log using divs, draw polygon, clear icons
     2017-11-14 page working for connect, subscribe, close
@@ -126,10 +128,13 @@ var mapbounds;
 
 // Here we define the 'data records' of the incoming websocket feed
 var data_records = {};
-var record_index = 'VehicleRef';  // data record property that is primary key
-var record_ts = 'RecordedAtTime'; // data record property containing timestamp
-var record_ts_format = 'ISO8601'; // data record timestamp format
+var RECORD_INDEX = 'VehicleRef';  // data record property that is primary key
+var RECORDS_ARRAY = 'request_data'; // incoming socket data property containing data records
+var RECORD_TS = 'RecordedAtTime'; // data record property containing timestamp
+var RECORD_TS_FORMAT = 'ISO8601'; // data record timestamp format
                                   // 'ISO8601' = iso-format string
+var RECORD_LAT = 'Latitude';      // name of property containing latitude
+var RECORD_LNG = 'Longitude';     // name of property containing longitude
 
 var crumbs = []; // array to hold breadcrumbs as they are drawn
 
@@ -209,22 +214,22 @@ function bus_tooltip_content(bus)
                    ("0" + time.getMinutes()).slice(-2) + ":" + 
                    ("0" + time.getSeconds()).slice(-2);
     return time_str +
-                        '<br/>' + bus['VehicleRef'] + 
+                        '<br/>' + bus[RECORD_INDEX] + 
 			'<br/>Line "' + bus['PublishedLineName'] +'"'+
                         '<br/>Delay: ' + bus['Delay'];
 }
 
-function bus_popup_content(bus)
+function bus_popup_content(msg)
 {
     var time = new Date();
     var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
                    ("0" + time.getMinutes()).slice(-2) + ":" + 
                    ("0" + time.getSeconds()).slice(-2);
-    var record_key = bus[record_index];
+    var record_key = msg[RECORD_INDEX];
     return time_str +
         '<br/>' + record_key + 
-		'<br/>Line "' + bus['PublishedLineName'] +'"'+
-        '<br/>Delay: ' + bus['Delay']+
+		'<br/>Line "' + msg['PublishedLineName'] +'"'+
+        '<br/>Delay: ' + msg['Delay']+
         '<br/><a href="#" onclick="click_more('+"'"+record_key+"'"+')">more</a>';
 }
 
@@ -238,42 +243,47 @@ function bus_more_content(record_key)
     return content;
 }
 
-function update_bus(bus)
+function update_record(msg)
 {
 		// existing bus
 
-        var record_key = bus[record_index];
+        var record_key = msg[RECORD_INDEX];
 
-		if (bus['RecordedAtTime'] !== data_records[record_key].msg['RecordedAtTime'])
+		if (msg['RecordedAtTime'] !== data_records[record_key].msg['RecordedAtTime'])
         {
-            var position = [bus['Latitude'], bus['Longitude']];
-		    bus['marker'] = data_records[record_key]['marker'];
-		    bus['marker'].moveTo(position, [1000] ); 
-		    bus['marker'].resume();
-		    bus['marker'].setTooltipContent(bus_tooltip_content(bus));
-		    bus['marker'].setPopupContent(bus_popup_content(bus));
-		    data_records[record_key].msg = bus; // update entry for this bus
+            // move marker
+            var position = [msg[RECORD_LAT], msg[RECORD_LNG]];
+            var marker = data_records[record_key].marker;
+		    marker.moveTo(position, [1000] ); 
+		    marker.resume();
+
+            // update tooltip and popup
+		    marker.setTooltipContent(bus_tooltip_content(msg));
+		    marker.setPopupContent(bus_popup_content(msg));
+
+            // store as latest msg
+		    data_records[record_key].msg = msg; // update entry for this msg
             add_breadcrumb(position);
 		}
 }
 
-function create_bus(bus)
+function create_record(msg)
 {
     // new bus, create marker
-    log(' ** New '+bus['VehicleRef']);
+    log(' ** New '+msg[RECORD_INDEX]);
 
-    var record_key = bus[record_index];
+    var record_key = msg[RECORD_INDEX];
 
     var data_record = {};
 
-    data_record['marker'] = L.Marker.movingMarker([[bus['Latitude'], bus['Longitude']], 
-                                                   [bus['Latitude'], bus['Longitude']]],
+    data_record['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
+                                                   [msg[RECORD_LAT], msg[RECORD_LNG]]],
                                                   [1000],
                                                   {icon: busIcon});
     data_record['marker']
         .addTo(map)
-        .bindPopup(bus_popup_content(bus), { className: "bus-popup"})
-        .bindTooltip(bus_tooltip_content(bus), {
+        .bindPopup(bus_popup_content(msg), { className: "bus-popup"})
+        .bindTooltip(bus_tooltip_content(msg), {
                             // permanent: true,
                             className: "bus-tooltip",
                             interactive: true
@@ -284,7 +294,7 @@ function create_bus(bus)
                 })
         .start();
 
-    data_record.msg = bus;
+    data_record.msg = msg;
     data_records[record_key] = data_record;
 }
 
@@ -298,21 +308,23 @@ function add_breadcrumb(pos)
 }
 
 function handle_records(websock_data) {
-    var json = JSON.parse(websock_data);
+    var incoming_data = JSON.parse(websock_data);
     //console.log('handle_records'+json['request_data'].length);
-    for (var i = 0; i < json['request_data'].length; i++) 
+    for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++) 
     {
-	    var bus = json['request_data'][i];
+	    var data_record = incoming_data[RECORDS_ARRAY][i];
 
-        var record_key = bus[record_index];
+        var record_key = data_record[RECORD_INDEX];
 
+        // If an existing entry in 'data_records' has this key, then update
+        // otherwise create new entry.
 	    if (data_records.hasOwnProperty(record_key)) 
 	    {
-            update_bus(bus);
+            update_record(data_record);
 	    }
 	    else 
 	    {
-            create_bus(bus);
+            create_record(data_record);
 	    }
     }
 } // end function handle_records
@@ -331,7 +343,7 @@ function check_old_records()
     //console.log('checking for old data records..,');
 
     // do nothing if timestamp format not recognised
-    switch (record_ts_format)
+    switch (RECORD_TS_FORMAT)
     {
         case 'ISO8601':
             break;
@@ -348,10 +360,10 @@ function check_old_records()
 
         var data_record = data_records[key];
 
-        switch (record_ts_format)
+        switch (RECORD_TS_FORMAT)
         {
             case 'ISO8601':
-                data_timestamp = new Date(data_record.msg[record_ts]);
+                data_timestamp = new Date(data_record.msg[RECORD_TS]);
                 break;
 
             default:
@@ -359,7 +371,7 @@ function check_old_records()
         }
 
         var diff_seconds = (now - data_timestamp) / 1000;
-        //console.log(key+' '+data_record.msg[record_ts]+' '+diff_seconds);
+        //console.log(key+' '+data_record.msg[RECORD_TS]+' '+diff_seconds);
         if (diff_seconds > OLD_DATA_RECORD)
         {
             // skip if this data record is already flagged as old
