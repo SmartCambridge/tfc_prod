@@ -97,7 +97,7 @@ nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_serve
 # ################   SIRIVM CLOUDAMBER FEEDMAKER  #############################################
 # #############################################################################################
 
-# SIRIVM FEEDMAKER FOR CLOUDAMBER SIRIVM DATA
+# SIRIVM FEEDMAKER FOR CLOUDAMBER SIRIVM AND SIRIVM_JSON DATA
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.A" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.A.err & disown
 
 # SIRIVM ZONEMANAGER FOR CLOUDAMBER SIRIVM DATA
@@ -109,11 +109,6 @@ nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_serve
 # SIRIVM MSGROUTER (tfc-app2 only)
 if [ "$HOSTNAME" = tfc-app2 ]; then
 nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.cloudamber.sirivm.err & disown
-fi
-
-# FEEDMAKER.EVENTBUS for forwarded SiriVM eventbus messages (tfc-app3 and tfc-app4 only)
-if [ "$HOSTNAME" = tfc-app3 ] || [ "$HOSTNAME" = tfc-app4 ]; then
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.eventbus" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.eventbus.err & disown
 fi
 
 # #############################################################################################
