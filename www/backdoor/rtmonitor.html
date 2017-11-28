@@ -63,6 +63,32 @@ body {
     font-size: small;
 }
 
+.marker_bus_M {
+    background-image: url("/static/images/bus_logo_M.png");
+    /* background-color: green; */
+}
+
+.marker_bus_L {
+    background-image: url("/static/images/bus_logo_L.png");
+    /* background-color: green; */
+}
+
+.marker_label_M {
+    /* background-color: white; */
+    /* margin-left: 8px; */
+    margin-top: 7px;
+    font-size: 7px;
+    text-align: center;
+}
+
+.marker_label_L {
+    /* background-color: white; */
+    /* margin-left: 8px; */
+    margin-top: 8px;
+    font-size: 11px;
+    text-align: center;
+}
+
 .log_record {
 }
 
@@ -138,15 +164,14 @@ var RECORD_TS_FORMAT = 'ISO8601'; // data record timestamp format
 var RECORD_LAT = 'Latitude';      // name of property containing latitude
 var RECORD_LNG = 'Longitude';     // name of property containing longitude
 
+var ICON_URL = '/static/images/bus-logo.png';
+
 var crumbs = []; // array to hold breadcrumbs as they are drawn
 
-var busIcon = L.icon({
-    iconUrl: '/static_web/images/bus-logo.png',
-    iconSize: [30, 30]
-});
+var icon_size = 'L';
 
 var oldBusIcon = L.icon({
-    iconUrl: '/static_web/images/bus-logo.png',
+    iconUrl: ICON_URL,
     iconSize: [20, 20]
 });
 
@@ -247,7 +272,7 @@ function bus_more_content(record_key)
 
 function update_record(msg)
 {
-		// existing bus
+		// existing bus data record has arrived
 
         var record_key = msg[RECORD_INDEX];
 
@@ -266,7 +291,40 @@ function update_record(msg)
             // store as latest msg
 		    data_records[record_key].msg = msg; // update entry for this msg
             add_breadcrumb(position);
+
+            // flag if this record is OLD or NEW
+            update_old_status(data_records[record_key]);
 		}
+}
+
+function create_icon(msg)
+{
+    var line = '';
+
+    if (msg.LineRef != null)
+    {
+        line = msg.LineRef;
+    }
+
+    var marker_html =  '<div class="marker_label_'+icon_size+'">'+line+'</div>';
+
+    var marker_size = new L.Point(30,30);
+
+    switch (icon_size)
+    {
+        case 'L':
+            marker_size = new L.Point(45,45);
+            break;
+
+        default:
+            break;
+    }
+
+    return L.divIcon({ 
+        className: 'marker_bus_'+icon_size,
+        iconSize: marker_size,
+        html: marker_html
+    });
 }
 
 function create_record(msg)
@@ -278,10 +336,12 @@ function create_record(msg)
 
     var data_record = {};
 
+    var marker_icon = create_icon(msg);
+
     data_record['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
                                                    [msg[RECORD_LAT], msg[RECORD_LNG]]],
                                                   [1000],
-                                                  {icon: busIcon});
+                                                  {icon: marker_icon});
     data_record['marker']
         .addTo(map)
         .bindPopup(bus_popup_content(msg), { className: "bus-popup"})
@@ -298,6 +358,7 @@ function create_record(msg)
 
     data_record.msg = msg;
     data_records[record_key] = data_record;
+    update_old_status(data_record);
 }
 
 function add_breadcrumb(pos)
@@ -354,42 +415,58 @@ function check_old_records()
             return;
     }
 
-    var now = new Date();
-
     for (key in data_records)
     {
-        var data_timestamp; // will hold Date from data_record
+        update_old_status(data_records[key]);
+    }
+}
 
-        var data_record = data_records[key];
+// given a data record, update '.old' property t|f and reset marker icon
+function update_old_status(data_record)
+{
+    var data_timestamp; // will hold Date from data_record
 
-        switch (RECORD_TS_FORMAT)
+    var now = new Date();
+
+    switch (RECORD_TS_FORMAT)
+    {
+        case 'ISO8601':
+            data_timestamp = new Date(data_record.msg[RECORD_TS]);
+            break;
+
+        default:
+            return;
+    }
+
+    // get current value of data_record.old flag (default false)
+    var current_old_flag = !(data_record.old == null) || data_record.old;
+
+    // calculate age of data_record (in seconds) 
+    var age = (now - data_timestamp) / 1000;
+
+    if (age > OLD_DATA_RECORD)
+    {
+        // data record is OLD
+        // skip if this data record is already flagged as old
+        if (data_record.old != null && data_record.old)
         {
-            case 'ISO8601':
-                data_timestamp = new Date(data_record.msg[RECORD_TS]);
-                break;
-
-            default:
-                return;
+            return;
         }
-
-        var diff_seconds = (now - data_timestamp) / 1000;
-        //console.log(key+' '+data_record.msg[RECORD_TS]+' '+diff_seconds);
-        if (diff_seconds > OLD_DATA_RECORD)
+        // set the 'old' flag on this record and update icon
+        data_record.old = true;
+        data_record.marker.setIcon(oldBusIcon);
+    }
+    else
+    {
+        // data record is NOT OLD
+        // skip if this data record is already NOT OLD
+        if (data_record.old != null && !data_record.old)
         {
-            // skip if this data record is already flagged as old
-            if (data_record.old != null && data_record.old)
-            {
-                continue;
-            }
-            //console.log('OLD DATA FOR '+key+' ('+diff_seconds+')');
-            data_record.marker.setIcon(oldBusIcon);
+            return;
         }
-        else
-        {
-            // reset the 'old' flag on this data record
-            data_record.old = false;
-            data_record.marker.setIcon(busIcon);
-        }
+        // reset the 'old' flag on this data record and update icon
+        data_record.old = false;
+        data_record.marker.setIcon(create_icon(data_record.msg));
     }
 }
 
