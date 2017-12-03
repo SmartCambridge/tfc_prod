@@ -4,10 +4,12 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTRoute v0.16</title>
+    <title>RTRoute v0.17</title>
 <!--
 RELEASE INFO:
+    2017-12-01 imported stops, journeys and trip data, draw_stops and draw_route code
     2017-11-30 Moved code into rtroute.html to experiment with route calculations
+    ----
     2017-11-26 generalized from buses, latest full data in popup, icon resize on old data,
                map can go fullscreen
     2017-11-25 supports connect, close, subscribe, request with filters '=' and 'inside'
@@ -28,7 +30,7 @@ body {
 #rt_scratchpad {
     font-size: x-small;
     width: 95%;
-    height: 60%;
+    height: 40%;
 }
 
 #map {
@@ -124,11 +126,17 @@ body {
 
 <script type="text/javascript" src="/static_web/js/MovingMarker.js"></script>
 
+<!-- ********************************************************************************* -->
 <!-- load stops and journey data for OriginRef 0500CCAMB011 (De La Warr Way Cambourne) -->
 
+<!-- create js object rtroute_journeys (every timetable journey from Cambourne) -->
+<script type="text/javascript" src="rtroute_journeys.js"></script>
+
+<!-- create js object rtroute_stops (all stops used in above journeys) -->
 <script type="text/javascript" src="rtroute_stops.js"></script>
 
-<script type="text/javascript" src="rtroute_journeys.js"></script>
+<!-- create array of sirivm js objects rtroute_trip (one sample journey) -->
+<script type="text/javascript" src="rtroute_trip.js"></script>
 
 <!-- WebSockets library to connect to RTMonitor -->
 <script src="sockjs.min.js"></script>
@@ -150,25 +158,30 @@ var OLD_DATA_RECORD = 60; // time (s) threshold where a data record is considere
 
 // Globals
 
-var map;
-var vehicle_journey = "ea-20-7-A-y08-1-11-T0";
+var map;       // Leaflet map
+var map_tiles; // map tiles layer
+
+var DEBUG_VEHICLE_JOURNEY_ID = "20-4-_-y08-1-51-T0";
+
 var urlparams = new URLSearchParams(window.location.search);
 var debug = urlparams.has('debug');
 var mapbounds;
 
+var clock_time; // the 'current time', either now() or replay_time
+
 var console_div;
 
-// *****************
+// *********************************************************
 // RTRoutes globals
 
-// local dictionary of stops keyed on stop_id
+// Local dictionary of stops keyed on stop_id
 // Sample stop record in rtroute_stops:
 // { stop_id:'0500CCITY055', lat:52.2114061236, lng:0.10481260687, common_name:'Storey\'s Way'},
 // becomes
 // stops['0500CCITY055'] = {this stop record}
 var stops = {};
 
-// local dictionary of journeys keyed on vehicle_journey_id
+// Local dictionary of journeys keyed on vehicle_journey_id
 // Sample journey data record in rtroutes_journeys:
 // {vehicle_journey_id:'20-4-_-y08-1-98-T2',order:1,time:'11:22:00',stop_id:'0500SCAMB011'},
 // becomes:
@@ -176,8 +189,19 @@ var stops = {};
 var journeys = {};
 var journeys_count = 0;
 
-// *****************
-// display options
+// Data recording
+var recorded_records = [];
+var recording_on = false;
+
+// Replay
+var replay_time; // holds unix timestamp (secs since 1970), current time of replay
+var replay_timer; // the JS interval timer for the replay function
+var replay_on = false; // Replay mode on|off
+var replay_interval = 1; // Replay step interval (seconds)
+var replay_index = 0; // current index into replay data
+
+// *********************************************************
+// Display options
 
 var breadcrumbs = false; // location 'breadcrumbs' will be dropped as things move
 
@@ -242,7 +266,7 @@ function init()
 
     map.on('click',map_click);
 
-    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    map_tiles = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
@@ -322,10 +346,11 @@ function init_journeys()
             journey.route[order - 1].arrow = new L.marker(
                 center,
                 { icon: new L.divIcon({ 
-                              className : "arrow_icon",
+                              className : 'arrow_icon',
                               iconSize: new L.Point(30,30), 
                               iconAnchor: new L.Point(15,15), 
-                              html : "<div style = 'font-size: 20px; -webkit-transform: rotate("+ angle +"deg)'>&#10152;</div>"
+                              html : '<div style = "font-size: 20px;'+
+                                  '-webkit-transform: rotate('+ angle +'deg)">&#10152;</div>'
                               })
                 }
             );
@@ -367,6 +392,8 @@ function draw_stops()
     }
 }
 
+// Draw the straight lines between stops on the selected journey
+// The journey stops data is stored in 'journeys' created at startup
 function draw_journey(vehicle_journey_id)
 {
     var journey = journeys[vehicle_journey_id];
@@ -401,6 +428,79 @@ function draw_journey(vehicle_journey_id)
 // ************* Geometric Functions ***********************************************
 // *********************************************************************************
 
+// Return distance in m between positions p1 and p2.
+// lat/longs in e.g. p1.lat etc
+function distance(p1, p2) 
+{
+    var R = 6378137; // Earth's mean radius in meter
+    var dLat = rad(p2.lat - p1.lat);
+    var dLong = rad(p2.lng - p1.lng);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) *
+                        Math.sin(dLong / 2) * Math.sin(dLong / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    var d = R * c;
+    return d; // returns the distance in meter
+};
+
+// Return true is position is inside bounding polygon
+// http://stackoverflow.com/questions/13950062/checking-if-a-longitude-latitude-coordinate-resides-inside-a-complex-polygon-in
+function inside(position, bounds_path, box)
+{
+    // easy optimization - return false if position is outside bounding rectangle (box)
+    if ( position.lat > box.north ||
+         position.lat < box.south || 
+         position.lng < box.west || 
+         position.lng > box.east)
+        return false;
+
+    var lastPoint = bounds_path[bounds_path.length - 1];
+    var isInside = false;
+    var x = position.lng;
+    for (var i=0; i<bounds_path.length; i++)
+    {
+        var point = bounds_path[i];
+        var x1 = lastPoint.lng;
+        var x2 = point.lng;
+        var dx = x2 - x1;
+
+        if (Math.abs(dx) > 180.0)
+        {
+            // we have, most likely, just jumped the dateline 
+            // (could do further validation to this effect if needed).  normalise the
+            // numbers.
+            if (x > 0)
+            {
+                while (x1 < 0)
+                    x1 += 360;
+                while (x2 < 0)
+                    x2 += 360;
+            }
+            else
+            {
+                while (x1 > 0)
+                    x1 -= 360;
+                while (x2 > 0)
+                    x2 -= 360;
+            }
+            dx = x2 - x1;
+        }
+
+        if ((x1 <= x && x2 > x) || (x1 >= x && x2 < x))
+        {
+            var grad = (point.lat - lastPoint.lat) / dx;
+            var intersectAtLat = lastPoint.lat + ((x - x1) * grad);
+
+            if (intersectAtLat > position.lat)
+                isInside = !isInside;
+        }
+        lastPoint = point;
+    }
+
+    return isInside;
+}
+
+
 // Bearing in degrees from pos1 -> pos2 as {lat: , lng: }
 function bearing(pos1, pos2)
 {
@@ -408,8 +508,61 @@ function bearing(pos1, pos2)
     var b = { lat: pos2.lat * Math.PI / 180, lng: pos2.lng * Math.PI / 180 };
 
     var y = Math.sin(b.lng-a.lng) * Math.cos(b.lat);
-    var x = Math.cos(a.lat)*Math.sin(b.lat) - Math.sin(a.lat)*Math.cos(b.lat)*Math.cos(b.lng-a.lng);
+    var x = Math.cos(a.lat)*Math.sin(b.lat) - 
+                Math.sin(a.lat)*Math.cos(b.lat)*Math.cos(b.lng-a.lng);
     return (Math.atan2(y, x) * 180 / Math.PI) - 90;
+}
+
+// http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+// Detect whether lines A->B and C->D intersect
+// return { intersect: true/false, position: LatLng (if lines do intersect), progress: 0..1 }
+// where 'progress' is how far the intersection is along the A->B path
+function intersect(line1, line2)
+{
+    var A = line1[0], B = line1[1], C = line2[0], D = line2[1];
+
+    var s1 = { lat: B.lat - A.lat, lng: B.lng - A.lng };
+    var s2 = { lat: D.lat - C.lat, lng: D.lng - C.lng };
+
+    var s = (-s1.lat * (A.lng - C.lng) + s1.lng * (A.lat - C.lat)) / 
+                (-s2.lng * s1.lat + s1.lng * s2.lat);
+    var t = ( s2.lng * (A.lat - C.lat) - s2.lat * (A.lng - C.lng)) / 
+                (-s2.lng * s1.lat + s1.lng * s2.lat);
+
+    if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+    {
+        // lines A->B and C->D intersect
+        return { success: true, 
+                 position: { lat: A.lat + (t * s1.lat), 
+                             lng: A.lng + (t * s1.lng) }, 
+                 progress: t };
+    }
+
+    return { success: false }; // lines don't intersect
+}
+
+
+//*********************************************************************************************
+//*********************************************************************************************
+//*************** CONVERSION FUNCTIONS, E.G. meters to nautical miles *************************
+//*********************************************************************************************
+//*********************************************************************************************
+
+// degrees to radians
+var rad = function(x) {
+      return x * Math.PI / 180;
+};
+
+// meters to nautical miles
+function nm(x)
+{
+        return x * 0.000539956803;
+}
+
+// meters to statute miles
+function miles(x)
+{
+        return x * 0.000621371;
 }
 
 // *********************************************************************************
@@ -552,33 +705,90 @@ function add_breadcrumb(pos)
     }
 }
 
-function handle_records(websock_data) {
+// ********************************************************************************
+// ********************************************************************************
+// ***********  Process the data records arrived from WebSocket or Replay *********
+// ********************************************************************************
+// ********************************************************************************
+
+// Process websocket data
+function handle_records(websock_data)
+{
     var incoming_data = JSON.parse(websock_data);
     //console.log('handle_records'+json['request_data'].length);
     for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++) 
     {
-	    var data_record = incoming_data[RECORDS_ARRAY][i];
-
-        var record_key = data_record[RECORD_INDEX];
-
-        // If an existing entry in 'data_records' has this key, then update
-        // otherwise create new entry.
-	    if (data_records.hasOwnProperty(record_key)) 
-	    {
-            update_record(data_record);
-	    }
-	    else 
-	    {
-            create_record(data_record);
-	    }
+	    handle_record(incoming_data[RECORDS_ARRAY][i]);
     }
 } // end function handle_records
+
+// Process replay data
+function replay_step()
+{
+    replay_time = replay_time + replay_interval;
+
+    var current_index = replay_index;
+
+    // skip earlier records
+
+    while ( replay_index < rtroute_trip.length && 
+            rtroute_trip[replay_index]['acp_ts'] < replay_time)
+    {
+        replay_index++;
+    }
+
+    if ( replay_index < rtroute_trip.length 
+         && replay_index > current_index)
+    {
+        var data_record = rtroute_trip[replay_index-1];
+
+        var time_str = get_hh_mm_ss(new Date(data_record['acp_ts']*1000));
+        var next_time_str = (replay_index < rtroute_trip.length - 1)
+                            ? get_hh_mm_ss(new Date(rtroute_trip[replay_index]['acp_ts']*1000))
+                            : '--end of records--';
+        log('replay record '+(replay_index-1)+' '+time_str+' next: '+next_time_str);
+
+        handle_record(data_record);
+    }
+}
+
+// process a single data record
+function handle_record(data_record)
+{
+    // add to recorded_data if recording is on
+
+    if (recording_on)
+    {
+        recorded_records.push(JSON.stringify(data_record));
+    }
+
+    var record_key = data_record[RECORD_INDEX];
+
+    // If an existing entry in 'data_records' has this key, then update
+    // otherwise create new entry.
+    if (data_records.hasOwnProperty(record_key)) 
+    {
+        update_record(data_record);
+    }
+    else 
+    {
+        create_record(data_record);
+    }
+}
 
 // update realtime clock on page
 // called via intervalTimer in init()
 function update_clock()
 {
-    document.getElementById('clock').innerHTML = get_hh_mm_ss(new Date());
+    if (replay_on)
+    {
+        clock_time = new Date(replay_time*1000);
+    }
+    else
+    {
+        clock_time = new Date();
+    }
+    document.getElementById('clock').innerHTML = get_hh_mm_ss(clock_time);
 }
 
 // watchdog function to flag 'old' data records
@@ -608,8 +818,6 @@ function update_old_status(data_record)
 {
     var data_timestamp; // will hold Date from data_record
 
-    var now = new Date();
-
     switch (RECORD_TS_FORMAT)
     {
         case 'ISO8601':
@@ -624,7 +832,7 @@ function update_old_status(data_record)
     var current_old_flag = !(data_record.old == null) || data_record.old;
 
     // calculate age of data_record (in seconds) 
-    var age = (now - data_timestamp) / 1000;
+    var age = (clock_time - data_timestamp) / 1000;
 
     if (age > OLD_DATA_RECORD)
     {
@@ -1000,6 +1208,88 @@ function page_normal()
     map.invalidateSize();
 }
 
+// ********************
+// Recording buttons
+
+function record_start()
+{
+    recording_on = true;
+    document.getElementById('record_start').value = 'Recording';
+}
+
+function record_clear()
+{
+    recording_on = false;
+    recorded_records = [];
+    document.getElementById('record_start').value = 'Record';
+}
+
+function record_print()
+{
+    console.log('Printing '+recorded_records.length+' recorded records '+new Date());
+    for (var i=0; i<recorded_records.length; i++)
+    {
+        console.log(recorded_records[i]);
+    }
+}
+
+// user clicked 'Replay' button
+function replay_start()
+{
+    // get start time from text box (js compatible)
+    var start_time = new Date(document.getElementById('replay_start').value);
+    if (!start_time)
+    {
+        log('<span style="color: red">'+
+            'Bad replay start time format (try 2017-11-20T06:00:00Z)'+
+            '</span>');
+        return;
+    }
+
+    // if not paused, initialize the replay time to the chosen start time
+    if (!replay_on)
+    {
+        replay_time = start_time.getTime()/1000;
+
+        replay_index = 0;
+
+        // set 'replay mode' flag
+        replay_on = true;
+
+        log('Replay started '+new Date(replay_time*1000));
+    }
+    // kick off regular timer
+    replay_timer = setInterval(replay_step, replay_interval * 1000);
+    log('Timer started '+new Date(replay_time*1000));
+}
+
+function replay_pause()
+{
+    clearInterval(replay_timer);
+    log('Replay paused at '+new Date(replay_time*1000));
+}
+
+function replay_stop()
+{
+    clearInterval(replay_timer);
+    // Reset 'replay mode' flag
+    replay_on = false;
+    log('Replay stopped at '+new Date(replay_time*1000));
+}
+
+function click_show_map()
+{
+    show_map = document.getElementById("show_map").checked == true;
+    if (!show_map)
+    {
+        map.removeLayer(map_tiles);
+    }
+    else
+    {
+        map.addLayer(map_tiles);
+    }
+}
+
 </script>
  
 </head>
@@ -1009,11 +1299,6 @@ function page_normal()
 <div id="control_div" class="top-aligned control_div">
 <h1>RTMonitor <span id='clock'></span></h1>
 <div><a href="#" onclick="page_map()">only show map</a>
-</div>
-<div class="control_box">
-    <button onclick="draw_journey('20-4-_-y08-1-98-T2')"
-        title="Draw test journey"
-        >Draw journey</button><br/>
 </div>
 <div class="control_box">
     <button onclick="sock_connect('nginx')"
@@ -1044,6 +1329,34 @@ function page_normal()
 <div>Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
 Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
 </div>
+<div class="control_box">
+    <input type="button" id="record_start" onclick="record_start()" value="Record"
+        title="Record the data as it arrives"
+        ></input>
+    <input type="button" id="record_clear" onclick="record_clear()" value="Clear"
+        title="Cancel recording"
+        ></input>
+    <input type="button" id="record_print" onclick="record_print()" value="Print"
+        title="Print the recorded data to the console"
+        ></input>
+</div>
+
+<div class="control_box">
+    <button onclick="draw_journey(DEBUG_VEHICLE_JOURNEY_ID)"
+        title="Draw test journey"
+        >Draw journey</button>
+    Show map: <input id="show_map" type="checkbox" onclick="click_show_map()" checked/><br/>
+    <button onclick="replay_start()"
+        title="Replay test SiriVM data"
+        >Replay</button>
+    <input id="replay_start" type="text" size="22" value="2017-11-20T06:00:00Z"></input><br/>
+    <button onclick="replay_pause()"
+        title="Pause replay"
+        >Pause</button>
+    <button onclick="replay_stop()"
+        title="Stop replay"
+        >Stop</button>
+</div>
 
 <h4>Realtime API scratchpad:</h4>
 
@@ -1053,7 +1366,7 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
   <button class="verticle_button" onclick="clear_textarea('rt_scratchpad')">Clear</button>
 </div>
 
-<textarea rows="25" cols="70" id="rt_scratchpad">
+<textarea rows="25" cols="50" id="rt_scratchpad">
 { "msg_type": "rt_subscribe",
   "request_id": "A",
   "filters" : [
