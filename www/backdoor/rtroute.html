@@ -62,16 +62,16 @@ body {
     height: 80%;
 }
 
-.bus-popup {
+.sensor-popup {
     font-size: small;
 }
 
-.marker_bus_M {
+.marker_sensor_M {
     background-image: url("/static/images/bus_logo_M.png");
     /* background-color: green; */
 }
 
-.marker_bus_L {
+.marker_sensor_L {
     background-image: url("/static/images/bus_logo_L.png");
     /* background-color: green; */
 }
@@ -198,6 +198,7 @@ var replay_time; // holds unix timestamp (secs since 1970), current time of repl
 var replay_timer; // the JS interval timer for the replay function
 var replay_on = false; // Replay mode on|off
 var replay_interval = 1; // Replay step interval (seconds)
+var replay_speedup = 1; // relative speed of replay time to real time
 var replay_index = 0; // current index into replay data
 
 // *********************************************************
@@ -208,8 +209,9 @@ var breadcrumbs = false; // location 'breadcrumbs' will be dropped as things mov
 var map_only = false; // page is in "only display map" mode
 
 // *****************
-// Here we define the 'data records' of the incoming websocket feed
-var data_records = {};
+var sensors = {};
+
+// Here we define the 'data record format' of the incoming websocket feed
 var RECORD_INDEX = 'VehicleRef';  // data record property that is primary key
 var RECORDS_ARRAY = 'request_data'; // incoming socket data property containing data records
 var RECORD_TS = 'RecordedAtTime'; // data record property containing timestamp
@@ -226,7 +228,7 @@ var crumbs = []; // array to hold breadcrumbs as they are drawn
 
 var icon_size = 'L';
 
-var oldBusIcon = L.icon({
+var oldsensorIcon = L.icon({
     iconUrl: ICON_URL,
     iconSize: [20, 20]
 });
@@ -236,8 +238,8 @@ var oldBusIcon = L.icon({
 
 var bus_stop_icon = L.icon({
     iconUrl: '/static/images/bus_stop.png',
-    iconSize: [15,50],
-    iconAnchor: [3,50]
+    iconSize: [15,40],
+    iconAnchor: [3,40]
 });
 
 // ************************
@@ -305,6 +307,16 @@ function init()
 
     draw_stops();
 
+    //debug
+
+    var A = {lat: 52, lng: 0-1/120};
+    var B = {lat: 52+1/60, lng: 1/60};
+    var C = {lat: 52, lng: 0+1/120};
+    var P = {lat: 52+1/120, lng: 1/120}; 
+    log('distance AB '+distance(A,B));
+    log('distance AC '+distance(A,C));
+    log('distance CP '+distance(C,P));
+    log('line distance P to A,B '+distance_from_line(P,[A,B]));
 } // end init()            
 
 // *********************************************************************************
@@ -432,7 +444,7 @@ function draw_journey(vehicle_journey_id)
 // lat/longs in e.g. p1.lat etc
 function distance(p1, p2) 
 {
-    var R = 6378137; // Earth's mean radius in meter
+    var R = 6371000; // Earth's mean radius in meter
     var dLat = rad(p2.lat - p1.lat);
     var dLong = rad(p2.lng - p1.lng);
     var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -541,6 +553,26 @@ function intersect(line1, line2)
     return { success: false }; // lines don't intersect
 }
 
+// Perpendicular distance of point {lat:, lng:} from a line [A,B]
+// where A,B are points
+function distance_from_line(point, line)
+{
+    // d13 is (angular) distance from start point to third point
+    // theta13 is (initial) bearing from start point to third point
+    // theta12 is (initial) bearing from start point to end point
+    // R is Earth radius
+
+    var R = 6371000; // Earth's mean radius in meter
+
+    var d13 = distance(line[0], point);
+
+    var theta13 = rad(bearing(line[0], point));
+
+    var theta12 = rad(bearing(line[0], line[1]));
+
+    var d = Math.asin(Math.sin(d13/R)*Math.sin(theta13-theta12)) * R;
+    return Math.abs(d);
+}
 
 //*********************************************************************************************
 //*********************************************************************************************
@@ -566,69 +598,69 @@ function miles(x)
 }
 
 // *********************************************************************************
-// ************* Bus update code ***************************************************
+// ************* Sensor update code ***************************************************
 // *********************************************************************************
 
-function bus_tooltip_content(bus)
+function tooltip_content(msg)
 {
     var time = new Date();
     var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
                    ("0" + time.getMinutes()).slice(-2) + ":" + 
                    ("0" + time.getSeconds()).slice(-2);
     return time_str +
-                        '<br/>' + bus[RECORD_INDEX] + 
-			'<br/>Line "' + bus['PublishedLineName'] +'"'+
-                        '<br/>Delay: ' + bus['Delay'];
+                        '<br/>' + msg[RECORD_INDEX] + 
+			'<br/>Line "' + msg['PublishedLineName'] +'"'+
+                        '<br/>Delay: ' + msg['Delay'];
 }
 
-function bus_popup_content(msg)
+function popup_content(msg)
 {
     var time = new Date();
     var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
                    ("0" + time.getMinutes()).slice(-2) + ":" + 
                    ("0" + time.getSeconds()).slice(-2);
-    var record_key = msg[RECORD_INDEX];
+    var sensor_id = msg[RECORD_INDEX];
     return time_str +
-        '<br/>' + record_key + 
+        '<br/>' + sensor_id + 
 		'<br/>Line "' + msg['PublishedLineName'] +'"'+
         '<br/>Delay: ' + msg['Delay']+
-        '<br/><a href="#" onclick="click_more('+"'"+record_key+"'"+')">more</a>';
+        '<br/><a href="#" onclick="click_more('+"'"+sensor_id+"'"+')">more</a>';
 }
 
-// user has clicked on 'more' in the bus popup
-function bus_more_content(record_key)
+// user has clicked on 'more' in the sensor popup
+function more_content(sensor_id)
 {
-    var data_record = data_records[record_key];
-    var content = JSON.stringify(data_record.msg).replace(/,/g,', ');
+    var sensor_state = sensors[sensor_id];
+    var content = JSON.stringify(sensor_state.msg).replace(/,/g,', ');
     content +=
-        '<br/><a href="#" onclick="click_less('+"'"+record_key+"'"+')">less</a>';
+        '<br/><a href="#" onclick="click_less('+"'"+sensor_id+"'"+')">less</a>';
     return content;
 }
 
-function update_record(msg)
+function update_sensor(msg)
 {
-		// existing bus data record has arrived
+		// existing sensor data record has arrived
 
-        var record_key = msg[RECORD_INDEX];
+        var sensor_id = msg[RECORD_INDEX];
 
-		if (msg['RecordedAtTime'] !== data_records[record_key].msg['RecordedAtTime'])
+		if (msg[RECORD_TS] !== sensors[sensor_id].msg[RECORD_TS])
         {
             // move marker
             var position = [msg[RECORD_LAT], msg[RECORD_LNG]];
-            var marker = data_records[record_key].marker;
+            var marker = sensors[sensor_id].marker;
 		    marker.moveTo(position, [1000] ); 
 		    marker.resume();
 
             // update tooltip and popup
-		    marker.setTooltipContent(bus_tooltip_content(msg));
-		    marker.setPopupContent(bus_popup_content(msg));
+		    marker.setTooltipContent(tooltip_content(msg));
+		    marker.setPopupContent(popup_content(msg));
 
             // store as latest msg
-		    data_records[record_key].msg = msg; // update entry for this msg
+		    sensors[sensor_id].msg = msg; // update entry for this msg
             add_breadcrumb(position);
 
             // flag if this record is OLD or NEW
-            update_old_status(data_records[record_key]);
+            update_old_status(sensors[sensor_id]);
 		}
 }
 
@@ -656,33 +688,33 @@ function create_icon(msg)
     }
 
     return L.divIcon({ 
-        className: 'marker_bus_'+icon_size,
+        className: 'marker_sensor_'+icon_size,
         iconSize: marker_size,
         html: marker_html
     });
 }
 
-function create_record(msg)
+function create_sensor(msg)
 {
-    // new bus, create marker
+    // new sensor, create marker
     log(' ** New '+msg[RECORD_INDEX]);
 
-    var record_key = msg[RECORD_INDEX];
+    var sensor_id = msg[RECORD_INDEX];
 
-    var data_record = {};
+    var sensor_state = {};
 
     var marker_icon = create_icon(msg);
 
-    data_record['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
+    sensor_state['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
                                                    [msg[RECORD_LAT], msg[RECORD_LNG]]],
                                                   [1000],
                                                   {icon: marker_icon});
-    data_record['marker']
+    sensor_state['marker']
         .addTo(map)
-        .bindPopup(bus_popup_content(msg), { className: "bus-popup"})
-        .bindTooltip(bus_tooltip_content(msg), {
+        .bindPopup(popup_content(msg), { className: "sensor-popup"})
+        .bindTooltip(tooltip_content(msg), {
                             // permanent: true,
-                            className: "bus-tooltip",
+                            className: "sensor-tooltip",
                             interactive: true
                           })
         .on('click', function()
@@ -691,9 +723,9 @@ function create_record(msg)
                 })
         .start();
 
-    data_record.msg = msg;
-    data_records[record_key] = data_record;
-    update_old_status(data_record);
+    sensor_state.msg = msg;
+    sensors[sensor_id] = sensor_state;
+    update_old_status(sensor_state);
 }
 
 function add_breadcrumb(pos)
@@ -725,7 +757,7 @@ function handle_records(websock_data)
 // Process replay data
 function replay_step()
 {
-    replay_time = replay_time + replay_interval;
+    replay_time = replay_time + (replay_interval*replay_speedup);
 
     var current_index = replay_index;
 
@@ -740,39 +772,44 @@ function replay_step()
     if ( replay_index < rtroute_trip.length 
          && replay_index > current_index)
     {
-        var data_record = rtroute_trip[replay_index-1];
+        var msg = rtroute_trip[replay_index-1];
 
-        var time_str = get_hh_mm_ss(new Date(data_record['acp_ts']*1000));
+        var time_str = hh_mm_ss(new Date(msg['acp_ts']*1000));
         var next_time_str = (replay_index < rtroute_trip.length - 1)
-                            ? get_hh_mm_ss(new Date(rtroute_trip[replay_index]['acp_ts']*1000))
+                            ? hh_mm_ss(new Date(rtroute_trip[replay_index]['acp_ts']*1000))
                             : '--end of records--';
         log('replay record '+(replay_index-1)+' '+time_str+' next: '+next_time_str);
 
-        handle_record(data_record);
+        handle_record(msg);
+    }
+
+    if ( replay_index == rtroute_trip.length )
+    {
+        replay_stop();
     }
 }
 
 // process a single data record
-function handle_record(data_record)
+function handle_record(msg)
 {
     // add to recorded_data if recording is on
 
     if (recording_on)
     {
-        recorded_records.push(JSON.stringify(data_record));
+        recorded_records.push(JSON.stringify(msg));
     }
 
-    var record_key = data_record[RECORD_INDEX];
+    var sensor_id = msg[RECORD_INDEX];
 
-    // If an existing entry in 'data_records' has this key, then update
+    // If an existing entry in 'sensors' has this key, then update
     // otherwise create new entry.
-    if (data_records.hasOwnProperty(record_key)) 
+    if (sensors.hasOwnProperty(sensor_id)) 
     {
-        update_record(data_record);
+        update_sensor(msg);
     }
     else 
     {
-        create_record(data_record);
+        create_sensor(msg);
     }
 }
 
@@ -788,11 +825,11 @@ function update_clock()
     {
         clock_time = new Date();
     }
-    document.getElementById('clock').innerHTML = get_hh_mm_ss(clock_time);
+    document.getElementById('clock').innerHTML = hh_mm_ss(clock_time);
 }
 
 // watchdog function to flag 'old' data records
-// records are stored in 'data_records' object
+// records are stored in 'sensors' object
 function check_old_records()
 {
     //console.log('checking for old data records..,');
@@ -807,61 +844,61 @@ function check_old_records()
             return;
     }
 
-    for (key in data_records)
+    for (key in sensors)
     {
-        update_old_status(data_records[key]);
+        update_old_status(sensors[key]);
     }
 }
 
 // given a data record, update '.old' property t|f and reset marker icon
-function update_old_status(data_record)
+function update_old_status(sensor_state)
 {
-    var data_timestamp; // will hold Date from data_record
+    var data_timestamp; // will hold Date from sensor_state
 
     switch (RECORD_TS_FORMAT)
     {
         case 'ISO8601':
-            data_timestamp = new Date(data_record.msg[RECORD_TS]);
+            data_timestamp = new Date(sensor_state.msg[RECORD_TS]);
             break;
 
         default:
             return;
     }
 
-    // get current value of data_record.old flag (default false)
-    var current_old_flag = !(data_record.old == null) || data_record.old;
+    // get current value of sensor_state.old flag (default false)
+    var current_old_flag = !(sensor_state.old == null) || sensor_state.old;
 
-    // calculate age of data_record (in seconds) 
+    // calculate age of sensor_state (in seconds) 
     var age = (clock_time - data_timestamp) / 1000;
 
     if (age > OLD_DATA_RECORD)
     {
         // data record is OLD
         // skip if this data record is already flagged as old
-        if (data_record.old != null && data_record.old)
+        if (sensor_state.old != null && sensor_state.old)
         {
             return;
         }
         // set the 'old' flag on this record and update icon
-        data_record.old = true;
-        data_record.marker.setIcon(oldBusIcon);
+        sensor_state.old = true;
+        sensor_state.marker.setIcon(oldsensorIcon);
     }
     else
     {
         // data record is NOT OLD
         // skip if this data record is already NOT OLD
-        if (data_record.old != null && !data_record.old)
+        if (sensor_state.old != null && !sensor_state.old)
         {
             return;
         }
         // reset the 'old' flag on this data record and update icon
-        data_record.old = false;
-        data_record.marker.setIcon(create_icon(data_record.msg));
+        sensor_state.old = false;
+        sensor_state.marker.setIcon(create_icon(sensor_state.msg));
     }
 }
 
 // return provided JS Date() as HH:MM:SS
-function get_hh_mm_ss(datetime)
+function hh_mm_ss(datetime)
 {
     var hh = ('0'+datetime.getHours()).slice(-2);
     var mm = ('0'+datetime.getMinutes()).slice(-2);
@@ -882,7 +919,7 @@ var log_append = false;
 function log(msg)
 {
     // create HH:MM:SS timestamp for this log record
-    var ts = get_hh_mm_ss(new Date());
+    var ts = hh_mm_ss(new Date());
 
     // create outermost log record element
     var new_log_record = document.createElement('div');
@@ -1025,7 +1062,7 @@ function sock_send_str(msg)
 // *************** User interaction functions *********************************************
 // ****************************************************************************************
 
-// toggle the 'breadcrumbs' function that draws a dot every time a bus position is received
+// toggle the 'breadcrumbs' function that draws a dot every time a sensor position is received
 function click_breadcrumbs()
 {
     breadcrumbs = document.getElementById("breadcrumbs").checked == true;
@@ -1042,18 +1079,18 @@ function click_log_append()
     }
 }
 
-// remove all markers from map and reset 'data_records' array
+// remove all markers from map and reset 'sensors' array
 function clear_markers()
 {
     //console.log('clear_markers');
-    for (record_key in data_records)
+    for (sensor_id in sensors)
     {
-        if (data_records[record_key]['marker'])
+        if (sensors[sensor_id]['marker'])
         {
-            map.removeLayer(data_records[record_key]['marker']);
+            map.removeLayer(sensors[sensor_id]['marker']);
         }
     }
-    data_records = {};
+    sensors = {};
 }
 
 // remove all crumbs from map
@@ -1174,18 +1211,18 @@ function draw_poly()
     }
 }
 
-// user clicked on 'more' in bus popup                          
-function click_more(record_key)
+// user clicked on 'more' in sensor popup                          
+function click_more(sensor_id)
 {
-    var data_record = data_records[record_key];
-    data_record.marker.setPopupContent(bus_more_content(record_key));
+    var sensor_state = sensors[sensor_id];
+    sensor_state.marker.setPopupContent(more_content(sensor_id));
 }
 
-// user clicked on 'less' in bus popup
-function click_less(record_key)
+// user clicked on 'less' in sensor popup
+function click_less(sensor_id)
 {
-    var data_record = data_records[record_key];
-    data_record.marker.setPopupContent(bus_popup_content(data_record.msg));
+    var sensor_state = sensors[sensor_id];
+    sensor_state.marker.setPopupContent(popup_content(sensor_state.msg));
 }
 
 // user has clicked to only show the map
@@ -1277,6 +1314,12 @@ function replay_stop()
     log('Replay stopped at '+new Date(replay_time*1000));
 }
 
+function click_replay_speedup()
+{
+    replay_speedup = document.getElementById('replay_speedup').value;
+    log('Changed replay speedup to '+replay_speedup);
+}
+
 function click_show_map()
 {
     show_map = document.getElementById("show_map").checked == true;
@@ -1320,7 +1363,7 @@ function click_show_map()
         title="Draw a polygon on the map to create an API 'inside' filter in scratchpad"
         ></input>
     <input type="button" id="clear_markers" onclick="clear_markers()" value="Clear icons"
-        title="Remove any bus icons that have been drawn on the map"
+        title="Remove any sensor icons that have been drawn on the map"
         ></input>
     <input type="button" id="clear_crumbs" onclick="clear_crumbs()" value="Clear breadcrumbs"
         title="Remove any breadcrumbs that have been drawn on the map"
@@ -1356,6 +1399,8 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
     <button onclick="replay_stop()"
         title="Stop replay"
         >Stop</button>
+    Speedup: <input id="replay_speedup" type="text" size="4" value="1" 
+                onchange="click_replay_speedup()"></input>
 </div>
 
 <h4>Realtime API scratchpad:</h4>
