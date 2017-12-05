@@ -4,7 +4,7 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTRoute v0.17</title>
+    <title>RTRoute v0.18</title>
 <!--
 RELEASE INFO:
     2017-12-01 imported stops, journeys and trip data, draw_stops and draw_route code
@@ -150,8 +150,8 @@ body {
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
-var MAP_CENTER = [52.205, 0.119];
-var MAP_SCALE = 13;
+var MAP_CENTER = [52.218, -0.0666];//[52.205, 0.119];
+var MAP_SCALE = 15;//13;
 
 var OLD_TIMER_INTERVAL = 30; // watchdog timer interval (s) checking for old data records
 var OLD_DATA_RECORD = 60; // time (s) threshold where a data record is considered 'old'
@@ -174,20 +174,48 @@ var console_div;
 // *********************************************************
 // RTRoutes globals
 
-// Local dictionary of stops keyed on stop_id
+// Local dictionary of STOPS keyed on stop_id
 // Sample stop record in rtroute_stops:
 // { stop_id:'0500CCITY055', lat:52.2114061236, lng:0.10481260687, common_name:'Storey\'s Way'},
 // becomes
 // stops['0500CCITY055'] = {this stop record}
 var stops = {};
 
-// Local dictionary of journeys keyed on vehicle_journey_id
+// Local dictionary of JOURNEYS keyed on vehicle_journey_id
 // Sample journey data record in rtroutes_journeys:
 // {vehicle_journey_id:'20-4-_-y08-1-98-T2',order:1,time:'11:22:00',stop_id:'0500SCAMB011'},
 // becomes:
 // journeys['20-4-_-y08-1-98-T2'] = { route: [ ... {above record} ] }
 var journeys = {};
 var journeys_count = 0;
+
+// Trip data (from rtroutes_trip.js)
+//  { "Delay": "PT0S", 
+//    "acp_id": "SCCM-19611", 
+//    "acp_ts": 1511156152, 
+//    "Bearing": "0",
+//    "InPanic": "0", 
+//    "LineRef": "4", 
+//    "acp_lat": 52.230381,
+//    "acp_lng": 0.159207,
+//    "Latitude": "52.2303810",
+//    "Longitude": "0.1592070",
+//    "Monitored": "true",
+//    "OriginRef": "0500SCAMB011", 
+//    "OriginName": "De La Warr Way", 
+//    "VehicleRef": "SCCM-19611", 
+//    "OperatorRef": "SCCM", 
+//    "DataFrameRef": "1", 
+//    "DirectionRef": "INBOUND", 
+//    "DestinationRef": "0500CCITY484", 
+//    "RecordedAtTime": "2017-11-20T05:35:52+00:00", 
+//    "ValidUntilTime": "2017-11-20T05:35:52+00:00", 
+//    "DestinationName": "Drummer Str Stop D3", 
+//    "PublishedLineName": "4", 
+//    "VehicleMonitoringRef": "SCCM-19611", 
+//    "DatedVehicleJourneyRef": "2", 
+//    "OriginAimedDepartureTime": "2017-11-20T06:02:00+00:00"
+//    },
 
 // Data recording
 var recorded_records = [];
@@ -198,7 +226,7 @@ var replay_time; // holds unix timestamp (secs since 1970), current time of repl
 var replay_timer; // the JS interval timer for the replay function
 var replay_on = false; // Replay mode on|off
 var replay_interval = 1; // Replay step interval (seconds)
-var replay_speedup = 1; // relative speed of replay time to real time
+var replay_speedup = 10; // relative speed of replay time to real time
 var replay_index = 0; // current index into replay data
 
 // *********************************************************
@@ -266,7 +294,7 @@ function init()
     map = L.map('map', map_options)
             .setView(MAP_CENTER, MAP_SCALE);
 
-    map.on('click',map_click);
+    map.on('click',click_map);
 
     map_tiles = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
@@ -300,23 +328,13 @@ function init()
     // RTROUTE STUFF
 
     // build stops dictionary keyed on stop_id
-    init_stops();
+    load_stops();
 
     // build journeys dictionary keyed on vehicle_journey_id
-    init_journeys();
+    load_journeys();
 
     draw_stops();
 
-    //debug
-
-    var A = {lat: 52, lng: 0-1/120};
-    var B = {lat: 52+1/60, lng: 1/60};
-    var C = {lat: 52, lng: 0+1/120};
-    var P = {lat: 52+1/120, lng: 1/120}; 
-    log('distance AB '+distance(A,B));
-    log('distance AC '+distance(A,C));
-    log('distance CP '+distance(C,P));
-    log('line distance P to A,B '+distance_from_line(P,[A,B]));
 } // end init()            
 
 // *********************************************************************************
@@ -324,7 +342,7 @@ function init()
 // *********************************************************************************
 
 // Load the rtroute_stops array (from rtroute_stops.js) into stops dictionary
-function init_stops()
+function load_stops()
 {
     for (var i=0; i<rtroute_stops.length; i++)
     {
@@ -333,13 +351,13 @@ function init_stops()
 }
 
 // Load the rtroute_journeys array (from rtroute_journeys.js) into journeys dictionary
-function init_journeys()
+function load_journeys()
 {
     // Iterate through all the vehicle_journey_id/stop_id/time/order... records
     for (var i=0; i<rtroute_journeys.length; i++)
     {
         var journey_stop = rtroute_journeys[i];
-        var order = journey_stop.order;
+        var stop_index = journey_stop.order - 1; // order goes 1..n, stop_index starts at 0
         var vehicle_journey_id = journey_stop.vehicle_journey_id;
         var stop = stops[journey_stop.stop_id];
 
@@ -349,33 +367,34 @@ function init_journeys()
             var journey = journeys[vehicle_journey_id];
 
             // Add an arrow from previous stop to this stop
-            var prev_stop = stops[journey.route[order - 1].stop_id];
-            var diffLat = stop.lat - prev_stop.lat;
-            var diffLng = stop.lng - prev_stop.lng;
-            var center = [prev_stop.lat + diffLat/2, prev_stop.lng + diffLng/2];
-            var angle = bearing({ lat: prev_stop.lat, lng: prev_stop.lng },
-                                { lat: stop.lat, lng: stop.lng });
-            journey.route[order - 1].arrow = new L.marker(
-                center,
-                { icon: new L.divIcon({ 
-                              className : 'arrow_icon',
-                              iconSize: new L.Point(30,30), 
-                              iconAnchor: new L.Point(15,15), 
-                              html : '<div style = "font-size: 20px;'+
-                                  '-webkit-transform: rotate('+ angle +'deg)">&#10152;</div>'
-                              })
-                }
-            );
-
+            if (stop_index > 0)
+            {
+                var prev_stop = stops[journey.route[stop_index - 1].stop_id];
+                var diffLat = stop.lat - prev_stop.lat;
+                var diffLng = stop.lng - prev_stop.lng;
+                var center = [prev_stop.lat + diffLat/2, prev_stop.lng + diffLng/2];
+                var angle = (bearing(prev_stop, stop)- 90 + 360) % 360;
+                journey.route[stop_index - 1].arrow = new L.marker(
+                    center,
+                    { icon: new L.divIcon({ 
+                                  className : 'arrow_icon',
+                                  iconSize: new L.Point(30,30), 
+                                  iconAnchor: new L.Point(15,15), 
+                                  html : '<div style = "font-size: 20px;'+
+                                      '-webkit-transform: rotate('+ angle +'deg)">&#10152;</div>'
+                                  })
+                    }
+                );
+            }
             // Add this journey row to an existing journey in dictionary
-            journey.route[journey_stop.order] = journey_stop;
+            journey.route[stop_index] = journey_stop;
         }
         else
         {
             // Create a new journey entry with this vehicle_journey_id
             // Start with route of just this current stop
             var new_route = [];
-            new_route[journey_stop.order] = journey_stop;
+            new_route[stop_index] = journey_stop;
 
             // Add this route to a new journeys entry
             journeys[journey_stop.vehicle_journey_id] = {route: new_route};
@@ -387,55 +406,21 @@ function init_journeys()
 
 }
 
-// Draw the (test) stops on the map and provide a custom marker for each with a popup
-function draw_stops()
+//debug Given a sirivm msg, return the vehicle journey_id
+function sirivm_to_vehicle_journey_id(msg)
 {
-    for (var stop_id in stops)
-    {
-        if (stops.hasOwnProperty(stop_id))
-        {
-            var stop = stops[stop_id];
-            var bus_stop_marker = L.marker([stop.lat, stop.lng], {icon: bus_stop_icon})
-                .addTo(map)
-                .bindPopup(stop.common_name);
-            // store marker for future manipulation of popup
-            stops[stop_id].marker = bus_stop_marker;
-        }
-    }
+    return DEBUG_VEHICLE_JOURNEY_ID;
 }
 
-// Draw the straight lines between stops on the selected journey
-// The journey stops data is stored in 'journeys' created at startup
-function draw_journey(vehicle_journey_id)
+function vehicle_journey_id_to_route(vehicle_journey_id)
 {
-    var journey = journeys[vehicle_journey_id];
-    var poly_line = L.polyline([], {color: 'red'}).addTo(map);
-    journey.poly_line = poly_line;
-    log('Drawing journey '+vehicle_journey_id+', length '+journey.route.length);
-    for (var i=1; i<=journey.route.length; i++)
+    if (!journeys.hasOwnProperty(vehicle_journey_id))
     {
-        if (journey.route[i])
-        {
-            var route_stop = journey.route[i];
-            var stop_id = route_stop.stop_id;
-            console.log('draw_journey() ' +stop_id);
-            var stop = stops[stop_id];
-            console.log('stops['+stop_id+']='+stop.stop_id+' lat,lng='+stop.lat+','+stop.lng);
-            // update stop popup with time for this journey
-            stop.marker.setPopupContent(stop.common_name+'</br>'+route_stop.time);
-            // add journey segment to map
-            var p = new L.LatLng(stop.lat, stop.lng);
-            journey.poly_line.addLatLng(p);
-
-            // add arrow
-            if (journey.route[i].arrow)
-            {
-                journey.route[i].arrow.addTo(map);
-            }
-        }
+        return null;
     }
+    return journeys[vehicle_journey_id].route;
 }
-    
+
 // *********************************************************************************
 // ************* Geometric Functions ***********************************************
 // *********************************************************************************
@@ -516,13 +501,13 @@ function inside(position, bounds_path, box)
 // Bearing in degrees from pos1 -> pos2 as {lat: , lng: }
 function bearing(pos1, pos2)
 {
-    var a = { lat: pos1.lat * Math.PI / 180, lng: pos1.lng * Math.PI / 180 };
-    var b = { lat: pos2.lat * Math.PI / 180, lng: pos2.lng * Math.PI / 180 };
+    var a = { lat: rad(pos1.lat), lng: rad(pos1.lng) };
+    var b = { lat: rad(pos2.lat), lng: rad(pos2.lng) };
 
     var y = Math.sin(b.lng-a.lng) * Math.cos(b.lat);
     var x = Math.cos(a.lat)*Math.sin(b.lat) - 
                 Math.sin(a.lat)*Math.cos(b.lat)*Math.cos(b.lng-a.lng);
-    return (Math.atan2(y, x) * 180 / Math.PI) - 90;
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 // http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
@@ -553,24 +538,50 @@ function intersect(line1, line2)
     return { success: false }; // lines don't intersect
 }
 
-// Perpendicular distance of point {lat:, lng:} from a line [A,B]
+// Perpendicular distance of point P {lat:, lng:} from a line [A,B]
 // where A,B are points
-function distance_from_line(point, line)
+function distance_from_line(P, line)
 {
-    // d13 is (angular) distance from start point to third point
-    // theta13 is (initial) bearing from start point to third point
-    // theta12 is (initial) bearing from start point to end point
-    // R is Earth radius
 
+    // Prepare some values for the calculation
     var R = 6371000; // Earth's mean radius in meter
 
-    var d13 = distance(line[0], point);
+    var A = line[0];
 
-    var theta13 = rad(bearing(line[0], point));
+    var B = line[1];
 
-    var theta12 = rad(bearing(line[0], line[1]));
+    var bearing_AP = bearing(A, P);
 
-    var d = Math.asin(Math.sin(d13/R)*Math.sin(theta13-theta12)) * R;
+    var bearing_AB = bearing(A, B);
+
+    var bearing_BP = bearing(B, P);
+
+    // if point P is 'behind' A wrt to B, then return distance from A
+    var angle_BAP = (bearing_AP - bearing_AB + 360) % 360;
+
+    console.log('angle_BAP',angle_BAP);
+
+    if (angle_BAP > 90 && angle_BAP < 270)
+    {
+        return distance(A,P);
+    }
+
+    // if point P is 'behind' B wrt to A, then return distance from B
+    var angle_ABP = (180 - bearing_BP + bearing_AB + 360) % 360;
+
+    console.log('angle_ABP',angle_ABP);
+
+    if (angle_ABP > 90 && angle_ABP < 270)
+    {
+        return distance(B,P);
+    }
+
+    // ok, so the point P is somewhere between A and B, so return perpendicular distance
+
+    var distance_AB = distance(A, P);
+
+    var d = Math.asin(Math.sin(distance_AB/R)*Math.sin(rad(bearing_AP - bearing_AB))) * R;
+    
     return Math.abs(d);
 }
 
@@ -601,42 +612,6 @@ function miles(x)
 // ************* Sensor update code ***************************************************
 // *********************************************************************************
 
-function tooltip_content(msg)
-{
-    var time = new Date();
-    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
-                   ("0" + time.getMinutes()).slice(-2) + ":" + 
-                   ("0" + time.getSeconds()).slice(-2);
-    return time_str +
-                        '<br/>' + msg[RECORD_INDEX] + 
-			'<br/>Line "' + msg['PublishedLineName'] +'"'+
-                        '<br/>Delay: ' + msg['Delay'];
-}
-
-function popup_content(msg)
-{
-    var time = new Date();
-    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
-                   ("0" + time.getMinutes()).slice(-2) + ":" + 
-                   ("0" + time.getSeconds()).slice(-2);
-    var sensor_id = msg[RECORD_INDEX];
-    return time_str +
-        '<br/>' + sensor_id + 
-		'<br/>Line "' + msg['PublishedLineName'] +'"'+
-        '<br/>Delay: ' + msg['Delay']+
-        '<br/><a href="#" onclick="click_more('+"'"+sensor_id+"'"+')">more</a>';
-}
-
-// user has clicked on 'more' in the sensor popup
-function more_content(sensor_id)
-{
-    var sensor_state = sensors[sensor_id];
-    var content = JSON.stringify(sensor_state.msg).replace(/,/g,', ');
-    content +=
-        '<br/><a href="#" onclick="click_less('+"'"+sensor_id+"'"+')">less</a>';
-    return content;
-}
-
 function update_sensor(msg)
 {
 		// existing sensor data record has arrived
@@ -659,12 +634,199 @@ function update_sensor(msg)
 		    sensors[sensor_id].msg = msg; // update entry for this msg
             add_breadcrumb(position);
 
-            // flag if this record is OLD or NEW
-            update_old_status(sensors[sensor_id]);
+            var sensor = sensors[sensor_id];
+
+            update_state(sensor);
 		}
 }
 
-function create_icon(msg)
+function create_sensor(msg)
+{
+    // new sensor, create marker
+    log(' ** New '+msg[RECORD_INDEX]);
+
+    var sensor_id = msg[RECORD_INDEX];
+
+    var sensor = { sensor_id: sensor_id,
+                   msg: msg
+                 };
+
+    var marker_icon = create_sensor_icon(msg);
+
+    sensor['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
+                                                   [msg[RECORD_LAT], msg[RECORD_LNG]]],
+                                                  [1000],
+                                                  {icon: marker_icon});
+    sensor['marker']
+        .addTo(map)
+        .bindPopup(popup_content(msg), { className: "sensor-popup"})
+        .bindTooltip(tooltip_content(msg), {
+                            // permanent: true,
+                            className: "sensor-tooltip",
+                            interactive: true
+                          })
+        .on('click', function()
+                {
+                  //console.log("marker click handler");
+                })
+        .start();
+
+    sensors[sensor_id] = sensor;
+
+    init_state(sensor);
+}
+
+// Initialize sensor state (e.g. for bus, vehicle_journey_id, route_index)
+function init_state(sensor)
+{
+    //log('Initializing '+sensor.sensor_id);
+
+    sensor.state = {};
+
+    if (!sensor.msg['OriginRef'])
+    {
+        return;
+    }
+
+    sensor.state.vehicle_journey_id = sirivm_to_vehicle_journey_id(sensor.msg);
+
+    // flag if this record is OLD or NEW
+    update_old_status(sensor);
+
+    update_route_index(sensor);
+}
+
+// Update sensor state
+function update_state(sensor)
+{
+    //log('Updating '+sensor.sensor_id);
+
+    // flag if this record is OLD or NEW
+    update_old_status(sensor);
+
+    update_route_index(sensor);
+
+}
+
+// Given a data record, update '.old' property t|f and reset marker icon
+// Note that 'current time' is the JS date value in global 'clock_time'
+// so that this function works equally well during replay of old data.
+function update_old_status(sensor)
+{
+    var data_timestamp; // will hold Date from sensor
+
+    switch (RECORD_TS_FORMAT)
+    {
+        case 'ISO8601':
+            data_timestamp = new Date(sensor.msg[RECORD_TS]);
+            break;
+
+        default:
+            return;
+    }
+
+    // get current value of sensor.state.old flag (default false)
+    var current_old_flag = !(sensor.state.old == null) || sensor.state.old;
+
+    // calculate age of sensor (in seconds) 
+    var age = (clock_time - data_timestamp) / 1000;
+
+    if (age > OLD_DATA_RECORD)
+    {
+        // data record is OLD
+        // skip if this data record is already flagged as old
+        if (sensor.state.old != null && sensor.state.old)
+        {
+            return;
+        }
+        // set the 'old' flag on this record and update icon
+        sensor.state.old = true;
+        sensor.marker.setIcon(oldsensorIcon);
+    }
+    else
+    {
+        // data record is NOT OLD
+        // skip if this data record is already NOT OLD
+        if (sensor.state.old != null && !sensor.state.old)
+        {
+            return;
+        }
+        // reset the 'old' flag on this data record and update icon
+        sensor.state.old = false;
+        sensor.marker.setIcon(create_sensor_icon(sensor.msg));
+    }
+}
+
+function update_route_index(sensor)
+{
+    // If sensor doesn't have a vehicle_journey_id then
+    // there's nothing we can do, so return
+    if (!sensor.state.vehicle_journey_id)
+    {
+        return;
+    }
+
+    var route = vehicle_journey_id_to_route(sensor.state.vehicle_journey_id);
+
+    //debug here we're hardcoding the start of the journey
+    // for testing purposes
+    sensor.state.route_index = nearest_route_segment(sensor, route);
+
+    // highlight line on map of next route segment
+    var route_index = sensor.state.route_index > 0 ? sensor.state.route_index : 1;
+    
+    var prev_stop_id = sensor.state.prev_stop_id;
+
+    var next_stop_id = sensor.state.next_stop_id;
+
+    sensor.state.prev_stop_id = route[route_index - 1].stop_id;
+
+    sensor.state.next_stop_id = route[route_index].stop_id;
+
+    if (prev_stop_id != sensor.state.prev_stop_id || next_stop_id != sensor.state.next_stop_id) 
+    {
+        if (sensor.state.route_segment_line)
+        {
+            map.removeLayer(sensor.state.route_segment_line);
+        }
+        sensor.state.route_segment_line = draw_line(stops[sensor.state.prev_stop_id],
+                                                stops[sensor.state.next_stop_id],
+                                                'green');
+        log('Next stop for '+sensor.sensor_id+' is '+sensor.state.next_stop_id);
+    }
+}
+
+// Given a sensor location, return route_index of nearest route segment
+// where the segment is route[route_index-1]..route[route_index]
+function nearest_route_segment(sensor, route)
+{
+    var P = get_point(sensor.msg);
+
+    var min_distance = 999999999;
+    var route_index = 0;
+
+    for (var i=1; i<route.length; i++)
+    {
+        var prev_stop_id = route[i-1].stop_id;
+        var next_stop_id = route[i].stop_id;
+
+        var line_distance = distance_from_line(P, [stops[prev_stop_id],stops[next_stop_id]]);
+        if (line_distance < min_distance)
+        {
+            route_index = i;
+            min_distance = line_distance;
+        }
+    }
+    return route_index;
+}
+
+// return {lat:, lng:} from sensor message
+function get_point(msg)
+{
+    return { lat: msg[RECORD_LAT], lng: msg[RECORD_LNG] };
+}
+
+function create_sensor_icon(msg)
 {
     var line = '';
 
@@ -694,40 +856,6 @@ function create_icon(msg)
     });
 }
 
-function create_sensor(msg)
-{
-    // new sensor, create marker
-    log(' ** New '+msg[RECORD_INDEX]);
-
-    var sensor_id = msg[RECORD_INDEX];
-
-    var sensor_state = {};
-
-    var marker_icon = create_icon(msg);
-
-    sensor_state['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
-                                                   [msg[RECORD_LAT], msg[RECORD_LNG]]],
-                                                  [1000],
-                                                  {icon: marker_icon});
-    sensor_state['marker']
-        .addTo(map)
-        .bindPopup(popup_content(msg), { className: "sensor-popup"})
-        .bindTooltip(tooltip_content(msg), {
-                            // permanent: true,
-                            className: "sensor-tooltip",
-                            interactive: true
-                          })
-        .on('click', function()
-                {
-                  //console.log("marker click handler");
-                })
-        .start();
-
-    sensor_state.msg = msg;
-    sensors[sensor_id] = sensor_state;
-    update_old_status(sensor_state);
-}
-
 function add_breadcrumb(pos)
 {
     if (breadcrumbs)
@@ -735,6 +863,43 @@ function add_breadcrumb(pos)
         var crumb = L.circleMarker(pos, { color: 'blue', radius: 1 }).addTo(map);
         crumbs.push(crumb);
     }
+}
+
+function tooltip_content(msg)
+{
+    var time = new Date();
+    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
+                   ("0" + time.getMinutes()).slice(-2) + ":" + 
+                   ("0" + time.getSeconds()).slice(-2);
+    return time_str +
+                        '<br/>' + msg[RECORD_INDEX] + 
+			'<br/>Line "' + msg['PublishedLineName'] +'"'+
+                        '<br/>Delay: ' + msg['Delay'];
+}
+
+function popup_content(msg)
+{
+    var time = new Date();
+    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
+                   ("0" + time.getMinutes()).slice(-2) + ":" + 
+                   ("0" + time.getSeconds()).slice(-2);
+    var sensor_id = msg[RECORD_INDEX];
+    return time_str +
+        '<br/>' + sensor_id + 
+		'<br/>Line "' + msg['PublishedLineName'] +'"'+
+        '<br/>Delay: ' + msg['Delay']+
+        '<br/><a href="#" onclick="click_journey('+"'"+sensor_id+"'"+')">journey</a>'+
+        '<br/><a href="#" onclick="click_more('+"'"+sensor_id+"'"+')">more</a>';
+}
+
+// user has clicked on 'more' in the sensor popup
+function more_content(sensor_id)
+{
+    var sensor = sensors[sensor_id];
+    var content = JSON.stringify(sensor.msg).replace(/,/g,', ');
+    content +=
+        '<br/><a href="#" onclick="click_less('+"'"+sensor_id+"'"+')">less</a>';
+    return content;
 }
 
 // ********************************************************************************
@@ -750,7 +915,7 @@ function handle_records(websock_data)
     //console.log('handle_records'+json['request_data'].length);
     for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++) 
     {
-	    handle_record(incoming_data[RECORDS_ARRAY][i]);
+	    handle_msg(incoming_data[RECORDS_ARRAY][i]);
     }
 } // end function handle_records
 
@@ -780,7 +945,7 @@ function replay_step()
                             : '--end of records--';
         log('replay record '+(replay_index-1)+' '+time_str+' next: '+next_time_str);
 
-        handle_record(msg);
+        handle_msg(msg);
     }
 
     if ( replay_index == rtroute_trip.length )
@@ -790,7 +955,7 @@ function replay_step()
 }
 
 // process a single data record
-function handle_record(msg)
+function handle_msg(msg)
 {
     // add to recorded_data if recording is on
 
@@ -844,56 +1009,9 @@ function check_old_records()
             return;
     }
 
-    for (key in sensors)
+    for (sensor_id in sensors)
     {
-        update_old_status(sensors[key]);
-    }
-}
-
-// given a data record, update '.old' property t|f and reset marker icon
-function update_old_status(sensor_state)
-{
-    var data_timestamp; // will hold Date from sensor_state
-
-    switch (RECORD_TS_FORMAT)
-    {
-        case 'ISO8601':
-            data_timestamp = new Date(sensor_state.msg[RECORD_TS]);
-            break;
-
-        default:
-            return;
-    }
-
-    // get current value of sensor_state.old flag (default false)
-    var current_old_flag = !(sensor_state.old == null) || sensor_state.old;
-
-    // calculate age of sensor_state (in seconds) 
-    var age = (clock_time - data_timestamp) / 1000;
-
-    if (age > OLD_DATA_RECORD)
-    {
-        // data record is OLD
-        // skip if this data record is already flagged as old
-        if (sensor_state.old != null && sensor_state.old)
-        {
-            return;
-        }
-        // set the 'old' flag on this record and update icon
-        sensor_state.old = true;
-        sensor_state.marker.setIcon(oldsensorIcon);
-    }
-    else
-    {
-        // data record is NOT OLD
-        // skip if this data record is already NOT OLD
-        if (sensor_state.old != null && !sensor_state.old)
-        {
-            return;
-        }
-        // reset the 'old' flag on this data record and update icon
-        sensor_state.old = false;
-        sensor_state.marker.setIcon(create_icon(sensor_state.msg));
+        update_old_status(sensors[sensor_id]);
     }
 }
 
@@ -1062,6 +1180,77 @@ function sock_send_str(msg)
 // *************** User interaction functions *********************************************
 // ****************************************************************************************
 
+// Draw the (test) stops on the map and provide a custom marker for each with a popup
+function draw_stops()
+{
+    for (var stop_id in stops)
+    {
+        if (stops.hasOwnProperty(stop_id))
+        {
+            var stop = stops[stop_id];
+            var bus_stop_marker = L.marker([stop.lat, stop.lng], {icon: bus_stop_icon})
+                .addTo(map)
+                .bindPopup(stop.common_name);
+            // store marker for future manipulation of popup
+            stops[stop_id].marker = bus_stop_marker;
+        }
+    }
+}
+
+// Draw the straight lines between stops on the selected journey
+// The journey stops data is stored in 'journeys' created at startup
+function draw_journey(vehicle_journey_id)
+{
+    // Get journey route (sequence of stops).
+    // For data structure see global 'journeys' declaration.
+    // The 'stops' array is in journeys[vehicle_journey_id].route
+    var journey = journeys[vehicle_journey_id];
+
+    // And simply draw the polyline between the stops
+    var poly_line = L.polyline([], {color: 'red'}).addTo(map);
+    journey.poly_line = poly_line;
+    log('Drawing journey '+vehicle_journey_id+', length '+journey.route.length);
+    for (var i=0; i<journey.route.length; i++)
+    {
+        if (journey.route[i])
+        {
+            var route_stop = journey.route[i];
+            var stop_id = route_stop.stop_id;
+            //console.log('draw_journey() ' +stop_id);
+            var stop = stops[stop_id];
+            //console.log('stops['+stop_id+']='+stop.stop_id+' lat,lng='+stop.lat+','+stop.lng);
+
+            // update stop popup with time for this journey
+            stop.marker.setPopupContent(stop.common_name+'</br>'+route_stop.time);
+
+            // add journey segment to map
+            var p = new L.LatLng(stop.lat, stop.lng);
+            journey.poly_line.addLatLng(p);
+
+            // add arrow
+            if (journey.route[i].arrow)
+            {
+                journey.route[i].arrow.addTo(map);
+            }
+        }
+    }
+}
+
+// draw a line between points A and B as {lat:, lng:}
+function draw_line(A,B, color)
+{
+    if (!color) color = 'green';
+    var line = L.polyline([[A.lat, A.lng],[B.lat,B.lng]], {color: color}).addTo(map);
+    return line;
+}
+
+function draw_circle(A,radius,color)
+{
+    if (!color) color = 'green';
+    var circle = L.circle([A.lat, A.lng],radius,{color: color}).addTo(map);
+    return circle;
+}
+
 // toggle the 'breadcrumbs' function that draws a dot every time a sensor position is received
 function click_breadcrumbs()
 {
@@ -1133,7 +1322,10 @@ function subscribe_all()
     sock_send_str('{ "msg_type": "rt_subscribe", "request_id": "A" }');
 }
 
-function map_click(e)
+// User has clicked on map.
+// If 'poly_draw' is true then draw a polygon on the map and 
+// update the realtime scratchpad with a matching 'inside' request
+function click_map(e)
 {
     if (poly_draw)
     {
@@ -1211,18 +1403,30 @@ function draw_poly()
     }
 }
 
+// user clicked on 'journey' in sensor popup
+function click_journey(sensor_id)
+{
+    var vehicle_journey_id = sensors[sensor_id].state.vehicle_journey_id;
+    if (!vehicle_journey_id)
+    {
+        log('<span style="{ color: red }">No journey available for sensor '+sensor_id+'</span>');
+        return;
+    }
+    draw_journey(vehicle_journey_id);
+}
+
 // user clicked on 'more' in sensor popup                          
 function click_more(sensor_id)
 {
-    var sensor_state = sensors[sensor_id];
-    sensor_state.marker.setPopupContent(more_content(sensor_id));
+    var sensor = sensors[sensor_id];
+    sensor.marker.setPopupContent(more_content(sensor_id));
 }
 
 // user clicked on 'less' in sensor popup
 function click_less(sensor_id)
 {
-    var sensor_state = sensors[sensor_id];
-    sensor_state.marker.setPopupContent(popup_content(sensor_state.msg));
+    var sensor = sensors[sensor_id];
+    sensor.marker.setPopupContent(popup_content(sensor.msg));
 }
 
 // user has clicked to only show the map
@@ -1337,6 +1541,11 @@ function click_show_map()
  
 </head>
 
+<!-- ************************************************************************************** -->
+<!-- ************************************************************************************** -->
+<!-- *********  PAGE HTML      ************************************************************ -->
+<!-- ************************************************************************************** -->
+<!-- ************************************************************************************** -->
 <body onload='init()'>
 
 <div id="control_div" class="top-aligned control_div">
@@ -1399,7 +1608,7 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
     <button onclick="replay_stop()"
         title="Stop replay"
         >Stop</button>
-    Speedup: <input id="replay_speedup" type="text" size="4" value="1" 
+    Speedup: <input id="replay_speedup" type="text" size="4" value="10" 
                 onchange="click_replay_speedup()"></input>
 </div>
 
