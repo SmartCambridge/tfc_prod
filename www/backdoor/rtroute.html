@@ -150,6 +150,8 @@ body {
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
+var LOG_TRUNCATE = 100; // we'll limit the log to this many messages
+
 var MAP_CENTER = [52.218, -0.0666];//[52.205, 0.119];
 var MAP_SCALE = 15;//13;
 
@@ -559,7 +561,7 @@ function distance_from_line(P, line)
     // if point P is 'behind' A wrt to B, then return distance from A
     var angle_BAP = (bearing_AP - bearing_AB + 360) % 360;
 
-    console.log('angle_BAP',angle_BAP);
+    //console.log('angle_BAP',angle_BAP);
 
     if (angle_BAP > 90 && angle_BAP < 270)
     {
@@ -569,7 +571,7 @@ function distance_from_line(P, line)
     // if point P is 'behind' B wrt to A, then return distance from B
     var angle_ABP = (180 - bearing_BP + bearing_AB + 360) % 360;
 
-    console.log('angle_ABP',angle_ABP);
+    //console.log('angle_ABP',angle_ABP);
 
     if (angle_ABP > 90 && angle_ABP < 270)
     {
@@ -621,9 +623,9 @@ function update_sensor(msg)
 		if (msg[RECORD_TS] !== sensors[sensor_id].msg[RECORD_TS])
         {
             // move marker
-            var position = [msg[RECORD_LAT], msg[RECORD_LNG]];
+            var pos = get_point(msg);
             var marker = sensors[sensor_id].marker;
-		    marker.moveTo(position, [1000] ); 
+		    marker.moveTo([pos.lat, pos.lng], [1000] ); 
 		    marker.resume();
 
             // update tooltip and popup
@@ -632,7 +634,7 @@ function update_sensor(msg)
 
             // store as latest msg
 		    sensors[sensor_id].msg = msg; // update entry for this msg
-            add_breadcrumb(position);
+            add_breadcrumb(pos);
 
             var sensor = sensors[sensor_id];
 
@@ -689,6 +691,8 @@ function init_state(sensor)
     }
 
     sensor.state.vehicle_journey_id = sirivm_to_vehicle_journey_id(sensor.msg);
+
+    sensor.state.route = vehicle_journey_id_to_route(sensor.state.vehicle_journey_id);
 
     // flag if this record is OLD or NEW
     update_old_status(sensor);
@@ -766,12 +770,25 @@ function update_route_index(sensor)
         return;
     }
 
-    var route = vehicle_journey_id_to_route(sensor.state.vehicle_journey_id);
+    var segment_vector = route_segment_vector(sensor);
 
-    //debug here we're hardcoding the start of the journey
-    // for testing purposes
-    sensor.state.route_index = nearest_route_segment(sensor, route);
+    var max_probability = 0;
+    sensor.state.route_index = 0;
 
+    for (var i=0; i<segment_vector.length; i++)
+    {
+        if (segment_vector[i] > max_probability)
+        {
+            sensor.state.route_index = i+1;
+            max_probability = segment_vector[i];
+        }
+    }
+
+    draw_route_segment(sensor);
+}
+
+function draw_route_segment(sensor)
+{
     // highlight line on map of next route segment
     var route_index = sensor.state.route_index > 0 ? sensor.state.route_index : 1;
     
@@ -779,9 +796,9 @@ function update_route_index(sensor)
 
     var next_stop_id = sensor.state.next_stop_id;
 
-    sensor.state.prev_stop_id = route[route_index - 1].stop_id;
+    sensor.state.prev_stop_id = sensor.state.route[route_index - 1].stop_id;
 
-    sensor.state.next_stop_id = route[route_index].stop_id;
+    sensor.state.next_stop_id = sensor.state.route[route_index].stop_id;
 
     if (prev_stop_id != sensor.state.prev_stop_id || next_stop_id != sensor.state.next_stop_id) 
     {
@@ -797,27 +814,124 @@ function update_route_index(sensor)
 }
 
 // Given a sensor location, return route_index of nearest route segment
+
+// Given a sensor, return an array of distances of sensor from each route segment
 // where the segment is route[route_index-1]..route[route_index]
-function nearest_route_segment(sensor, route)
+function route_segment_vector(sensor)
 {
+    // How many nearest segments to consider (zero out others)
+    var NEAREST_COUNT = 5;
+
     var P = get_point(sensor.msg);
 
-    var min_distance = 999999999;
-    var route_index = 0;
+    var route = sensor.state.route;
 
-    for (var i=1; i<route.length; i++)
+    // Create distance_vector array of { route_index:, distance: }
+    var distance_vector = [];
+
+    for (var route_index=1; route_index<route.length; route_index++)
     {
-        var prev_stop_id = route[i-1].stop_id;
-        var next_stop_id = route[i].stop_id;
+        var prev_stop_id = route[route_index-1].stop_id;
+        var next_stop_id = route[route_index].stop_id;
+        var dist = distance_from_line(P, [stops[prev_stop_id],stops[next_stop_id]]);
+        distance_vector.push({ route_index: route_index, distance: dist });
+    }
 
-        var line_distance = distance_from_line(P, [stops[prev_stop_id],stops[next_stop_id]]);
-        if (line_distance < min_distance)
+    //console.log('');
+
+    //console.log('distance_vector :'+distance_vector.map(x => (Math.floor(x.distance)+'     ').slice(0,4)));
+
+    // Create nearest_segments array of NEAREST_COUNT { route_index:, distance: } elements
+    var nearest_segments = distance_vector
+                                .slice() // create copy
+                                .sort((a,b) => Math.floor(a.distance - b.distance))
+                                .slice(0,NEAREST_COUNT);
+    
+    //console.log('nearest : '+nearest_segments.map( x => JSON.stringify(x) ));
+
+    // Create array[NEAREST_COUNT] containing segment probabilities 0..1, summing to 1
+    var nearest_probs = probabilize(nearest_segments.map(x => x.distance));
+
+    //console.log('softmax probs: '+nearest_probs.map(y => ''+Math.floor(y*100)/100));
+
+    // Initialize final result segment_vector with zeros
+    // and then insert the weights of the nearest segments
+    var segment_vector = new Array(route.length - 1);
+    for (var i=0; i<route.length-1; i++)
+    {
+        segment_vector[i] = 0;
+    }
+    for (var j=0; j<nearest_segments.length; j++)
+    {
+        segment_vector[nearest_segments[j].route_index - 1] = nearest_probs[j];
+    }
+
+    console.log('segment_vector  :'+vector_to_string(segment_vector));
+
+    return segment_vector;
+}
+
+function probabilize(vector)
+{
+    var denominator = vector.reduce( (sum,x) => sum + x);
+    var probs = vector.map( x => denominator / (x+50) );
+    var max_prob = probs[0];
+
+    var probs_max_1 = (probs.map( x => x / max_prob ));
+
+    //console.log('probs_max_1 :'+probs_max_1.map(y => ''+Math.floor(y*100)/100));
+
+    var sm = softmax(probs_max_1);
+
+    return sm;
+}
+
+// Normalize an array to values 0..1, with sum 1.0 via exponential softmax function
+function softmax(vector) 
+{
+    // Each element x -> exp(x) / sum(all exp(x))
+    var denominator =  vector.map(x => Math.exp(x)).reduce( (sum, x) => sum + x );
+    return vector.map( x => Math.exp(x) / denominator);
+}
+
+// Return printable version of probability vector (array with all elements 0..1)
+function vector_to_string(vector)
+{
+    var str = '';
+    // find index of largest element
+    var max_value = 0;
+    var max_index = 0;
+    for (var i=0; i<vector.length; i++)
+    {
+        if (vector[i] > max_value)
         {
-            route_index = i;
-            min_distance = line_distance;
+            max_value = vector[i];
+            max_index = i;
         }
     }
-    return route_index;
+
+    // Build print string, with [..] around max
+    for (var i=0; i<vector.length; i++)
+    {
+        var spacer = ' ';
+        if (i == max_index)
+        {
+            spacer = '[';
+        }
+        else if (i==max_index+1)
+        {
+            spacer = ']';
+        }
+        if (vector[i] == 0)
+        {
+            str += spacer + ' - ';
+        }
+        else
+        {
+            str += spacer + (''+Math.floor(vector[i]*100)/100+'0').slice(1,4);
+        }
+    }
+    return str;
 }
 
 // return {lat:, lng:} from sensor message
@@ -860,7 +974,7 @@ function add_breadcrumb(pos)
 {
     if (breadcrumbs)
     {
-        var crumb = L.circleMarker(pos, { color: 'blue', radius: 1 }).addTo(map);
+        var crumb = L.circleMarker([pos.lat, pos.lng], { color: 'blue', radius: 1 }).addTo(map);
         crumbs.push(crumb);
     }
 }
@@ -1027,8 +1141,6 @@ function hh_mm_ss(datetime)
 // ***************************************************************************
 // *******************  Logging code      ************************************
 // ***************************************************************************
-
-var LOG_TRUNCATE = 10; // we'll limit the log to this many messages
 
 var log_record_odd = true; // binary toggle for alternate log background colors
 
@@ -1504,7 +1616,7 @@ function replay_start()
     log('Timer started '+new Date(replay_time*1000));
 }
 
-function replay_pause()
+function click_replay_pause()
 {
     clearInterval(replay_timer);
     log('Replay paused at '+new Date(replay_time*1000));
@@ -1516,6 +1628,12 @@ function replay_stop()
     // Reset 'replay mode' flag
     replay_on = false;
     log('Replay stopped at '+new Date(replay_time*1000));
+}
+
+function click_replay_step()
+{
+    clearInterval(replay_timer);
+    replay_step();
 }
 
 function click_replay_speedup()
@@ -1596,20 +1714,27 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
 <div class="control_box">
     <button onclick="draw_journey(DEBUG_VEHICLE_JOURNEY_ID)"
         title="Draw test journey"
-        >Draw journey</button>
+        value="Draw journey">Draw journey</button>
     Show map: <input id="show_map" type="checkbox" onclick="click_show_map()" checked/><br/>
     <button onclick="replay_start()"
         title="Replay test SiriVM data"
-        >Replay</button>
+        value="Replay"
+        class="button_img"><img src="/static/images/replay_play.png"/></button>
     <input id="replay_start" type="text" size="22" value="2017-11-20T06:00:00Z"></input><br/>
-    <button onclick="replay_pause()"
+    <button onclick="click_replay_pause()"
         title="Pause replay"
-        >Pause</button>
+        value="Pause"
+        class="button_img"><img src="/static/images/replay_pause.png"/></button>
     <button onclick="replay_stop()"
         title="Stop replay"
-        >Stop</button>
-    Speedup: <input id="replay_speedup" type="text" size="4" value="10" 
+        value="Stop"
+        class="button_img"><img src="/static/images/replay_stop.png"/></button>
+    Speed: <input id="replay_speedup" type="text" size="4" value="10" 
                 onchange="click_replay_speedup()"></input>
+    <button onclick="click_replay_step()"
+        title="Step replay"
+        value="Step"
+        class="button_img"><img src="/static/images/replay_step.png"/></button>
 </div>
 
 <h4>Realtime API scratchpad:</h4>
