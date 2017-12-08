@@ -1,0 +1,262 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+
+<head>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+    <title>RTRoute v0.19</title>
+<!--
+RELEASE INFO:
+    2017-12-08 moved JS into rtroute.js.
+               Replay with sample trip
+               Shims for sirivm_to_journey_id and vehicle_journey_id_to_route
+               'state' code for buses e.g. route_index, segment_probability
+               Route segment probabilities based on sirivm -> segment distance
+               Route segment probabilities based on current route_index
+    2017-12-01 imported stops, journeys and trip data, draw_stops and draw_route code
+    2017-11-30 Moved code into rtroute.html to experiment with route calculations
+    ----
+    2017-11-26 generalized from buses, latest full data in popup, icon resize on old data,
+               map can go fullscreen
+    2017-11-25 supports connect, close, subscribe, request with filters '=' and 'inside'
+                console log using divs, draw polygon, clear icons
+    2017-11-14 page working for connect, subscribe, close
+    2017-11-11 initial version to connect websocket to vertx rtmonitor
+-->
+<style type="text/css">
+html {
+    height: 100%;
+}
+
+body {
+    font-family: sans-serif;
+    height: 100%;
+}
+
+#rt_scratchpad {
+    font-size: x-small;
+    width: 95%;
+    height: 40%;
+}
+
+#map {
+	display: inline-block;
+	width: 68%;
+    height: 80%;
+}
+
+#console_div {
+    margin-top: 10px;
+}
+
+.top-aligned {
+    vertical-align: top;
+}
+
+.control_box {
+    padding: 6px;
+}
+
+.scratchpad_box {
+    width: 100%;
+    height: 90%;
+}
+
+.control_div {
+    display: inline-block;
+    width: 30%;
+    height: 80%;
+}
+
+.sensor-popup {
+    font-size: small;
+}
+
+.marker_sensor_M {
+    background-image: url("/static/images/bus_logo_M.png");
+    /* background-color: green; */
+}
+
+.marker_sensor_L {
+    background-image: url("/static/images/bus_logo_L.png");
+    /* background-color: green; */
+}
+
+.marker_label_M {
+    /* background-color: white; */
+    /* margin-left: 8px; */
+    margin-top: 7px;
+    font-size: 7px;
+    text-align: center;
+}
+
+.marker_label_L {
+    /* background-color: white; */
+    /* margin-left: 8px; */
+    margin-top: 8px;
+    font-size: 11px;
+    text-align: center;
+}
+
+.log_record {
+}
+
+.log_msg {
+    display: inline-block;
+    margin-left: 1em;
+}
+
+.log_ts {
+    display: inline-block;
+}
+
+.log_record_odd {
+    background-color: lightblue;
+}
+
+.log_record_even {
+    background-color: lightgray;
+}
+
+.log_error {
+    color: red;
+}
+
+</style>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
+
+<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"></script>
+
+<link rel="stylesheet" href="/static_web/map.css" />
+
+<script type="text/javascript" src="/static_web/js/MovingMarker.js"></script>
+
+<!-- ********************************************************************************* -->
+<!-- load stops and journey data for OriginRef 0500CCAMB011 (De La Warr Way Cambourne) -->
+
+<!-- create js object rtroute_journeys (every timetable journey from Cambourne) -->
+<script type="text/javascript" src="rtroute_journeys.js"></script>
+
+<!-- create js object rtroute_stops (all stops used in above journeys) -->
+<script type="text/javascript" src="rtroute_stops.js"></script>
+
+<!-- create array of sirivm js objects rtroute_trip (one sample journey) -->
+<script type="text/javascript" src="rtroute_trip.js"></script>
+
+<!-- WebSockets library to connect to RTMonitor -->
+<script src="sockjs.min.js"></script>
+
+<script src="rtroute.js"></script>
+
+</head>
+
+<!-- ************************************************************************************** -->
+<!-- ************************************************************************************** -->
+<!-- *********  PAGE HTML      ************************************************************ -->
+<!-- ************************************************************************************** -->
+<!-- ************************************************************************************** -->
+<body onload='init()'>
+
+<div id="control_div" class="top-aligned control_div">
+<h1>RTMonitor <span id='clock'></span></h1>
+<div><a href="#" onclick="page_map()">only show map</a>
+</div>
+<div class="control_box">
+    <button onclick="sock_connect('nginx')"
+        title="Connect socket to server and send rt_connect msg"
+        >Connect</button>
+    <button onclick="sock_close()"
+        title="Close socket connection to server"
+        >Close</button><br/>
+    <button onclick="request_latest_msg()"
+        title="Get the latest eventbus message from the server"
+        >Request msg</button>
+    <button onclick="request_latest_records()"
+        title="Get all the latest data records accumulated on the server"
+        >Request records</button>
+    <button onclick="subscribe_all()"
+        title="Get a 'push' real-time subscription to all the data records as they arrive"
+        >Subscribe All</button><br/>
+    <input type="button" id="draw_poly" onclick="draw_poly()" value="Draw Polygon"
+        title="Draw a polygon on the map to create an API 'inside' filter in scratchpad"
+        ></input>
+    <input type="button" id="clear_markers" onclick="clear_markers()" value="Clear icons"
+        title="Remove any sensor icons that have been drawn on the map"
+        ></input>
+    <input type="button" id="clear_crumbs" onclick="clear_crumbs()" value="Clear breadcrumbs"
+        title="Remove any breadcrumbs that have been drawn on the map"
+        ></input>
+</div>
+<div>Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
+Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
+</div>
+<div class="control_box">
+    <input type="button" id="record_start" onclick="record_start()" value="Record"
+        title="Record the data as it arrives"
+        ></input>
+    <input type="button" id="record_clear" onclick="record_clear()" value="Clear"
+        title="Cancel recording"
+        ></input>
+    <input type="button" id="record_print" onclick="record_print()" value="Print"
+        title="Print the recorded data to the console"
+        ></input>
+</div>
+
+<div class="control_box">
+    <button onclick="draw_journey(DEBUG_VEHICLE_JOURNEY_ID)"
+        title="Draw test journey"
+        value="Draw journey">Draw journey</button>
+    Show map: <input id="show_map" type="checkbox" onclick="click_show_map()" checked/><br/>
+    <button onclick="replay_start()"
+        title="Replay test SiriVM data"
+        value="Replay"
+        class="button_img"><img src="/static/images/replay_play.png"/></button>
+    <input id="replay_start" type="text" size="22" value="2017-11-20T06:00:00Z"></input><br/>
+    <button onclick="click_replay_pause()"
+        title="Pause replay"
+        value="Pause"
+        class="button_img"><img src="/static/images/replay_pause.png"/></button>
+    <button onclick="replay_stop()"
+        title="Stop replay"
+        value="Stop"
+        class="button_img"><img src="/static/images/replay_stop.png"/></button>
+    Speed: <input id="replay_speedup" type="text" size="4" value="10"
+                onchange="click_replay_speedup()"></input>
+    <button onclick="click_replay_step()"
+        title="Step replay"
+        value="Step"
+        class="button_img"><img src="/static/images/replay_step.png"/></button>
+</div>
+
+<h4>Realtime API scratchpad:</h4>
+
+<div class="scratchpad_box">
+<div class="button_box">
+  <button class="verticle_button" onclick="sock_send('rt_scratchpad')">Send:</button>
+  <button class="verticle_button" onclick="clear_textarea('rt_scratchpad')">Clear</button>
+</div>
+
+<textarea rows="25" cols="50" id="rt_scratchpad">
+{ "msg_type": "rt_subscribe",
+  "request_id": "A",
+  "filters" : [
+                {"test": "=",
+		 "key": "VehicleRef",
+                 "value": "ABC"
+                }
+              ]
+}
+</textarea>
+</div>
+
+</div> <!-- end of control_div -->
+
+<!-- MAP -->
+<div class="top-aligned" id="map"></div>
+
+<!-- console log -->
+<div id="console_div"></div>
+
+</body>
+</html>

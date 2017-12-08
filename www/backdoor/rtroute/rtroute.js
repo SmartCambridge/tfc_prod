@@ -1,148 +1,3 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html>
-
-<head>
-    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-
-    <title>RTRoute v0.18</title>
-<!--
-RELEASE INFO:
-    2017-12-01 imported stops, journeys and trip data, draw_stops and draw_route code
-    2017-11-30 Moved code into rtroute.html to experiment with route calculations
-    ----
-    2017-11-26 generalized from buses, latest full data in popup, icon resize on old data,
-               map can go fullscreen
-    2017-11-25 supports connect, close, subscribe, request with filters '=' and 'inside'
-                console log using divs, draw polygon, clear icons
-    2017-11-14 page working for connect, subscribe, close
-    2017-11-11 initial version to connect websocket to vertx rtmonitor
--->	
-<style type="text/css">
-html {
-    height: 100%;
-}
-
-body {
-    font-family: sans-serif;
-    height: 100%;
-}
-
-#rt_scratchpad {
-    font-size: x-small;
-    width: 95%;
-    height: 40%;
-}
-
-#map {
-	display: inline-block;
-	width: 68%;
-    height: 80%;
-} 
-
-#console_div {
-    margin-top: 10px;
-}
-
-.top-aligned {
-    vertical-align: top;
-}
-
-.control_box {
-    padding: 6px;
-}
-
-.scratchpad_box {
-    width: 100%;
-    height: 90%;
-}
-
-.control_div {
-    display: inline-block;
-    width: 30%;
-    height: 80%;
-}
-
-.sensor-popup {
-    font-size: small;
-}
-
-.marker_sensor_M {
-    background-image: url("/static/images/bus_logo_M.png");
-    /* background-color: green; */
-}
-
-.marker_sensor_L {
-    background-image: url("/static/images/bus_logo_L.png");
-    /* background-color: green; */
-}
-
-.marker_label_M {
-    /* background-color: white; */
-    /* margin-left: 8px; */
-    margin-top: 7px;
-    font-size: 7px;
-    text-align: center;
-}
-
-.marker_label_L {
-    /* background-color: white; */
-    /* margin-left: 8px; */
-    margin-top: 8px;
-    font-size: 11px;
-    text-align: center;
-}
-
-.log_record {
-}
-
-.log_msg {
-    display: inline-block;
-    margin-left: 1em;
-}
-
-.log_ts {
-    display: inline-block;
-}
-
-.log_record_odd {
-    background-color: lightblue;
-}
-
-.log_record_even {
-    background-color: lightgray;
-}
-
-.log_error {
-    color: red;
-}
-
-</style>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
-
-<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"></script>
-
-<link rel="stylesheet" href="/static_web/map.css" />
-
-<script type="text/javascript" src="/static_web/js/MovingMarker.js"></script>
-
-<!-- ********************************************************************************* -->
-<!-- load stops and journey data for OriginRef 0500CCAMB011 (De La Warr Way Cambourne) -->
-
-<!-- create js object rtroute_journeys (every timetable journey from Cambourne) -->
-<script type="text/javascript" src="rtroute_journeys.js"></script>
-
-<!-- create js object rtroute_stops (all stops used in above journeys) -->
-<script type="text/javascript" src="rtroute_stops.js"></script>
-
-<!-- create array of sirivm js objects rtroute_trip (one sample journey) -->
-<script type="text/javascript" src="rtroute_trip.js"></script>
-
-<!-- WebSockets library to connect to RTMonitor -->
-<script src="sockjs.min.js"></script>
-
-<script>
-
 // ***************************************************************************
 // *******************  Page and map code ************************************
 // ***************************************************************************
@@ -169,7 +24,7 @@ var urlparams = new URLSearchParams(window.location.search);
 var debug = urlparams.has('debug');
 var mapbounds;
 
-var clock_time; // the 'current time', either now() or replay_time
+var clock_time; // the JS Date 'current time', either now() or replay_time
 
 var console_div;
 
@@ -192,30 +47,30 @@ var journeys = {};
 var journeys_count = 0;
 
 // Trip data (from rtroutes_trip.js)
-//  { "Delay": "PT0S", 
-//    "acp_id": "SCCM-19611", 
-//    "acp_ts": 1511156152, 
+//  { "Delay": "PT0S",
+//    "acp_id": "SCCM-19611",
+//    "acp_ts": 1511156152,
 //    "Bearing": "0",
-//    "InPanic": "0", 
-//    "LineRef": "4", 
+//    "InPanic": "0",
+//    "LineRef": "4",
 //    "acp_lat": 52.230381,
 //    "acp_lng": 0.159207,
 //    "Latitude": "52.2303810",
 //    "Longitude": "0.1592070",
 //    "Monitored": "true",
-//    "OriginRef": "0500SCAMB011", 
-//    "OriginName": "De La Warr Way", 
-//    "VehicleRef": "SCCM-19611", 
-//    "OperatorRef": "SCCM", 
-//    "DataFrameRef": "1", 
-//    "DirectionRef": "INBOUND", 
-//    "DestinationRef": "0500CCITY484", 
-//    "RecordedAtTime": "2017-11-20T05:35:52+00:00", 
-//    "ValidUntilTime": "2017-11-20T05:35:52+00:00", 
-//    "DestinationName": "Drummer Str Stop D3", 
-//    "PublishedLineName": "4", 
-//    "VehicleMonitoringRef": "SCCM-19611", 
-//    "DatedVehicleJourneyRef": "2", 
+//    "OriginRef": "0500SCAMB011",
+//    "OriginName": "De La Warr Way",
+//    "VehicleRef": "SCCM-19611",
+//    "OperatorRef": "SCCM",
+//    "DataFrameRef": "1",
+//    "DirectionRef": "INBOUND",
+//    "DestinationRef": "0500CCITY484",
+//    "RecordedAtTime": "2017-11-20T05:35:52+00:00",
+//    "ValidUntilTime": "2017-11-20T05:35:52+00:00",
+//    "DestinationName": "Drummer Str Stop D3",
+//    "PublishedLineName": "4",
+//    "VehicleMonitoringRef": "SCCM-19611",
+//    "DatedVehicleJourneyRef": "2",
 //    "OriginAimedDepartureTime": "2017-11-20T06:02:00+00:00"
 //    },
 
@@ -224,7 +79,7 @@ var recorded_records = [];
 var recording_on = false;
 
 // Replay
-var replay_time; // holds unix timestamp (secs since 1970), current time of replay
+var replay_time; // holds JS Date, current time of replay
 var replay_timer; // the JS interval timer for the replay function
 var replay_on = false; // Replay mode on|off
 var replay_interval = 1; // Replay step interval (seconds)
@@ -337,7 +192,7 @@ function init()
 
     draw_stops();
 
-} // end init()            
+} // end init()
 
 // *********************************************************************************
 // ************* RTRoute code      ***************************************************
@@ -378,10 +233,10 @@ function load_journeys()
                 var angle = (bearing(prev_stop, stop)- 90 + 360) % 360;
                 journey.route[stop_index - 1].arrow = new L.marker(
                     center,
-                    { icon: new L.divIcon({ 
+                    { icon: new L.divIcon({
                                   className : 'arrow_icon',
-                                  iconSize: new L.Point(30,30), 
-                                  iconAnchor: new L.Point(15,15), 
+                                  iconSize: new L.Point(30,30),
+                                  iconAnchor: new L.Point(15,15),
                                   html : '<div style = "font-size: 20px;'+
                                       '-webkit-transform: rotate('+ angle +'deg)">&#10152;</div>'
                                   })
@@ -429,7 +284,7 @@ function vehicle_journey_id_to_route(vehicle_journey_id)
 
 // Return distance in m between positions p1 and p2.
 // lat/longs in e.g. p1.lat etc
-function distance(p1, p2) 
+function distance(p1, p2)
 {
     var R = 6371000; // Earth's mean radius in meter
     var dLat = rad(p2.lat - p1.lat);
@@ -448,8 +303,8 @@ function inside(position, bounds_path, box)
 {
     // easy optimization - return false if position is outside bounding rectangle (box)
     if ( position.lat > box.north ||
-         position.lat < box.south || 
-         position.lng < box.west || 
+         position.lat < box.south ||
+         position.lng < box.west ||
          position.lng > box.east)
         return false;
 
@@ -465,7 +320,7 @@ function inside(position, bounds_path, box)
 
         if (Math.abs(dx) > 180.0)
         {
-            // we have, most likely, just jumped the dateline 
+            // we have, most likely, just jumped the dateline
             // (could do further validation to this effect if needed).  normalise the
             // numbers.
             if (x > 0)
@@ -507,7 +362,7 @@ function bearing(pos1, pos2)
     var b = { lat: rad(pos2.lat), lng: rad(pos2.lng) };
 
     var y = Math.sin(b.lng-a.lng) * Math.cos(b.lat);
-    var x = Math.cos(a.lat)*Math.sin(b.lat) - 
+    var x = Math.cos(a.lat)*Math.sin(b.lat) -
                 Math.sin(a.lat)*Math.cos(b.lat)*Math.cos(b.lng-a.lng);
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
@@ -523,17 +378,17 @@ function intersect(line1, line2)
     var s1 = { lat: B.lat - A.lat, lng: B.lng - A.lng };
     var s2 = { lat: D.lat - C.lat, lng: D.lng - C.lng };
 
-    var s = (-s1.lat * (A.lng - C.lng) + s1.lng * (A.lat - C.lat)) / 
+    var s = (-s1.lat * (A.lng - C.lng) + s1.lng * (A.lat - C.lat)) /
                 (-s2.lng * s1.lat + s1.lng * s2.lat);
-    var t = ( s2.lng * (A.lat - C.lat) - s2.lat * (A.lng - C.lng)) / 
+    var t = ( s2.lng * (A.lat - C.lat) - s2.lat * (A.lng - C.lng)) /
                 (-s2.lng * s1.lat + s1.lng * s2.lat);
 
     if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
     {
         // lines A->B and C->D intersect
-        return { success: true, 
-                 position: { lat: A.lat + (t * s1.lat), 
-                             lng: A.lng + (t * s1.lng) }, 
+        return { success: true,
+                 position: { lat: A.lat + (t * s1.lat),
+                             lng: A.lng + (t * s1.lng) },
                  progress: t };
     }
 
@@ -583,14 +438,12 @@ function distance_from_line(P, line)
     var distance_AB = distance(A, P);
 
     var d = Math.asin(Math.sin(distance_AB/R)*Math.sin(rad(bearing_AP - bearing_AB))) * R;
-    
+
     return Math.abs(d);
 }
 
 //*********************************************************************************************
-//*********************************************************************************************
 //*************** CONVERSION FUNCTIONS, E.G. meters to nautical miles *************************
-//*********************************************************************************************
 //*********************************************************************************************
 
 // degrees to radians
@@ -610,10 +463,26 @@ function miles(x)
         return x * 0.000621371;
 }
 
-// *********************************************************************************
+// ************************************************************************************
+// ************************************************************************************
+// ************************************************************************************
+// ************************************************************************************
 // ************* Sensor update code ***************************************************
-// *********************************************************************************
+// ************************************************************************************
+// ************************************************************************************
 
+// We maintain the 'state' of a sensor as we progress:
+//
+// sensor
+//    .msg              - the most recent data message received for this sensor
+//    .state
+//        .route        - array of stop records
+//        .route_index  - the index of the NEXT STOP in the ROUTE
+//        .segment_vector - probability vector for bus on each route segment
+//        .prev_stop_id - atco_code of previous stop passed
+//        .next_stop_id - atco_code of next stop
+
+// We have received a new data message from an existing sensor
 function update_sensor(msg)
 {
 		// existing sensor data record has arrived
@@ -625,7 +494,7 @@ function update_sensor(msg)
             // move marker
             var pos = get_point(msg);
             var marker = sensors[sensor_id].marker;
-		    marker.moveTo([pos.lat, pos.lng], [1000] ); 
+		    marker.moveTo([pos.lat, pos.lng], [1000] );
 		    marker.resume();
 
             // update tooltip and popup
@@ -642,6 +511,7 @@ function update_sensor(msg)
 		}
 }
 
+// We have received data from a previously unseen sensor, so initialize
 function create_sensor(msg)
 {
     // new sensor, create marker
@@ -655,7 +525,7 @@ function create_sensor(msg)
 
     var marker_icon = create_sensor_icon(msg);
 
-    sensor['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]], 
+    sensor['marker'] = L.Marker.movingMarker([[msg[RECORD_LAT], msg[RECORD_LNG]],
                                                    [msg[RECORD_LAT], msg[RECORD_LNG]]],
                                                   [1000],
                                                   {icon: marker_icon});
@@ -694,10 +564,15 @@ function init_state(sensor)
 
     sensor.state.route = vehicle_journey_id_to_route(sensor.state.vehicle_journey_id);
 
+    sensor.state.route_index = 0;
+
+    //debug segment_vector should be route.length+1, for pre-start and finished
+    sensor.state.segment_vector = new Array(sensor.state.route.length-1);
+
     // flag if this record is OLD or NEW
     update_old_status(sensor);
 
-    update_route_index(sensor);
+    init_route_index(sensor);
 }
 
 // Update sensor state
@@ -717,22 +592,12 @@ function update_state(sensor)
 // so that this function works equally well during replay of old data.
 function update_old_status(sensor)
 {
-    var data_timestamp; // will hold Date from sensor
-
-    switch (RECORD_TS_FORMAT)
-    {
-        case 'ISO8601':
-            data_timestamp = new Date(sensor.msg[RECORD_TS]);
-            break;
-
-        default:
-            return;
-    }
+    var data_timestamp = get_date(sensor.msg); // will hold Date from sensor
 
     // get current value of sensor.state.old flag (default false)
     var current_old_flag = !(sensor.state.old == null) || sensor.state.old;
 
-    // calculate age of sensor (in seconds) 
+    // calculate age of sensor (in seconds)
     var age = (clock_time - data_timestamp) / 1000;
 
     if (age > OLD_DATA_RECORD)
@@ -761,6 +626,15 @@ function update_old_status(sensor)
     }
 }
 
+//debug hardcoded to 1
+function init_route_index(sensor)
+{
+    sensor.state.route_index = 1;
+}
+
+// Update sensor.state.route_index
+// This is the key function that calculates the position of the bus
+// along its route.
 function update_route_index(sensor)
 {
     // If sensor doesn't have a vehicle_journey_id then
@@ -770,8 +644,27 @@ function update_route_index(sensor)
         return;
     }
 
-    var segment_vector = route_segment_vector(sensor);
+    // Build the probability vectors for bus on route
 
+    var progress_vector = route_progress_vector(sensor);
+
+    console.log(hh_mm_ss(get_date(sensor.msg))+' progress :'+vector_to_string(progress_vector,' ','()'));
+
+    var distance_vector = update_segment_distance_vector(sensor);
+
+    console.log('         distance :'+vector_to_string(distance_vector,' ','()'));
+
+    var segment_product = [];
+
+    for (var i=0; i < progress_vector.length; i++)
+    {
+        segment_product.push(progress_vector[i] * distance_vector[i]);
+    }
+    //console.log('          product :'+vector_to_string(segment_product));
+
+    var segment_vector = segment_product;
+
+    // Set sensor.state.route_index to segment with highest probability
     var max_probability = 0;
     sensor.state.route_index = 0;
 
@@ -784,40 +677,41 @@ function update_route_index(sensor)
         }
     }
 
+    sensor.state.segment_vector = segment_vector;
+
+    console.log('         RESULT '+
+                (' '+sensor.state.route_index).slice(-2)+
+                ':'+vector_to_string(segment_vector,'-','<>'));
+
     draw_route_segment(sensor);
 }
 
-function draw_route_segment(sensor)
-{
-    // highlight line on map of next route segment
-    var route_index = sensor.state.route_index > 0 ? sensor.state.route_index : 1;
-    
-    var prev_stop_id = sensor.state.prev_stop_id;
-
-    var next_stop_id = sensor.state.next_stop_id;
-
-    sensor.state.prev_stop_id = sensor.state.route[route_index - 1].stop_id;
-
-    sensor.state.next_stop_id = sensor.state.route[route_index].stop_id;
-
-    if (prev_stop_id != sensor.state.prev_stop_id || next_stop_id != sensor.state.next_stop_id) 
-    {
-        if (sensor.state.route_segment_line)
-        {
-            map.removeLayer(sensor.state.route_segment_line);
-        }
-        sensor.state.route_segment_line = draw_line(stops[sensor.state.prev_stop_id],
-                                                stops[sensor.state.next_stop_id],
-                                                'green');
-        log('Next stop for '+sensor.sensor_id+' is '+sensor.state.next_stop_id);
-    }
-}
-
-// Given a sensor location, return route_index of nearest route segment
-
+// ******************************************************************************
+// Route segment distance -> segment probability vector
+// ******************************************************************************
 // Given a sensor, return an array of distances of sensor from each route segment
 // where the segment is route[route_index-1]..route[route_index]
-function route_segment_vector(sensor)
+
+// Calculate an INITIAL probability vector for segments given a bus
+//debug hardcoded to first segment
+function init_segment_distance_vector(sensor)
+{
+    var route = sensor.state.route;
+
+    var segment_probability_vector = new Array(route.length - 1);
+
+    segment_probability_vector[0] = 1;
+
+    for (var i=1; i<route.length-1; i++)
+    {
+        segment_probability_vector[i] = 0;
+    }
+
+    return segment_probability_vector;
+}
+
+// Calculate the segment probability vector for an existing bus
+function update_segment_distance_vector(sensor)
 {
     // How many nearest segments to consider (zero out others)
     var NEAREST_COUNT = 5;
@@ -837,41 +731,35 @@ function route_segment_vector(sensor)
         distance_vector.push({ route_index: route_index, distance: dist });
     }
 
-    //console.log('');
-
-    //console.log('distance_vector :'+distance_vector.map(x => (Math.floor(x.distance)+'     ').slice(0,4)));
-
     // Create nearest_segments array of NEAREST_COUNT { route_index:, distance: } elements
     var nearest_segments = distance_vector
                                 .slice() // create copy
                                 .sort((a,b) => Math.floor(a.distance - b.distance))
                                 .slice(0,NEAREST_COUNT);
-    
+
     //console.log('nearest : '+nearest_segments.map( x => JSON.stringify(x) ));
 
     // Create array[NEAREST_COUNT] containing segment probabilities 0..1, summing to 1
-    var nearest_probs = probabilize(nearest_segments.map(x => x.distance));
-
-    //console.log('softmax probs: '+nearest_probs.map(y => ''+Math.floor(y*100)/100));
+    var nearest_probs = distance_to_probabilities(nearest_segments.map(x => x.distance));
 
     // Initialize final result segment_vector with zeros
     // and then insert the weights of the nearest segments
-    var segment_vector = new Array(route.length - 1);
+    var segment_probability_vector = new Array(route.length - 1);
+
     for (var i=0; i<route.length-1; i++)
     {
-        segment_vector[i] = 0;
+        segment_probability_vector[i] = 0;
     }
     for (var j=0; j<nearest_segments.length; j++)
     {
-        segment_vector[nearest_segments[j].route_index - 1] = nearest_probs[j];
+        segment_probability_vector[nearest_segments[j].route_index - 1] = nearest_probs[j];
     }
 
-    console.log('segment_vector  :'+vector_to_string(segment_vector));
-
-    return segment_vector;
+    return segment_probability_vector;
 }
 
-function probabilize(vector)
+// When the distances from route segments have been calculated, convert them to 0..1, sum 1.0
+function distance_to_probabilities(vector)
 {
     var denominator = vector.reduce( (sum,x) => sum + x);
     var probs = vector.map( x => denominator / (x+50) );
@@ -886,8 +774,66 @@ function probabilize(vector)
     return sm;
 }
 
+// ******************************************************************************
+// Route_index -> segment probability vector
+// ******************************************************************************
+
+function route_progress_vector(sensor)
+{
+    var route = sensor.state.route;
+    var route_index = sensor.state.route_index;
+
+    // Initialize final result segment_vector with zeros
+    // and then insert the weights of the nearest forward segments
+
+    var segment_probability_vector = new Array(route.length - 1);
+
+    for (var i=0; i<route.length-1; i++)
+    {
+        segment_probability_vector[i] = 0;
+    }
+
+    //debug this should be relative to distance travelled since last msg
+
+    //debug maybe this should be smudged according to the segment_distance_probabilities
+
+    // probability of next route_index as [offset from prior route_index, probability
+    var PROB0 = [[0,0.31],[1,0.3],[2,0.2],[3,0.19]]; // from first segment
+    var PROB4 = [[-1,0.1],[0,0.24],[1,0.23],[2,0.22],[3,0.21]]; // (default) 3 segments from end or more
+    var PROB3 = [[-1,0.1],[0,0.31],[1,0.3],[2,0.29]]; // (default) 3 segments from end or more
+    var PROB2 = [[-1,0.1],[0,0.5],[1,0.4]] // 2 segments from end of route
+    var PROB1 = [[-1,0.1],[0,0.9]] // on last segment of route
+    var progress_probs = PROB4;
+    if (route_index == 1)
+    {
+        progress_probs = PROB0;
+    }
+    else if (route_index == route.length - 3)
+    {
+        progress_probs = PROB3;
+    }
+    else if (route_index == route.length - 2)
+    {
+        progress_probs = PROB2;
+    }
+    else if (route_index == route.length - 1)
+    {
+        progress_probs = PROB1;
+    }
+    for (var i=0; i<progress_probs.length; i++)
+    {
+        segment_probability_vector[route_index-1+progress_probs[i][0]] = progress_probs[i][1];
+    }
+
+    return segment_probability_vector;
+}
+
+// ******************************************************************************
+// General state update useful functions
+// ******************************************************************************
+
 // Normalize an array to values 0..1, with sum 1.0 via exponential softmax function
-function softmax(vector) 
+function softmax(vector)
 {
     // Each element x -> exp(x) / sum(all exp(x))
     var denominator =  vector.map(x => Math.exp(x)).reduce( (sum, x) => sum + x );
@@ -895,8 +841,17 @@ function softmax(vector)
 }
 
 // Return printable version of probability vector (array with all elements 0..1)
-function vector_to_string(vector)
+// E.g. vector_to_string([0.1,0.2,0.0,0.3],'0','[]')
+function vector_to_string(vector, zero_value, max_brackets)
 {
+    if (!zero_value)
+    {
+        zero_value =  '-';
+    }
+    if (!max_brackets)
+    {
+        max_brackets = '[]';
+    }
     var str = '';
     // find index of largest element
     var max_value = 0;
@@ -916,15 +871,15 @@ function vector_to_string(vector)
         var spacer = ' ';
         if (i == max_index)
         {
-            spacer = '[';
+            spacer = max_brackets.slice(0,1);
         }
         else if (i==max_index+1)
         {
-            spacer = ']';
+            spacer = max_brackets.slice(1,2);
         }
         if (vector[i] == 0)
         {
-            str += spacer + ' - ';
+            str += spacer + ' '+zero_value+' ';
         }
         else
         {
@@ -934,12 +889,128 @@ function vector_to_string(vector)
     return str;
 }
 
+// Given a sensor.route_index, draw a green line on route segment
+// and delete the previous line if needed.
+function draw_route_segment(sensor)
+{
+    // highlight line on map of next route segment
+    var route_index = sensor.state.route_index > 0 ? sensor.state.route_index : 1;
+
+    var prev_stop_id = sensor.state.prev_stop_id;
+
+    var next_stop_id = sensor.state.next_stop_id;
+
+    sensor.state.prev_stop_id = sensor.state.route[route_index - 1].stop_id;
+
+    sensor.state.next_stop_id = sensor.state.route[route_index].stop_id;
+
+    if (prev_stop_id != sensor.state.prev_stop_id || next_stop_id != sensor.state.next_stop_id)
+    {
+        if (sensor.state.route_segment_line)
+        {
+            map.removeLayer(sensor.state.route_segment_line);
+        }
+        sensor.state.route_segment_line = draw_line(stops[sensor.state.prev_stop_id],
+                                                stops[sensor.state.next_stop_id],
+                                                'green');
+        log('Next stop for '+sensor.sensor_id+' is '+sensor.state.next_stop_id);
+    }
+}
+
 // return {lat:, lng:} from sensor message
 function get_point(msg)
 {
     return { lat: msg[RECORD_LAT], lng: msg[RECORD_LNG] };
 }
 
+// return a JS Date() from sensor message
+function get_date(msg)
+{
+    switch (RECORD_TS_FORMAT)
+    {
+        case 'ISO8601':
+            return new Date(msg[RECORD_TS]);
+            break;
+
+        default:
+            break;
+    }
+    return null;
+}
+
+// ***********************************************************
+// Pretty print an XML duration
+// Convert '-PT1H2M33S' to '-1:02:33'
+function xml_duration_to_string(xml)
+{
+    var seconds = xml_duration_to_seconds(xml);
+
+    var sign = (seconds < 0) ? '-' : '+';
+
+    seconds = Math.abs(seconds);
+
+    if (seconds < 60)
+    {
+        return sign + seconds + 's';
+    }
+
+    var minutes = Math.floor(seconds / 60);
+
+    var remainder_seconds = ('0' + (seconds - minutes * 60)).slice(-2);
+
+    if (minutes < 60)
+    {
+        return sign + minutes + ':' + remainder_seconds;
+    }
+
+    var hours = Math.floor(minutes / 60);
+
+    var remainder_minutes = ('0' + (minutes - hours * 60)).slice(-2);
+
+    return sign + hours + ':' + remainder_minutes + ':' + remainder_seconds;
+}
+
+// Parse an XML duration like '-PT1H2M33S' (minus 1:02:33) into seconds
+function xml_duration_to_seconds(xml)
+{
+    if (!xml || xml == '')
+    {
+        return 0;
+    }
+    var sign = 1;
+    if (xml.slice(0,1) == '-')
+    {
+        sign = -1;
+    }
+    var hours = get_xml_digits(xml,'H');
+    var minutes = get_xml_digits(xml,'M');
+    var seconds = get_xml_digits(xml,'S');
+
+    return sign * (hours * 3600 + minutes * 60 + seconds);
+}
+
+// Given '-PT1H2M33S' and 'S', return 33
+function get_xml_digits(xml, units)
+{
+    var end = xml.indexOf(units);
+    if (end < 0)
+    {
+        return 0;
+    }
+    start = end - 1;
+    // slide 'start' backwards until it points to non-digit
+    while (/[0-9]/.test(xml.slice(start, start+1)))
+    {
+        start--;
+    }
+
+    return Number(xml.slice(start+1,end));
+}
+
+// End of the XML duration pretty print code
+// *************************************************************
+
+// return a Leaflet Icon based on a real-time msg
 function create_sensor_icon(msg)
 {
     var line = '';
@@ -963,7 +1034,7 @@ function create_sensor_icon(msg)
             break;
     }
 
-    return L.divIcon({ 
+    return L.divIcon({
         className: 'marker_sensor_'+icon_size,
         iconSize: marker_size,
         html: marker_html
@@ -981,27 +1052,27 @@ function add_breadcrumb(pos)
 
 function tooltip_content(msg)
 {
-    var time = new Date();
-    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
-                   ("0" + time.getMinutes()).slice(-2) + ":" + 
+    var time = get_date(msg);
+    var time_str = ("0" + time.getHours()).slice(-2)   + ":" +
+                   ("0" + time.getMinutes()).slice(-2) + ":" +
                    ("0" + time.getSeconds()).slice(-2);
     return time_str +
-                        '<br/>' + msg[RECORD_INDEX] + 
+            '<br/>' + msg[RECORD_INDEX] +
 			'<br/>Line "' + msg['PublishedLineName'] +'"'+
-                        '<br/>Delay: ' + msg['Delay'];
+            '<br/>Delay: ' + xml_duration_to_string(msg['Delay']);
 }
 
 function popup_content(msg)
 {
-    var time = new Date();
-    var time_str = ("0" + time.getHours()).slice(-2)   + ":" + 
-                   ("0" + time.getMinutes()).slice(-2) + ":" + 
+    var time = get_date(msg);
+    var time_str = ("0" + time.getHours()).slice(-2)   + ":" +
+                   ("0" + time.getMinutes()).slice(-2) + ":" +
                    ("0" + time.getSeconds()).slice(-2);
     var sensor_id = msg[RECORD_INDEX];
     return time_str +
-        '<br/>' + sensor_id + 
+        '<br/>' + sensor_id +
 		'<br/>Line "' + msg['PublishedLineName'] +'"'+
-        '<br/>Delay: ' + msg['Delay']+
+        '<br/>Delay: ' + xml_duration_to_string(msg['Delay'])+
         '<br/><a href="#" onclick="click_journey('+"'"+sensor_id+"'"+')">journey</a>'+
         '<br/><a href="#" onclick="click_more('+"'"+sensor_id+"'"+')">more</a>';
 }
@@ -1027,28 +1098,30 @@ function handle_records(websock_data)
 {
     var incoming_data = JSON.parse(websock_data);
     //console.log('handle_records'+json['request_data'].length);
-    for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++) 
+    for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++)
     {
 	    handle_msg(incoming_data[RECORDS_ARRAY][i]);
     }
 } // end function handle_records
 
-// Process replay data
-function replay_step()
+// Process replay data relevant to updated 'replay_time'
+// 'replay_index' will be updated to point to NEXT record in rtroute_trip
+function replay_timestep()
 {
-    replay_time = replay_time + (replay_interval*replay_speedup);
+    // move replay_time forwards by the current timestep
+    replay_time.setSeconds(replay_time.getSeconds() + replay_interval*replay_speedup);
 
     var current_index = replay_index;
 
     // skip earlier records
 
-    while ( replay_index < rtroute_trip.length && 
-            rtroute_trip[replay_index]['acp_ts'] < replay_time)
+    while ( replay_index < rtroute_trip.length &&
+            get_date(rtroute_trip[replay_index]) < replay_time)
     {
         replay_index++;
     }
 
-    if ( replay_index < rtroute_trip.length 
+    if ( replay_index < rtroute_trip.length
          && replay_index > current_index)
     {
         var msg = rtroute_trip[replay_index-1];
@@ -1062,10 +1135,28 @@ function replay_step()
         handle_msg(msg);
     }
 
-    if ( replay_index == rtroute_trip.length )
+    if (replay_index == rtroute_trip.length)
     {
         replay_stop();
     }
+}
+
+// User has clicked the 'step' button so jump forwards to the next record.
+function replay_next_record()
+{
+    // do nothing if we've reached the end of rtroute_trip
+    if (replay_index >= rtroute_trip.length)
+    {
+        return;
+    }
+
+    var msg = rtroute_trip[replay_index++];
+
+    replay_time = get_date(msg);
+
+    update_clock();
+
+    handle_msg(msg);
 }
 
 // process a single data record
@@ -1082,11 +1173,11 @@ function handle_msg(msg)
 
     // If an existing entry in 'sensors' has this key, then update
     // otherwise create new entry.
-    if (sensors.hasOwnProperty(sensor_id)) 
+    if (sensors.hasOwnProperty(sensor_id))
     {
         update_sensor(msg);
     }
-    else 
+    else
     {
         create_sensor(msg);
     }
@@ -1098,7 +1189,7 @@ function update_clock()
 {
     if (replay_on)
     {
-        clock_time = new Date(replay_time*1000);
+        clock_time = replay_time;
     }
     else
     {
@@ -1201,7 +1292,7 @@ function log(msg)
 // reverse the order of the messages in the log
 function log_reverse()
 {
-    for (var i=0;i<console_div.childNodes.length;i++) 
+    for (var i=0;i<console_div.childNodes.length;i++)
       console_div.insertBefore(console_div.childNodes[i], console_div.firstChild);
 }
 
@@ -1253,7 +1344,7 @@ function sock_close()
 function sock_send(input_name)
 {
     var msg = document.getElementById(input_name).value;
-   
+
     sock_send_str(msg);
 }
 
@@ -1300,9 +1391,15 @@ function draw_stops()
         if (stops.hasOwnProperty(stop_id))
         {
             var stop = stops[stop_id];
-            var bus_stop_marker = L.marker([stop.lat, stop.lng], {icon: bus_stop_icon})
-                .addTo(map)
-                .bindPopup(stop.common_name);
+            var bus_stop_marker = L.marker([stop.lat, stop.lng],
+                                           {icon: bus_stop_icon})
+                .addTo(map);
+            var popup = L.popup({ closeOnClick: false,
+                                  autoClose: false,
+                                  offset: L.point(0,-25)})
+                .setContent(stop.common_name);
+
+            bus_stop_marker.bindPopup(popup);
             // store marker for future manipulation of popup
             stops[stop_id].marker = bus_stop_marker;
         }
@@ -1435,13 +1532,13 @@ function subscribe_all()
 }
 
 // User has clicked on map.
-// If 'poly_draw' is true then draw a polygon on the map and 
+// If 'poly_draw' is true then draw a polygon on the map and
 // update the realtime scratchpad with a matching 'inside' request
 function click_map(e)
 {
     if (poly_draw)
     {
-        var marker = new L.marker(e.latlng); 
+        var marker = new L.marker(e.latlng);
         if (poly_markers.length == 0)
         {
             marker.addTo(map);
@@ -1527,7 +1624,7 @@ function click_journey(sensor_id)
     draw_journey(vehicle_journey_id);
 }
 
-// user clicked on 'more' in sensor popup                          
+// user clicked on 'more' in sensor popup
 function click_more(sensor_id)
 {
     var sensor = sensors[sensor_id];
@@ -1586,6 +1683,9 @@ function record_print()
     }
 }
 
+// ***********************
+// Replay buttons
+
 // user clicked 'Replay' button
 function replay_start()
 {
@@ -1602,24 +1702,24 @@ function replay_start()
     // if not paused, initialize the replay time to the chosen start time
     if (!replay_on)
     {
-        replay_time = start_time.getTime()/1000;
+        replay_time = start_time;
 
         replay_index = 0;
 
         // set 'replay mode' flag
         replay_on = true;
 
-        log('Replay started '+new Date(replay_time*1000));
+        log('Replay started '+replay_time);
     }
     // kick off regular timer
-    replay_timer = setInterval(replay_step, replay_interval * 1000);
-    log('Timer started '+new Date(replay_time*1000));
+    replay_timer = setInterval(replay_timestep, replay_interval * 1000);
+    log('Timer started '+replay_time);
 }
 
 function click_replay_pause()
 {
     clearInterval(replay_timer);
-    log('Replay paused at '+new Date(replay_time*1000));
+    log('Replay paused at '+replay_time);
 }
 
 function replay_stop()
@@ -1627,13 +1727,13 @@ function replay_stop()
     clearInterval(replay_timer);
     // Reset 'replay mode' flag
     replay_on = false;
-    log('Replay stopped at '+new Date(replay_time*1000));
+    log('Replay stopped at '+replay_time);
 }
 
 function click_replay_step()
 {
     clearInterval(replay_timer);
-    replay_step();
+    replay_next_record();
 }
 
 function click_replay_speedup()
@@ -1655,116 +1755,3 @@ function click_show_map()
     }
 }
 
-</script>
- 
-</head>
-
-<!-- ************************************************************************************** -->
-<!-- ************************************************************************************** -->
-<!-- *********  PAGE HTML      ************************************************************ -->
-<!-- ************************************************************************************** -->
-<!-- ************************************************************************************** -->
-<body onload='init()'>
-
-<div id="control_div" class="top-aligned control_div">
-<h1>RTMonitor <span id='clock'></span></h1>
-<div><a href="#" onclick="page_map()">only show map</a>
-</div>
-<div class="control_box">
-    <button onclick="sock_connect('nginx')"
-        title="Connect socket to server and send rt_connect msg"
-        >Connect</button>  
-    <button onclick="sock_close()"
-        title="Close socket connection to server"
-        >Close</button><br/> 
-    <button onclick="request_latest_msg()"
-        title="Get the latest eventbus message from the server"
-        >Request msg</button>
-    <button onclick="request_latest_records()"
-        title="Get all the latest data records accumulated on the server"
-        >Request records</button>
-    <button onclick="subscribe_all()"
-        title="Get a 'push' real-time subscription to all the data records as they arrive"
-        >Subscribe All</button><br/>
-    <input type="button" id="draw_poly" onclick="draw_poly()" value="Draw Polygon"
-        title="Draw a polygon on the map to create an API 'inside' filter in scratchpad"
-        ></input>
-    <input type="button" id="clear_markers" onclick="clear_markers()" value="Clear icons"
-        title="Remove any sensor icons that have been drawn on the map"
-        ></input>
-    <input type="button" id="clear_crumbs" onclick="clear_crumbs()" value="Clear breadcrumbs"
-        title="Remove any breadcrumbs that have been drawn on the map"
-        ></input>
-</div>
-<div>Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
-Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
-</div>
-<div class="control_box">
-    <input type="button" id="record_start" onclick="record_start()" value="Record"
-        title="Record the data as it arrives"
-        ></input>
-    <input type="button" id="record_clear" onclick="record_clear()" value="Clear"
-        title="Cancel recording"
-        ></input>
-    <input type="button" id="record_print" onclick="record_print()" value="Print"
-        title="Print the recorded data to the console"
-        ></input>
-</div>
-
-<div class="control_box">
-    <button onclick="draw_journey(DEBUG_VEHICLE_JOURNEY_ID)"
-        title="Draw test journey"
-        value="Draw journey">Draw journey</button>
-    Show map: <input id="show_map" type="checkbox" onclick="click_show_map()" checked/><br/>
-    <button onclick="replay_start()"
-        title="Replay test SiriVM data"
-        value="Replay"
-        class="button_img"><img src="/static/images/replay_play.png"/></button>
-    <input id="replay_start" type="text" size="22" value="2017-11-20T06:00:00Z"></input><br/>
-    <button onclick="click_replay_pause()"
-        title="Pause replay"
-        value="Pause"
-        class="button_img"><img src="/static/images/replay_pause.png"/></button>
-    <button onclick="replay_stop()"
-        title="Stop replay"
-        value="Stop"
-        class="button_img"><img src="/static/images/replay_stop.png"/></button>
-    Speed: <input id="replay_speedup" type="text" size="4" value="10" 
-                onchange="click_replay_speedup()"></input>
-    <button onclick="click_replay_step()"
-        title="Step replay"
-        value="Step"
-        class="button_img"><img src="/static/images/replay_step.png"/></button>
-</div>
-
-<h4>Realtime API scratchpad:</h4>
-
-<div class="scratchpad_box">
-<div class="button_box">
-  <button class="verticle_button" onclick="sock_send('rt_scratchpad')">Send:</button>
-  <button class="verticle_button" onclick="clear_textarea('rt_scratchpad')">Clear</button>
-</div>
-
-<textarea rows="25" cols="50" id="rt_scratchpad">
-{ "msg_type": "rt_subscribe",
-  "request_id": "A",
-  "filters" : [
-                {"test": "=",
-		 "key": "VehicleRef",
-                 "value": "ABC"
-                }
-              ]
-}
-</textarea>
-</div>
-
-</div> <!-- end of control_div -->
-
-<!-- MAP -->
-<div class="top-aligned" id="map"></div>
-
-<!-- console log -->
-<div id="console_div"></div>
-  
-</body>
-</html>
