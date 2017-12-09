@@ -5,7 +5,7 @@
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
-var LOG_TRUNCATE = 100; // we'll limit the log to this many messages
+var LOG_TRUNCATE = 200; // we'll limit the log to this many messages
 
 var MAP_CENTER = [52.218, -0.0666];//[52.205, 0.119];
 var MAP_SCALE = 15;//13;
@@ -26,7 +26,13 @@ var mapbounds;
 
 var clock_time; // the JS Date 'current time', either now() or replay_time
 
-var console_div;
+var log_div;
+
+var log_record_odd = true; // binary toggle for alternate log background colors
+
+var log_append = false;
+
+var log_data = false;
 
 // *********************************************************
 // RTRoutes globals
@@ -86,6 +92,9 @@ var replay_interval = 1; // Replay step interval (seconds)
 var replay_speedup = 10; // relative speed of replay time to real time
 var replay_index = 0; // current index into replay data
 
+// Segment analysis
+var analyze = false;
+
 // *********************************************************
 // Display options
 
@@ -142,7 +151,7 @@ var poly_close; // line between poly last point and start, closing polygon
 function init()
 {
     // initialize log 'console'
-    console_div = document.getElementById('console_div');
+    log_div = document.getElementById('console_div');
 
     // initialize map
 
@@ -263,10 +272,18 @@ function load_journeys()
 
 }
 
+// ************************************************************************************
+// ************************    TIMETABLE API SHIM    **********************************
+// ************************************************************************************
 //debug Given a sirivm msg, return the vehicle journey_id
 function sirivm_to_vehicle_journey_id(msg)
 {
     return DEBUG_VEHICLE_JOURNEY_ID;
+}
+
+function vehicle_journey_id_to_journey(vehicle_journey_id)
+{
+    return journeys[vehicle_journey_id];
 }
 
 function vehicle_journey_id_to_route(vehicle_journey_id)
@@ -276,191 +293,6 @@ function vehicle_journey_id_to_route(vehicle_journey_id)
         return null;
     }
     return journeys[vehicle_journey_id].route;
-}
-
-// *********************************************************************************
-// ************* Geometric Functions ***********************************************
-// *********************************************************************************
-
-// Return distance in m between positions p1 and p2.
-// lat/longs in e.g. p1.lat etc
-function distance(p1, p2)
-{
-    var R = 6371000; // Earth's mean radius in meter
-    var dLat = rad(p2.lat - p1.lat);
-    var dLong = rad(p2.lng - p1.lng);
-    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) *
-                        Math.sin(dLong / 2) * Math.sin(dLong / 2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    var d = R * c;
-    return d; // returns the distance in meter
-};
-
-// Return true is position is inside bounding polygon
-// http://stackoverflow.com/questions/13950062/checking-if-a-longitude-latitude-coordinate-resides-inside-a-complex-polygon-in
-function inside(position, bounds_path, box)
-{
-    // easy optimization - return false if position is outside bounding rectangle (box)
-    if ( position.lat > box.north ||
-         position.lat < box.south ||
-         position.lng < box.west ||
-         position.lng > box.east)
-        return false;
-
-    var lastPoint = bounds_path[bounds_path.length - 1];
-    var isInside = false;
-    var x = position.lng;
-    for (var i=0; i<bounds_path.length; i++)
-    {
-        var point = bounds_path[i];
-        var x1 = lastPoint.lng;
-        var x2 = point.lng;
-        var dx = x2 - x1;
-
-        if (Math.abs(dx) > 180.0)
-        {
-            // we have, most likely, just jumped the dateline
-            // (could do further validation to this effect if needed).  normalise the
-            // numbers.
-            if (x > 0)
-            {
-                while (x1 < 0)
-                    x1 += 360;
-                while (x2 < 0)
-                    x2 += 360;
-            }
-            else
-            {
-                while (x1 > 0)
-                    x1 -= 360;
-                while (x2 > 0)
-                    x2 -= 360;
-            }
-            dx = x2 - x1;
-        }
-
-        if ((x1 <= x && x2 > x) || (x1 >= x && x2 < x))
-        {
-            var grad = (point.lat - lastPoint.lat) / dx;
-            var intersectAtLat = lastPoint.lat + ((x - x1) * grad);
-
-            if (intersectAtLat > position.lat)
-                isInside = !isInside;
-        }
-        lastPoint = point;
-    }
-
-    return isInside;
-}
-
-
-// Bearing in degrees from pos1 -> pos2 as {lat: , lng: }
-function bearing(pos1, pos2)
-{
-    var a = { lat: rad(pos1.lat), lng: rad(pos1.lng) };
-    var b = { lat: rad(pos2.lat), lng: rad(pos2.lng) };
-
-    var y = Math.sin(b.lng-a.lng) * Math.cos(b.lat);
-    var x = Math.cos(a.lat)*Math.sin(b.lat) -
-                Math.sin(a.lat)*Math.cos(b.lat)*Math.cos(b.lng-a.lng);
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-// http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
-// Detect whether lines A->B and C->D intersect
-// return { intersect: true/false, position: LatLng (if lines do intersect), progress: 0..1 }
-// where 'progress' is how far the intersection is along the A->B path
-function intersect(line1, line2)
-{
-    var A = line1[0], B = line1[1], C = line2[0], D = line2[1];
-
-    var s1 = { lat: B.lat - A.lat, lng: B.lng - A.lng };
-    var s2 = { lat: D.lat - C.lat, lng: D.lng - C.lng };
-
-    var s = (-s1.lat * (A.lng - C.lng) + s1.lng * (A.lat - C.lat)) /
-                (-s2.lng * s1.lat + s1.lng * s2.lat);
-    var t = ( s2.lng * (A.lat - C.lat) - s2.lat * (A.lng - C.lng)) /
-                (-s2.lng * s1.lat + s1.lng * s2.lat);
-
-    if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
-    {
-        // lines A->B and C->D intersect
-        return { success: true,
-                 position: { lat: A.lat + (t * s1.lat),
-                             lng: A.lng + (t * s1.lng) },
-                 progress: t };
-    }
-
-    return { success: false }; // lines don't intersect
-}
-
-// Perpendicular distance of point P {lat:, lng:} from a line [A,B]
-// where A,B are points
-function distance_from_line(P, line)
-{
-
-    // Prepare some values for the calculation
-    var R = 6371000; // Earth's mean radius in meter
-
-    var A = line[0];
-
-    var B = line[1];
-
-    var bearing_AP = bearing(A, P);
-
-    var bearing_AB = bearing(A, B);
-
-    var bearing_BP = bearing(B, P);
-
-    // if point P is 'behind' A wrt to B, then return distance from A
-    var angle_BAP = (bearing_AP - bearing_AB + 360) % 360;
-
-    //console.log('angle_BAP',angle_BAP);
-
-    if (angle_BAP > 90 && angle_BAP < 270)
-    {
-        return distance(A,P);
-    }
-
-    // if point P is 'behind' B wrt to A, then return distance from B
-    var angle_ABP = (180 - bearing_BP + bearing_AB + 360) % 360;
-
-    //console.log('angle_ABP',angle_ABP);
-
-    if (angle_ABP > 90 && angle_ABP < 270)
-    {
-        return distance(B,P);
-    }
-
-    // ok, so the point P is somewhere between A and B, so return perpendicular distance
-
-    var distance_AB = distance(A, P);
-
-    var d = Math.asin(Math.sin(distance_AB/R)*Math.sin(rad(bearing_AP - bearing_AB))) * R;
-
-    return Math.abs(d);
-}
-
-//*********************************************************************************************
-//*************** CONVERSION FUNCTIONS, E.G. meters to nautical miles *************************
-//*********************************************************************************************
-
-// degrees to radians
-var rad = function(x) {
-      return x * Math.PI / 180;
-};
-
-// meters to nautical miles
-function nm(x)
-{
-        return x * 0.000539956803;
-}
-
-// meters to statute miles
-function miles(x)
-{
-        return x * 0.000621371;
 }
 
 // ************************************************************************************
@@ -489,7 +321,7 @@ function update_sensor(msg)
 
         var sensor_id = msg[RECORD_INDEX];
 
-		if (msg[RECORD_TS] !== sensors[sensor_id].msg[RECORD_TS])
+		if (get_date(msg).getTime() != get_date(sensors[sensor_id].msg).getTime())
         {
             // move marker
             var pos = get_point(msg);
@@ -572,10 +404,42 @@ function init_state(sensor)
     // flag if this record is OLD or NEW
     update_old_status(sensor);
 
-    init_route_index(sensor);
+    // We have a user checkbox to control bus<->segment tracking
+    if (analyze)
+    {
+        var data_route_index = sensor.msg.route_index;
+
+        init_route_index(sensor);
+
+        log_analysis(sensor, data_route_index);
+
+    }
+
+    // For TESTING we annotate the actual sensor msg with the route_index
+    sensor.msg.route_index = sensor.state.route_index;
+}
+
+function log_analysis(sensor, data_route_index)
+{
+    if (data_route_index == null)
+    {
+        log(hh_mm_ss(get_date(sensor.msg))+' route_index '+sensor.state.route_index);
+    }
+    else
+    {
+        if (!data_route_index.includes(sensor.state.route_index))
+        {
+            log('<span style="color: red">'+
+                hh_mm_ss(get_date(sensor.msg))+
+                ' wrong route_index '+sensor.state.route_index+
+                ' should be '+data_route_index.toString()+
+                '</span>');
+        }
+    }
 }
 
 // Update sensor state
+
 function update_state(sensor)
 {
     //log('Updating '+sensor.sensor_id);
@@ -583,8 +447,18 @@ function update_state(sensor)
     // flag if this record is OLD or NEW
     update_old_status(sensor);
 
-    update_route_index(sensor);
+    // We have a user checkbox to control bus<->segment tracking
+    if (analyze)
+    {
+        var data_route_index = sensor.msg.route_index;
 
+        update_route_index(sensor);
+
+        log_analysis(sensor, data_route_index);
+    }
+
+    // For TESTING we annotate the actual sensor msg with the route_index
+    //sensor.msg.route_index = sensor.state.route_index;
 }
 
 // Given a data record, update '.old' property t|f and reset marker icon
@@ -626,15 +500,23 @@ function update_old_status(sensor)
     }
 }
 
-//debug hardcoded to 1
+//debug hardcoded to 0
 function init_route_index(sensor)
 {
-    sensor.state.route_index = 1;
+    sensor.state.route_index = 0;
 }
 
-// Update sensor.state.route_index
+// *****************************************************************
+// Update sensor.state.route_index and sensor.state.segment_vector
+//
 // This is the key function that calculates the position of the bus
 // along its route.
+//
+// The basic approach is to call sub-functions update_progress_vector(sensor)
+// and update_segment_distance_vector(sensor), each of which returns a
+// probability vector of the route segment probabilities, and then we
+// combine those to pruduce the final 'segment_vector'.
+//
 function update_route_index(sensor)
 {
     // If sensor doesn't have a vehicle_journey_id then
@@ -646,7 +528,7 @@ function update_route_index(sensor)
 
     // Build the probability vectors for bus on route
 
-    var progress_vector = route_progress_vector(sensor);
+    var progress_vector = update_progress_vector(sensor);
 
     console.log(hh_mm_ss(get_date(sensor.msg))+' progress :'+vector_to_string(progress_vector,' ','()'));
 
@@ -672,7 +554,7 @@ function update_route_index(sensor)
     {
         if (segment_vector[i] > max_probability)
         {
-            sensor.state.route_index = i+1;
+            sensor.state.route_index = i;
             max_probability = segment_vector[i];
         }
     }
@@ -698,11 +580,13 @@ function init_segment_distance_vector(sensor)
 {
     var route = sensor.state.route;
 
-    var segment_probability_vector = new Array(route.length - 1);
+    var segments = route.length + 1;
+
+    var segment_probability_vector = new Array(segments);
 
     segment_probability_vector[0] = 1;
 
-    for (var i=1; i<route.length-1; i++)
+    for (var i=1; i<segments; i++)
     {
         segment_probability_vector[i] = 0;
     }
@@ -720,10 +604,17 @@ function update_segment_distance_vector(sensor)
 
     var route = sensor.state.route;
 
+    var segments = route.length + 1;
+
     // Create distance_vector array of { route_index:, distance: }
     var distance_vector = [];
 
-    for (var route_index=1; route_index<route.length; route_index++)
+    // Add distance to first stop as distance_vector[0]
+
+    distance_vector.push( { route_index: 0, distance: distance(P, stops[route[0].stop_id]) } );
+
+    // Now add the distances for route segments
+    for (var route_index=1; route_index<segments-1; route_index++)
     {
         var prev_stop_id = route[route_index-1].stop_id;
         var next_stop_id = route[route_index].stop_id;
@@ -731,7 +622,13 @@ function update_segment_distance_vector(sensor)
         distance_vector.push({ route_index: route_index, distance: dist });
     }
 
-    // Create nearest_segments array of NEAREST_COUNT { route_index:, distance: } elements
+    // And for the 'finished' segment[segments-1] add distance from last stop
+
+    distance_vector.push({ route_index: route.length+1,
+                           distance: distance(P, stops[route[route.length-1].stop_id]) });
+
+    // Create sorted nearest_segments array of NEAREST_COUNT
+    // { route_index:, distance: } elements
     var nearest_segments = distance_vector
                                 .slice() // create copy
                                 .sort((a,b) => Math.floor(a.distance - b.distance))
@@ -744,31 +641,41 @@ function update_segment_distance_vector(sensor)
 
     // Initialize final result segment_vector with zeros
     // and then insert the weights of the nearest segments
-    var segment_probability_vector = new Array(route.length - 1);
+    var segment_probability_vector = new Array(segments);
 
-    for (var i=0; i<route.length-1; i++)
+    // Initialize entire vector to 0
+    for (var i=0; i<segments; i++)
     {
         segment_probability_vector[i] = 0;
     }
+    // Insert in the calculations for nearest segments
     for (var j=0; j<nearest_segments.length; j++)
     {
-        segment_probability_vector[nearest_segments[j].route_index - 1] = nearest_probs[j];
+        segment_probability_vector[nearest_segments[j].route_index] = nearest_probs[j];
     }
 
     return segment_probability_vector;
 }
 
-// When the distances from route segments have been calculated, convert them to 0..1, sum 1.0
+// When the sorted distances from route segments have been calculated,
+// convert them to 0..1, sum 1.0
 function distance_to_probabilities(vector)
 {
-    var denominator = vector.reduce( (sum,x) => sum + x);
-    var probs = vector.map( x => denominator / (x+50) );
+    // Numerator is sum of all values
+    var numerator = vector.reduce( (sum,x) => sum + x);
+
+    // Likelihood is numerator / (x+50)
+    var probs = vector.map( x => numerator / (x+50) );
+
+    // 'vector' was sorted nearest first, so probs[0] is highest value
     var max_prob = probs[0];
 
+    // Divide all elements by highest value scales them linearly 0..1, with max as 1
     var probs_max_1 = (probs.map( x => x / max_prob ));
 
     //console.log('probs_max_1 :'+probs_max_1.map(y => ''+Math.floor(y*100)/100));
 
+    // Softmax them so they add up to 1.0
     var sm = softmax(probs_max_1);
 
     return sm;
@@ -778,7 +685,7 @@ function distance_to_probabilities(vector)
 // Route_index -> segment probability vector
 // ******************************************************************************
 
-function route_progress_vector(sensor)
+function update_progress_vector(sensor)
 {
     var route = sensor.state.route;
     var route_index = sensor.state.route_index;
@@ -786,9 +693,12 @@ function route_progress_vector(sensor)
     // Initialize final result segment_vector with zeros
     // and then insert the weights of the nearest forward segments
 
-    var segment_probability_vector = new Array(route.length - 1);
+    // Note for 'n' stops we have 'n+1' segments, including before start and after finish
+    var segments = route.length + 1;
 
-    for (var i=0; i<route.length-1; i++)
+    var segment_probability_vector = new Array(segments);
+
+    for (var i=0; i<segments; i++)
     {
         segment_probability_vector[i] = 0;
     }
@@ -800,29 +710,29 @@ function route_progress_vector(sensor)
     // probability of next route_index as [offset from prior route_index, probability
     var PROB0 = [[0,0.31],[1,0.3],[2,0.2],[3,0.19]]; // from first segment
     var PROB4 = [[-1,0.1],[0,0.24],[1,0.23],[2,0.22],[3,0.21]]; // (default) 3 segments from end or more
-    var PROB3 = [[-1,0.1],[0,0.31],[1,0.3],[2,0.29]]; // (default) 3 segments from end or more
+    var PROB3 = [[-1,0.1],[0,0.31],[1,0.3],[2,0.29]]; // 3 segments from end of route
     var PROB2 = [[-1,0.1],[0,0.5],[1,0.4]] // 2 segments from end of route
     var PROB1 = [[-1,0.1],[0,0.9]] // on last segment of route
     var progress_probs = PROB4;
-    if (route_index == 1)
+    if (route_index == 0)
     {
         progress_probs = PROB0;
     }
-    else if (route_index == route.length - 3)
+    else if (route_index == segments - 3)
     {
         progress_probs = PROB3;
     }
-    else if (route_index == route.length - 2)
+    else if (route_index == segments - 2)
     {
         progress_probs = PROB2;
     }
-    else if (route_index == route.length - 1)
+    else if (route_index == segments - 1)
     {
         progress_probs = PROB1;
     }
     for (var i=0; i<progress_probs.length; i++)
     {
-        segment_probability_vector[route_index-1+progress_probs[i][0]] = progress_probs[i][1];
+        segment_probability_vector[route_index + progress_probs[i][0]] = progress_probs[i][1];
     }
 
     return segment_probability_vector;
@@ -893,6 +803,7 @@ function vector_to_string(vector, zero_value, max_brackets)
 // and delete the previous line if needed.
 function draw_route_segment(sensor)
 {
+    //debug instead of warping to route_index 1, we could draw a circle around route[0]
     // highlight line on map of next route segment
     var route_index = sensor.state.route_index > 0 ? sensor.state.route_index : 1;
 
@@ -913,7 +824,7 @@ function draw_route_segment(sensor)
         sensor.state.route_segment_line = draw_line(stops[sensor.state.prev_stop_id],
                                                 stops[sensor.state.next_stop_id],
                                                 'green');
-        log('Next stop for '+sensor.sensor_id+' is '+sensor.state.next_stop_id);
+        //log('Next stop for '+sensor.sensor_id+' is '+sensor.state.next_stop_id);
     }
 }
 
@@ -1037,6 +948,7 @@ function create_sensor_icon(msg)
     return L.divIcon({
         className: 'marker_sensor_'+icon_size,
         iconSize: marker_size,
+        iconAnchor: L.point(23,38),
         html: marker_html
     });
 }
@@ -1105,7 +1017,7 @@ function handle_records(websock_data)
 } // end function handle_records
 
 // Process replay data relevant to updated 'replay_time'
-// 'replay_index' will be updated to point to NEXT record in rtroute_trip
+// 'replay_index' will be updated to point to NEXT record in recorded_records
 function replay_timestep()
 {
     // move replay_time forwards by the current timestep
@@ -1115,27 +1027,28 @@ function replay_timestep()
 
     // skip earlier records
 
-    while ( replay_index < rtroute_trip.length &&
-            get_date(rtroute_trip[replay_index]) < replay_time)
+    while ( replay_index < recorded_records.length &&
+            get_date(recorded_records[replay_index]) < replay_time)
     {
         replay_index++;
     }
 
-    if ( replay_index < rtroute_trip.length
+    if ( replay_index < recorded_records.length
          && replay_index > current_index)
     {
-        var msg = rtroute_trip[replay_index-1];
+        var msg = recorded_records[replay_index-1];
 
-        var time_str = hh_mm_ss(new Date(msg['acp_ts']*1000));
-        var next_time_str = (replay_index < rtroute_trip.length - 1)
-                            ? hh_mm_ss(new Date(rtroute_trip[replay_index]['acp_ts']*1000))
+        var time_str = hh_mm_ss(get_date(msg));
+
+        var next_time_str = (replay_index < recorded_records.length - 1)
+                            ? hh_mm_ss(get_date(recorded_records[replay_index]))
                             : '--end of records--';
-        log('replay record '+(replay_index-1)+' '+time_str+' next: '+next_time_str);
+        //log('replay record '+(replay_index-1)+' '+time_str+' next: '+next_time_str);
 
         handle_msg(msg);
     }
 
-    if (replay_index == rtroute_trip.length)
+    if (replay_index == recorded_records.length)
     {
         replay_stop();
     }
@@ -1144,13 +1057,13 @@ function replay_timestep()
 // User has clicked the 'step' button so jump forwards to the next record.
 function replay_next_record()
 {
-    // do nothing if we've reached the end of rtroute_trip
-    if (replay_index >= rtroute_trip.length)
+    // do nothing if we've reached the end of recorded_records
+    if (replay_index >= recorded_records.length)
     {
         return;
     }
 
-    var msg = rtroute_trip[replay_index++];
+    var msg = recorded_records[replay_index++];
 
     replay_time = get_date(msg);
 
@@ -1233,23 +1146,27 @@ function hh_mm_ss(datetime)
 // *******************  Logging code      ************************************
 // ***************************************************************************
 
-var log_record_odd = true; // binary toggle for alternate log background colors
-
-var log_append = false;
-
-function log(msg)
+function log(msg, format)
 {
-    // create HH:MM:SS timestamp for this log record
-    var ts = hh_mm_ss(new Date());
+    if (!format)
+    {
+        format = 'console';
+    }
 
     // create outermost log record element
     var new_log_record = document.createElement('div');
 
-    // create timestamp element
-    var ts_element = document.createElement('div');
-    ts_element.classList.add('log_ts');
-    ts_element.innerHTML = ts;
-    new_log_record.appendChild(ts_element);
+    if (format == 'console')
+    {
+        // create HH:MM:SS timestamp for this log record
+        var ts = hh_mm_ss(new Date());
+
+        // create timestamp element
+        var ts_element = document.createElement('div');
+        ts_element.classList.add('log_ts');
+        ts_element.innerHTML = ts;
+        new_log_record.appendChild(ts_element);
+    }
 
     // create msg element
     var msg_element = document.createElement('div');
@@ -1263,37 +1180,46 @@ function log(msg)
     log_record_odd = !log_record_odd;
 
     // if log is full then drop the oldest msg
-    if (console_div.childElementCount == LOG_TRUNCATE)
+    if (log_div.childElementCount == LOG_TRUNCATE)
     {
         //console.log('log hit limit '+LOG_TRUNCATE);
         if (log_append)
         {
             //console.log('log removing firstChild');
-            console_div.removeChild(console_div.firstChild);
+            log_div.removeChild(log_div.firstChild);
         }
         else
         {
-            //console.log('log removing lastChild '+console_div.lastChild.tagName);
-            console_div.removeChild(console_div.lastChild);
+            //console.log('log removing lastChild '+log_div.lastChild.tagName);
+            log_div.removeChild(log_div.lastChild);
         }
-        //console.log('log record count after removeChild: '+console_div.childElementCount)
+        //console.log('log record count after removeChild: '+log_div.childElementCount)
     }
     if (log_append)
     {
-        console_div.appendChild(new_log_record);
+        log_div.appendChild(new_log_record);
     }
     else
     {
-        console_div.insertBefore(new_log_record, console_div.firstChild);
+        log_div.insertBefore(new_log_record, log_div.firstChild);
     }
-    //console.log('log record count: '+console_div.childElementCount)
+    //console.log('log record count: '+log_div.childElementCount)
+}
+
+// Empty the console log div
+function log_clear()
+{
+    while (log_div.firstChild)
+    {
+            log_div.removeChild(log_div.firstChild);
+    }
 }
 
 // reverse the order of the messages in the log
 function log_reverse()
 {
-    for (var i=0;i<console_div.childNodes.length;i++)
-      console_div.insertBefore(console_div.childNodes[i], console_div.firstChild);
+    for (var i=0;i<log_div.childNodes.length;i++)
+      log_div.insertBefore(log_div.childNodes[i], log_div.firstChild);
 }
 
 // ***************************************************************************
@@ -1326,7 +1252,10 @@ function sock_connect(method)
                     log('<span class="log_error">** '+e.data+'</span>');
                     return;
                 }
-                log(e.data)
+                if (log_data)
+                {
+                    log(e.data);
+                }
                 handle_records(e.data);
                 };
 
@@ -1413,17 +1342,19 @@ function draw_journey(vehicle_journey_id)
     // Get journey route (sequence of stops).
     // For data structure see global 'journeys' declaration.
     // The 'stops' array is in journeys[vehicle_journey_id].route
-    var journey = journeys[vehicle_journey_id];
+    var journey = vehicle_journey_id_to_journey(vehicle_journey_id);
+
+    var route = vehicle_journey_id_to_route(vehicle_journey_id);
 
     // And simply draw the polyline between the stops
     var poly_line = L.polyline([], {color: 'red'}).addTo(map);
     journey.poly_line = poly_line;
     log('Drawing journey '+vehicle_journey_id+', length '+journey.route.length);
-    for (var i=0; i<journey.route.length; i++)
+    for (var i=0; i<route.length; i++)
     {
-        if (journey.route[i])
+        if (route[i])
         {
-            var route_stop = journey.route[i];
+            var route_stop = route[i];
             var stop_id = route_stop.stop_id;
             //console.log('draw_journey() ' +stop_id);
             var stop = stops[stop_id];
@@ -1437,9 +1368,27 @@ function draw_journey(vehicle_journey_id)
             journey.poly_line.addLatLng(p);
 
             // add arrow
-            if (journey.route[i].arrow)
+            if (route[i].arrow)
             {
-                journey.route[i].arrow.addTo(map);
+                route[i].arrow.addTo(map);
+            }
+        }
+    }
+}
+
+// User has un-checked 'Show Journey'
+function hide_journey(vehicle_journey_id)
+{
+    var journey = vehicle_journey_id_to_journey(vehicle_journey_id);
+    if (journey.poly_line)
+    {
+        map.removeLayer(journey.poly_line);
+        var route = journey.route;
+        for (var i=0; i<route.length; i++)
+        {
+            if (route[i].arrow)
+            {
+                map.removeLayer(route[i].arrow);
             }
         }
     }
@@ -1475,6 +1424,11 @@ function click_log_append()
     {
         log_reverse();
     }
+}
+
+function click_log_data()
+{
+    log_data = document.getElementById("log_data").checked == true;
 }
 
 // remove all markers from map and reset 'sensors' array
@@ -1639,7 +1593,7 @@ function click_less(sensor_id)
 }
 
 // user has clicked to only show the map
-function page_map()
+function hide_control()
 {
     map_only = true;
     document.getElementById('control_div').style.display = 'none';
@@ -1658,8 +1612,9 @@ function page_normal()
     map.invalidateSize();
 }
 
-// ********************
+// *************************************************************
 // Recording buttons
+// *************************************************************
 
 function record_start()
 {
@@ -1676,17 +1631,22 @@ function record_clear()
 
 function record_print()
 {
-    console.log('Printing '+recorded_records.length+' recorded records '+new Date());
+    log_clear();
+    var prev_log_append = log_append;
+    log_append = true;
+    log('Printing '+recorded_records.length+' recorded records '+new Date());
     for (var i=0; i<recorded_records.length; i++)
     {
-        console.log(recorded_records[i]);
+        log(JSON.stringify(recorded_records[i]),'div');
     }
+    log_append = prev_log_append;
 }
 
 // ***********************
 // Replay buttons
 
-// user clicked 'Replay' button
+// User clicked 'Replay' button
+// This launches an intervalTimer to step through the data records
 function replay_start()
 {
     // get start time from text box (js compatible)
@@ -1716,12 +1676,14 @@ function replay_start()
     log('Timer started '+replay_time);
 }
 
+// User has clicked the Replay Pause button
 function click_replay_pause()
 {
     clearInterval(replay_timer);
     log('Replay paused at '+replay_time);
 }
 
+// User has clicked the Replay Stop button
 function replay_stop()
 {
     clearInterval(replay_timer);
@@ -1730,22 +1692,52 @@ function replay_stop()
     log('Replay stopped at '+replay_time);
 }
 
+// User has clicked the Replay Step button, so increment to next data record
 function click_replay_step()
 {
     clearInterval(replay_timer);
     replay_next_record();
 }
 
+// User has updated the Replay speedup value
 function click_replay_speedup()
 {
     replay_speedup = document.getElementById('replay_speedup').value;
     log('Changed replay speedup to '+replay_speedup);
 }
 
-function click_show_map()
+// User has clicked on Show journey checkbox
+function click_show_journey()
 {
-    show_map = document.getElementById("show_map").checked == true;
-    if (!show_map)
+    var show_journey = document.getElementById("show_journey").checked;
+    if (show_journey)
+    {
+        analyze = true;
+        draw_journey(DEBUG_VEHICLE_JOURNEY_ID);
+    }
+    else
+    {
+        analyze = false;
+        hide_journey(DEBUG_VEHICLE_JOURNEY_ID);
+    }
+}
+
+function click_load_sirivm()
+{
+    recorded_records = [];
+    for (var i=0; i<rtroute_trip.length; i++)
+    {
+        recorded_records.push(Object.assign({},rtroute_trip[i]));
+    }
+    log('Loaded test trip');
+}
+
+// User has clicked on the 'hide map' checkbox.
+// The map layer will be hidden, so only the stops and route are shown with the buses
+function click_hide_map()
+{
+    var hide_map = document.getElementById("hide_map").checked;
+    if (hide_map)
     {
         map.removeLayer(map_tiles);
     }
@@ -1753,5 +1745,12 @@ function click_show_map()
     {
         map.addLayer(map_tiles);
     }
+}
+
+// User has toggled "Track Buses" checkbox, so set global boolean
+// This will control whether the bus->segment tracking code operates
+function click_analyze()
+{
+    analyze = document.getElementById("analyze").checked;
 }
 

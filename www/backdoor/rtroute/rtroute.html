@@ -4,7 +4,7 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTRoute v0.19</title>
+    <title>RTRoute v0.20</title>
 <!--
 RELEASE INFO:
     2017-12-08 moved JS into rtroute.js.
@@ -36,7 +36,7 @@ body {
 #rt_scratchpad {
     font-size: x-small;
     width: 95%;
-    height: 40%;
+    height: 30%;
 }
 
 #map {
@@ -54,7 +54,11 @@ body {
 }
 
 .control_box {
-    padding: 6px;
+    padding: 2px;
+}
+
+.control_heading {
+    font-weight: bold;
 }
 
 .scratchpad_box {
@@ -142,11 +146,15 @@ body {
 <script type="text/javascript" src="rtroute_stops.js"></script>
 
 <!-- create array of sirivm js objects rtroute_trip (one sample journey) -->
-<script type="text/javascript" src="rtroute_trip.js"></script>
+<script type="text/javascript" src="rtroute_trip2.js"></script>
 
 <!-- WebSockets library to connect to RTMonitor -->
 <script src="sockjs.min.js"></script>
 
+<!-- ijl20 library of useful geo functions -->
+<script src="geo.js"></script>
+
+<!-- The core realtime display and route analytics code -->
 <script src="rtroute.js"></script>
 
 </head>
@@ -160,8 +168,9 @@ body {
 
 <div id="control_div" class="top-aligned control_div">
 <h1>RTMonitor <span id='clock'></span></h1>
-<div><a href="#" onclick="page_map()">only show map</a>
+<div><a href="#" onclick="hide_control()">hide control panel</a>
 </div>
+<div class="control_heading">Real-time requests and subscriptions</div>
 <div class="control_box">
     <button onclick="sock_connect('nginx')"
         title="Connect socket to server and send rt_connect msg"
@@ -174,24 +183,39 @@ body {
         >Request msg</button>
     <button onclick="request_latest_records()"
         title="Get all the latest data records accumulated on the server"
-        >Request records</button>
+        >Request records</button><br/>
     <button onclick="subscribe_all()"
         title="Get a 'push' real-time subscription to all the data records as they arrive"
         >Subscribe All</button><br/>
     <input type="button" id="draw_poly" onclick="draw_poly()" value="Draw Polygon"
         title="Draw a polygon on the map to create an API 'inside' filter in scratchpad"
         ></input>
+</div>
+<div class="control_heading">Display options</div>
+<div class="control_box">
     <input type="button" id="clear_markers" onclick="clear_markers()" value="Clear icons"
         title="Remove any sensor icons that have been drawn on the map"
         ></input>
+    Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
     <input type="button" id="clear_crumbs" onclick="clear_crumbs()" value="Clear breadcrumbs"
         title="Remove any breadcrumbs that have been drawn on the map"
         ></input>
 </div>
-<div>Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
-Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
-</div>
+<div class="control_heading">Console log options</div>
 <div class="control_box">
+    Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
+    Log data records: <input id="log_data" type="checkbox" onclick="click_log_data()"/>
+    <input type="button" onclick="log_clear()"
+        title="Clear log"
+        value="Clear"
+        ></input>
+</div>
+<div class="control_heading">Data recording</div>
+<div class="control_box">
+    <input type="button" onclick="click_load_sirivm()"
+        title="Load test SiriVM data"
+        value="Load test data"
+        ></input><br/>
     <input type="button" id="record_start" onclick="record_start()" value="Record"
         title="Record the data as it arrives"
         ></input>
@@ -202,12 +226,12 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
         title="Print the recorded data to the console"
         ></input>
 </div>
-
+<div class="control_heading">Route analysis</div>
 <div class="control_box">
-    <button onclick="draw_journey(DEBUG_VEHICLE_JOURNEY_ID)"
-        title="Draw test journey"
-        value="Draw journey">Draw journey</button>
-    Show map: <input id="show_map" type="checkbox" onclick="click_show_map()" checked/><br/>
+    Show journey: <input id="show_journey" type="checkbox" onclick="click_show_journey()"/>
+    Hide map: <input id="hide_map" type="checkbox" onclick="click_hide_map()"/>
+    Analyze: <input id="analyze" type="checkbox" onclick="click_analyze()"/><br/>
+
     <button onclick="replay_start()"
         title="Replay test SiriVM data"
         value="Replay"
@@ -229,7 +253,7 @@ Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs(
         class="button_img"><img src="/static/images/replay_step.png"/></button>
 </div>
 
-<h4>Realtime API scratchpad:</h4>
+<div class="control_heading">Realtime API scratchpad:</div>
 
 <div class="scratchpad_box">
 <div class="button_box">
