@@ -4,9 +4,10 @@
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 
-    <title>RTRoute v0.20</title>
+    <title>RTRoute v0.21</title>
 <!--
 RELEASE INFO:
+    2017-12-10 added progress vector, improved record, replay, logging
     2017-12-08 moved JS into rtroute.js.
                Replay with sample trip
                Shims for sirivm_to_journey_id and vehicle_journey_id_to_route
@@ -41,7 +42,7 @@ body {
 
 #map {
 	display: inline-block;
-	width: 68%;
+	width: 61%;
     height: 80%;
 }
 
@@ -63,13 +64,25 @@ body {
 
 .scratchpad_box {
     width: 100%;
-    height: 90%;
+    height: 70%;
 }
 
 .control_div {
     display: inline-block;
     width: 30%;
     height: 80%;
+}
+
+.progress_div {
+    display: inline-block;
+    background-color: lightblue;
+    height: 80%;
+    width: 7%;
+}
+
+.progress_canvas {
+    height: 100%;
+    width: 100%;
 }
 
 .sensor-popup {
@@ -168,7 +181,7 @@ body {
 
 <div id="control_div" class="top-aligned control_div">
 <h1>RTMonitor <span id='clock'></span></h1>
-<div><a href="#" onclick="hide_control()">hide control panel</a>
+<div><a href="#" onclick="hide_control()">hide</a>
 </div>
 <div class="control_heading">Real-time requests and subscriptions</div>
 <div class="control_box">
@@ -177,16 +190,16 @@ body {
         >Connect</button>
     <button onclick="sock_close()"
         title="Close socket connection to server"
-        >Close</button><br/>
+        >Close</button>
     <button onclick="request_latest_msg()"
         title="Get the latest eventbus message from the server"
         >Request msg</button>
     <button onclick="request_latest_records()"
         title="Get all the latest data records accumulated on the server"
-        >Request records</button><br/>
+        >Request records</button>
     <button onclick="subscribe_all()"
         title="Get a 'push' real-time subscription to all the data records as they arrive"
-        >Subscribe All</button><br/>
+        >Subscribe All</button>
     <input type="button" id="draw_poly" onclick="draw_poly()" value="Draw Polygon"
         title="Draw a polygon on the map to create an API 'inside' filter in scratchpad"
         ></input>
@@ -215,7 +228,7 @@ body {
     <input type="button" onclick="click_load_sirivm()"
         title="Load test SiriVM data"
         value="Load test data"
-        ></input><br/>
+        ></input>
     <input type="button" id="record_start" onclick="record_start()" value="Record"
         title="Record the data as it arrives"
         ></input>
@@ -275,6 +288,12 @@ body {
 </div>
 
 </div> <!-- end of control_div -->
+
+<!-- progress -->
+<div id="progress_div" class="progress_div">
+    <canvas id="progress_canvas" class="progress_canvas">
+    </canvas>
+</div>
 
 <!-- MAP -->
 <div class="top-aligned" id="map"></div>
