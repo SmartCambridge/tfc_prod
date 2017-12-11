@@ -1,7 +1,7 @@
 Adaptive Cities Platform Glossary
 =================================
 
-v0.1 - 2017-11-21
+v0.2 - 2017-12-11
 
 JOURNEY
 -------
@@ -53,6 +53,17 @@ PATH
 ----
 
 The representation of the actual **LOCATION**s traversed by a vehicle.
+
+SEGMENT
+-------
+
+The section of a **JOURNEY** between **STOP POINTS** (or before an 
+**ORIGIN STOP POINT** or after a **DESTINATION STOP POINT**). Also:
+
+** JOURNEY PATTERN SEGMENT**: The straight-line between adjacent **STOP 
+POINTS**.
+** PATH SEGMENT: The section of a **PATH** between adjacent **STOP 
+POINTS**.
 
 STOP POINT
 ----------
