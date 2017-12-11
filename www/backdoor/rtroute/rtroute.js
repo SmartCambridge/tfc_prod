@@ -542,11 +542,11 @@ function update_route_analysis(sensor)
 
     var progress_vector = update_progress_vector(sensor);
 
-    console.log(hh_mm_ss(get_date(sensor.msg))+' progress :'+vector_to_string(progress_vector,' ','()'));
+    console.log(hh_mm_ss(get_date(sensor.msg))+' progress :'+vector_to_string(progress_vector,' ','('));
 
     var distance_vector = update_segment_distance_vector(sensor);
 
-    console.log('         distance :'+vector_to_string(distance_vector,' ','()'));
+    console.log('         distance :'+vector_to_string(distance_vector,' ','('));
 
     var segment_product = [];
 
@@ -575,7 +575,9 @@ function update_route_analysis(sensor)
 
     console.log('         RESULT '+
                 (' '+sensor.state.segment_index).slice(-2)+
-                ':'+vector_to_string(segment_vector,'-','<>'));
+                ':'+vector_to_string(segment_vector,'-','<','{',sensor.msg.segment_index));
+
+    sensor.state.segment_progress = get_segment_progress(sensor);
 
     draw_route_segment(sensor);
 }
@@ -752,6 +754,33 @@ function update_progress_vector(sensor)
     return segment_probability_vector;
 }
 
+// Return progress 0..1 along a route segment for a sensor.
+// The current route for this sensor is in sensor.state.route
+// and the current segment is between stops route[segment_index-1]..route[segment_index]
+function get_segment_progress(sensor)
+{
+    var route = sensor.state.route;
+
+    if ((sensor.state.segment_index == 0) || (sensor.state.segment_index == route.length))
+    {
+        return 0;
+    }
+
+    var pos = get_point(sensor.msg);
+
+    var segment_index = sensor.state.segment_index;
+
+    var prev_stop = stops[route[segment_index - 1].stop_id];
+
+    var next_stop = stops[route[segment_index].stop_id];
+
+    var distance_to_prev_stop = distance(pos, prev_stop);
+
+    var distance_to_next_stop = distance(pos, next_stop);
+
+    return distance_to_prev_stop / (distance_to_prev_stop + distance_to_next_stop);
+}
+
 // ***************************************************************************************************
 // Return array {time: (seconds), distance: (meters), turn: (degrees) } for route,
 // starting at {starttime,0,0}
@@ -799,8 +828,10 @@ function create_route_profile(route)
     return route_profile;
 }
 
+// Update the vertical progress visualization
 function draw_progress(sensor)
 {
+    // Initialize context for drawing
     var progress_canvas = document.getElementById('progress_canvas');
     progress_canvas.width = progress_canvas.clientWidth;
     progress_canvas.height = progress_canvas.clientHeight;
@@ -861,35 +892,50 @@ function draw_progress(sensor)
     //
     var segment_index = sensor.state.segment_index;
 
+    var segment_top;
+
+    var segment_height = 0;
+
     ctx.fillStyle = '#88ff88';
 
     if (segment_index == 0) // not started route
     {
-        var y = PROGRESS_Y_START - 10;
+        segment_top = PROGRESS_Y_START - 10;
 
-        ctx.fillRect(x0,y,w,9);
+        ctx.fillRect(x0,segment_top,w,9);
     }
     else if (segment_index == route_profile.length+1) // finished route
     {
-        var y = PROGRESS_Y_FINISH + 1;
+        segment_top = PROGRESS_Y_FINISH + 1;
 
-        ctx.fillRect(x0,y,w,9);
+        ctx.fillRect(x0,segment_top,w,9);
     }
     else
     {
         var stop_distance = route_profile[segment_index - 1].distance;
-        var y0 = Math.floor(stop_distance / route_distance
+        segment_top = Math.floor(stop_distance / route_distance
                             * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
                             + PROGRESS_Y_START);
-         stop_distance = route_profile[segment_index].distance;
+
+        stop_distance = route_profile[segment_index].distance;
         var y1 = Math.floor(stop_distance / route_distance
                             * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
                             + PROGRESS_Y_START);
-        var h = y1 - y0 - 1; // allow space for line
 
-        ctx.fillRect(x0,y0,w,h);
+        segment_height = y1 - segment_top;
+
+        ctx.fillRect(x0,segment_top,w,segment_height-1);
     }
 
+    // Draw segment progress line
+    //
+    var segment_progress_y = segment_top + sensor.state.segment_progress * segment_height;
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#ffff00';
+    ctx.moveTo(PROGRESS_X_START, segment_progress_y);
+    ctx.lineTo(PROGRESS_X_FINISH, segment_progress_y);
+    ctx.stroke();
 }
 
 
@@ -906,17 +952,29 @@ function softmax(vector)
 }
 
 // Return printable version of probability vector (array with all elements 0..1)
-// E.g. vector_to_string([0.1,0.2,0.0,0.3],'0','[]')
-function vector_to_string(vector, zero_value, max_brackets)
+// E.g. vector_to_string([0.1,0.2,0.0,0.3],'0','[','{',[1,2])
+// where
+// vector: [0.1,0.2,0.0,0.3] is the vector to draw
+// zero_value: '0' is the zero value to use (to reduce the print clutter)
+// max_flag: '[' is the flag to use to highlight the maximum unless correct
+// correct_flag: '{' is the flag to use to highlight the correct maximum
+// correct_cells: [1,2] are the cells that if maximum are considered correct
+function vector_to_string(vector, zero_value, max_flag, correct_flag, correct_cells)
 {
     if (!zero_value)
     {
         zero_value =  '-';
     }
-    if (!max_brackets)
+    if (!max_flag)
     {
-        max_brackets = '[]';
+        max_flag = '[';
     }
+
+    if (!correct_flag)
+    {
+        correct_cells = [];
+    }
+
     var str = '';
     // find index of largest element
     var max_value = 0;
@@ -930,25 +988,33 @@ function vector_to_string(vector, zero_value, max_brackets)
         }
     }
 
-    // Build print string, with [..] around max
+    // Build print string
     for (var i=0; i<vector.length; i++)
     {
+        // Compute leading spacer
         var spacer = ' ';
-        if (i == max_index)
+
+        if (correct_cells.includes(i))
         {
-            spacer = max_brackets.slice(0,1);
+            spacer = correct_flag;
         }
-        else if (i==max_index+1)
+        else if (i == max_index)
         {
-            spacer = max_brackets.slice(1,2);
+            spacer = max_flag;
         }
+
+        // Print the spacer + value
+        //
+        str += spacer;
+
+        // Print zero or value
         if (vector[i] == 0)
         {
-            str += spacer + ' '+zero_value+' ';
+            str += ' '+zero_value+' ';
         }
-        else
+        else // Print value
         {
-            str += spacer + (''+Math.floor(vector[i]*100)/100+'0').slice(1,4);
+            str += (''+Math.floor(vector[i]*100)/100+'0').slice(1,4);
         }
     }
     return str;
@@ -985,7 +1051,6 @@ function draw_route_segment(sensor)
         sensor.state.route_segment_line = draw_line(stops[sensor.state.prev_stop_id],
                                                 stops[sensor.state.next_stop_id],
                                                 'green');
-        //log('Next stop for '+sensor.sensor_id+' is '+sensor.state.next_stop_id);
     }
 }
 
