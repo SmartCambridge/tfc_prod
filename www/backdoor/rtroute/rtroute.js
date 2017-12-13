@@ -13,6 +13,14 @@ var MAP_SCALE = 15;//13;
 var OLD_TIMER_INTERVAL = 30; // watchdog timer interval (s) checking for old data records
 var OLD_DATA_RECORD = 60; // time (s) threshold where a data record is considered 'old'
 
+var SVGNS = 'http://www.w3.org/2000/svg';
+
+var PROGRESS_MARGIN = 20;
+var PROGRESS_LEFT_MARGIN = 20;
+var PROGRESS_RIGHT_MARGIN = 50;
+var PROGRESS_TOP_MARGIN = 20;
+var PROGRESS_BOTTOM_MARGIN = 20;
+
 // Globals
 
 var map;       // Leaflet map
@@ -26,7 +34,16 @@ var mapbounds;
 
 var clock_time; // the JS Date 'current time', either now() or replay_time
 
-var log_div;
+var log_div; // page div element containing the log
+
+var progress_div; // page div element containing the progress visualization
+var progress_svg; // SVG element within progress_div
+var progress_update_elements = []; // these are the SVG elements we delete and create each update
+
+var PROGRESS_X_START; // pixel dimensions of progress visual route draw area
+var PROGRESS_X_FINISH;
+var PROGRESS_Y_START;
+var PROGRESS_Y_FINISH;
 
 var log_record_odd = true; // binary toggle for alternate log background colors
 
@@ -118,6 +135,9 @@ var RECORD_LNG = 'Longitude';     // name of property containing longitude
 // Map globals
 var ICON_URL = '/static/images/bus-logo.png';
 
+var ICON_IMAGE = new Image();
+ICON_IMAGE.src = ICON_URL;
+
 var crumbs = []; // array to hold breadcrumbs as they are drawn
 
 var icon_size = 'L';
@@ -151,7 +171,21 @@ var poly_close; // line between poly last point and start, closing polygon
 function init()
 {
     // initialize log 'console'
-    log_div = document.getElementById('console_div');
+    log_div = document.getElementById('log_div');
+
+    // initialize progress div
+    progress_div = document.getElementById('progress_div');
+
+    progress_svg = document.createElementNS(SVGNS, 'svg');
+    progress_svg.setAttribute('width',progress_div.clientWidth);
+    progress_svg.setAttribute('height',progress_div.clientHeight);
+
+    progress_div.appendChild(progress_svg);
+    PROGRESS_X_START = PROGRESS_LEFT_MARGIN;
+    PROGRESS_X_FINISH = progress_div.clientWidth - PROGRESS_RIGHT_MARGIN;
+    PROGRESS_Y_START = PROGRESS_TOP_MARGIN;
+    PROGRESS_Y_FINISH = progress_div.clientHeight - PROGRESS_BOTTOM_MARGIN;
+
 
     // initialize map
 
@@ -201,7 +235,7 @@ function init()
 
     draw_stops();
 
-    draw_progress();
+    draw_progress_init();
 
 } // end init()
 
@@ -415,7 +449,9 @@ function init_state(sensor)
 
         init_route_analysis(sensor);
 
-        draw_progress(sensor);
+        draw_progress_init(sensor); // add full route
+
+        draw_progress_update(sensor); // add moving markers
 
         log_analysis(sensor, data_segment_index);
     }
@@ -460,7 +496,7 @@ function update_state(sensor)
 
         update_route_analysis(sensor);
 
-        draw_progress(sensor);
+        draw_progress_update(sensor);
 
         log_analysis(sensor, data_segment_index);
     }
@@ -556,7 +592,7 @@ function update_route_analysis(sensor)
     }
     //console.log('          product :'+vector_to_string(segment_product));
 
-    var segment_vector = segment_product;
+    var segment_vector = linear_adjust(segment_product);
 
     // Set sensor.state.segment_index to segment with highest probability
     var max_probability = 0;
@@ -638,7 +674,7 @@ function update_segment_distance_vector(sensor)
 
     // And for the 'finished' segment[segments-1] add distance from last stop
 
-    distance_vector.push({ segment_index: route.length+1,
+    distance_vector.push({ segment_index: segments - 1,
                            distance: distance(P, stops[route[route.length-1].stop_id]) });
 
     // Create sorted nearest_segments array of NEAREST_COUNT
@@ -824,118 +860,12 @@ function create_route_profile(route)
         }
         route_profile.push(stop_info);
     }
+    for (var i=0; i<route_profile.length; i++)
+    {
+        console.log(i+' '+JSON.stringify(route_profile[i]));
+    }
     //console.log(JSON.stringify(route_profile));
     return route_profile;
-}
-
-// Update the vertical progress visualization
-function draw_progress(sensor)
-{
-    // Initialize context for drawing
-    var progress_canvas = document.getElementById('progress_canvas');
-    progress_canvas.width = progress_canvas.clientWidth;
-    progress_canvas.height = progress_canvas.clientHeight;
-    var height = progress_canvas.height;
-    var width = progress_canvas.width;
-    var ctx = progress_canvas.getContext('2d');
-
-    var PROGRESS_MARGIN = 20;
-    var PROGRESS_X_START = PROGRESS_MARGIN;
-    var PROGRESS_X_FINISH = width - PROGRESS_MARGIN;
-    var PROGRESS_Y_START = PROGRESS_MARGIN;
-    var PROGRESS_Y_FINISH = height - PROGRESS_MARGIN;
-
-    // Draw start and finish stop lines
-    ctx.beginPath();
-    ctx.lineWidth = 1;
-    ctx.moveTo(PROGRESS_X_START,PROGRESS_Y_START);
-    ctx.lineTo(PROGRESS_X_FINISH,PROGRESS_Y_START);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.lineWidth = 1;
-    ctx.moveTo(PROGRESS_X_START,PROGRESS_Y_FINISH);
-    ctx.lineTo(PROGRESS_X_FINISH,PROGRESS_Y_FINISH);
-    ctx.stroke();
-
-    if (!sensor || !sensor.state.route)
-    {
-        return;
-    }
-
-    // Get basic route info from route_profile
-    //
-    var route_profile = sensor.state.route_profile;
-
-    var route_distance = route_profile[route_profile.length-1].distance;
-
-    // Draw the vertical route outline
-    //
-    var x0 = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)/2;
-    var x1 = PROGRESS_X_FINISH;
-    var w = x1 - x0;
-
-    for (var i=1; i<route_profile.length-1;i++)
-    {
-        var stop_distance = route_profile[i].distance;
-        var y = Math.floor(stop_distance / route_distance
-                            * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
-                            + PROGRESS_Y_START);
-
-        ctx.beginPath();
-        ctx.moveTo(x0,y);
-        ctx.lineTo(x1,y);
-        ctx.stroke();
-    }
-
-    // Highlight the current route segment
-    //
-    var segment_index = sensor.state.segment_index;
-
-    var segment_top;
-
-    var segment_height = 0;
-
-    ctx.fillStyle = '#88ff88';
-
-    if (segment_index == 0) // not started route
-    {
-        segment_top = PROGRESS_Y_START - 10;
-
-        ctx.fillRect(x0,segment_top,w,9);
-    }
-    else if (segment_index == route_profile.length+1) // finished route
-    {
-        segment_top = PROGRESS_Y_FINISH + 1;
-
-        ctx.fillRect(x0,segment_top,w,9);
-    }
-    else
-    {
-        var stop_distance = route_profile[segment_index - 1].distance;
-        segment_top = Math.floor(stop_distance / route_distance
-                            * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
-                            + PROGRESS_Y_START);
-
-        stop_distance = route_profile[segment_index].distance;
-        var y1 = Math.floor(stop_distance / route_distance
-                            * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
-                            + PROGRESS_Y_START);
-
-        segment_height = y1 - segment_top;
-
-        ctx.fillRect(x0,segment_top,w,segment_height-1);
-    }
-
-    // Draw segment progress line
-    //
-    var segment_progress_y = segment_top + sensor.state.segment_progress * segment_height;
-
-    ctx.beginPath();
-    ctx.strokeStyle = '#ffff00';
-    ctx.moveTo(PROGRESS_X_START, segment_progress_y);
-    ctx.lineTo(PROGRESS_X_FINISH, segment_progress_y);
-    ctx.stroke();
 }
 
 
@@ -949,6 +879,13 @@ function softmax(vector)
     // Each element x -> exp(x) / sum(all exp(x))
     var denominator =  vector.map(x => Math.exp(x)).reduce( (sum, x) => sum + x );
     return vector.map( x => Math.exp(x) / denominator);
+}
+
+function linear_adjust(vector)
+{
+    // Each element x -> x/ sum(all x)
+    var denominator =  vector.reduce( (sum, x) => sum + x );
+    return vector.map( x => x / denominator);
 }
 
 // Return printable version of probability vector (array with all elements 0..1)
@@ -1007,14 +944,20 @@ function vector_to_string(vector, zero_value, max_flag, correct_flag, correct_ce
         //
         str += spacer;
 
+        var n = vector[i];
+
         // Print zero or value
-        if (vector[i] == 0)
+        if (n == 0)
         {
             str += ' '+zero_value+' ';
         }
+        else if (n == 1)
+        {
+            str += '1.0';
+        }
         else // Print value
         {
-            str += (''+Math.floor(vector[i]*100)/100+'0').slice(1,4);
+            str += (''+Math.floor(n*100)/100+'0').slice(1,4);
         }
     }
     return str;
@@ -1223,6 +1166,177 @@ function more_content(sensor_id)
     content +=
         '<br/><a href="#" onclick="click_less('+"'"+sensor_id+"'"+')">less</a>';
     return content;
+}
+
+// Initialize the vertical progress visualization
+function draw_progress_init(sensor)
+{
+
+    // Draw start and finish stop lines
+    //
+    var start_line = document.createElementNS(SVGNS, 'line');
+
+    var x_start_finish = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)*0.75;
+
+    start_line.setAttribute('x1', x_start_finish);
+    start_line.setAttribute('y1', PROGRESS_Y_START);
+    start_line.setAttribute('x2', PROGRESS_X_FINISH);
+    start_line.setAttribute('y2', PROGRESS_Y_START);
+    start_line.setAttribute('stroke', 'black');
+
+    progress_svg.appendChild(start_line);
+
+    var finish_line = document.createElementNS(SVGNS, 'line');
+
+    finish_line.setAttribute('x1', x_start_finish);
+    finish_line.setAttribute('y1', PROGRESS_Y_FINISH);
+    finish_line.setAttribute('x2', PROGRESS_X_FINISH);
+    finish_line.setAttribute('y2', PROGRESS_Y_FINISH);
+    finish_line.setAttribute('stroke', 'black');
+
+    progress_svg.appendChild(finish_line);
+
+    if (!sensor || !sensor.state.route)
+    {
+        return;
+    }
+
+    // Get basic route info from route_profile
+    //
+    var route_profile = sensor.state.route_profile;
+
+    var route_distance = route_profile[route_profile.length-1].distance;
+
+    // Draw the vertical route outline
+    //
+    var x1 = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)*0.8;
+    var x2 = PROGRESS_X_FINISH;
+    var w = x2 - x1;
+
+    for (var i=1; i<route_profile.length-1;i++)
+    {
+        var stop_distance = route_profile[i].distance;
+        var y = Math.floor(stop_distance / route_distance
+                            * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
+                            + PROGRESS_Y_START);
+
+        var line = document.createElementNS(SVGNS,'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', 'black');
+        progress_svg.appendChild(line);
+    }
+}
+
+// Update the visual progress visualization
+function draw_progress_update(sensor)
+{
+    // Get basic route info from route_profile
+    //
+    var route_profile = sensor.state.route_profile;
+
+    var route_distance = route_profile[route_profile.length-1].distance;
+
+    var x1 = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)*0.8;
+    var x2 = PROGRESS_X_FINISH;
+    var w = x2 - x1;
+
+    // Remove previous update elements
+    for (var i=0; i<progress_update_elements.length; i++)
+    {
+        progress_svg.removeChild(progress_update_elements[i]);
+    }
+
+    progress_update_elements = [];
+
+    // Highlight the current route segment
+    //
+    var segment_index = sensor.state.segment_index;
+
+    var segment_top;
+
+    var segment_height = 0;
+
+    var rect = document.createElementNS(SVGNS,'rect');
+
+    rect.setAttributeNS(null, 'fill', '#88ff88');
+
+    if (segment_index == 0) // not started route
+    {
+        segment_top = PROGRESS_Y_START - 10;
+
+        rect.setAttributeNS(null, 'x', x1);
+        rect.setAttributeNS(null, 'y', segment_top);
+        rect.setAttributeNS(null, 'width', w);
+        rect.setAttributeNS(null, 'height', 9);
+
+        progress_svg.appendChild(rect);
+    }
+    else if (segment_index == route_profile.length+1) // finished route
+    {
+        segment_top = PROGRESS_Y_FINISH + 1;
+
+        rect.setAttributeNS(null, 'x', x1);
+        rect.setAttributeNS(null, 'y', segment_top);
+        rect.setAttributeNS(null, 'width', w);
+        rect.setAttributeNS(null, 'height', 9);
+
+        progress_svg.appendChild(rect);
+    }
+    else
+    {
+        var stop_distance = route_profile[segment_index - 1].distance;
+        segment_top = Math.floor(stop_distance / route_distance
+                            * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
+                            + PROGRESS_Y_START);
+
+        stop_distance = route_profile[segment_index].distance;
+        var y1 = Math.floor(stop_distance / route_distance
+                            * (PROGRESS_Y_FINISH - PROGRESS_Y_START)
+                            + PROGRESS_Y_START);
+
+        segment_height = y1 - segment_top;
+
+        rect.setAttributeNS(null, 'x', x1);
+        rect.setAttributeNS(null, 'y', segment_top);
+        rect.setAttributeNS(null, 'width', w);
+        rect.setAttributeNS(null, 'height', segment_height-1);
+
+        progress_svg.appendChild(rect);
+    }
+
+    progress_update_elements.push(rect);
+
+    // Draw segment progress line
+    //
+    var segment_progress_y = segment_top + sensor.state.segment_progress * segment_height;
+
+    var segment_progress_x = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)*0.65;
+
+    var progress_line = document.createElementNS(SVGNS, 'line');
+
+    progress_line.setAttribute('x1', segment_progress_x);
+    progress_line.setAttribute('y1', segment_progress_y);
+    progress_line.setAttribute('x2', PROGRESS_X_FINISH);
+    progress_line.setAttribute('y2', segment_progress_y);
+    progress_line.setAttribute('stroke', 'black');
+
+    progress_svg.appendChild(progress_line);
+
+    progress_update_elements.push(progress_line);
+
+    var progress_icon = document.createElementNS(SVGNS, 'image');
+
+    progress_icon.setAttributeNS('http://www.w3.org/1999/xlink','href', ICON_URL);
+    progress_icon.setAttributeNS(null, 'x', segment_progress_x - 9);
+    progress_icon.setAttributeNS(null, 'y', segment_progress_y - 9);
+    progress_icon.setAttributeNS(null, 'width', 20);
+    progress_icon.setAttributeNS(null, 'height', 20);
+
+    progress_svg.appendChild(progress_icon);
+    progress_update_elements.push(progress_icon);
 }
 
 // ********************************************************************************
@@ -1565,6 +1679,9 @@ function draw_stops()
 // The journey stops data is stored in 'journeys' created at startup
 function draw_journey(vehicle_journey_id)
 {
+    // if it's already drawn, remove it and redraw
+    hide_journey(vehicle_journey_id);
+
     // Get journey route (sequence of stops).
     // For data structure see global 'journeys' declaration.
     // The 'stops' array is in journeys[vehicle_journey_id].route
@@ -1948,16 +2065,31 @@ function click_show_journey()
         analyze = false;
         hide_journey(DEBUG_VEHICLE_JOURNEY_ID);
     }
+    // set analyze checkbox appropriately
+    document.getElementById('analyze').checked = analyze;
 }
 
-function click_load_sirivm()
+function click_load_test()
 {
+    // transfer test records into 'recorded_records' store for replay
     recorded_records = [];
     for (var i=0; i<rtroute_trip.length; i++)
     {
         recorded_records.push(Object.assign({},rtroute_trip[i]));
     }
     log('Loaded test trip');
+
+    // turn analyze on
+    analyze = true;
+    document.getElementById('analyze').checked = true;
+
+    // show the test journey
+    document.getElementById("show_journey").checked = true;
+    draw_journey(DEBUG_VEHICLE_JOURNEY_ID);
+
+    // start replay
+    replay_stop(); // stop replay if it is already running
+    replay_start();
 }
 
 // User has clicked on the 'hide map' checkbox.

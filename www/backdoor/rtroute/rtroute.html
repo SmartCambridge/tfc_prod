@@ -46,7 +46,7 @@ body {
     height: 80%;
 }
 
-#console_div {
+#log_div {
     margin-top: 10px;
 }
 
@@ -225,10 +225,6 @@ body {
 </div>
 <div class="control_heading">Data recording</div>
 <div class="control_box">
-    <input type="button" onclick="click_load_sirivm()"
-        title="Load test SiriVM data"
-        value="Load test data"
-        ></input>
     <input type="button" id="record_start" onclick="record_start()" value="Record"
         title="Record the data as it arrives"
         ></input>
@@ -237,6 +233,9 @@ body {
         ></input>
     <input type="button" id="record_print" onclick="record_print()" value="Print"
         title="Print the recorded data to the console"
+        ></input><br/>
+    <input type="button" onclick="click_load_test()" value="Run test"
+        title="Load test SiriVM data and run replay with analysis"
         ></input>
 </div>
 <div class="control_heading">Route analysis</div>
@@ -291,15 +290,13 @@ body {
 
 <!-- progress -->
 <div id="progress_div" class="progress_div">
-    <canvas id="progress_canvas" class="progress_canvas">
-    </canvas>
 </div>
 
 <!-- MAP -->
 <div class="top-aligned" id="map"></div>
 
 <!-- console log -->
-<div id="console_div"></div>
+<div id="log_div"></div>
 
 </body>
 </html>
