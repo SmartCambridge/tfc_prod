@@ -5,7 +5,7 @@
 
 // Return distance in m between positions p1 and p2.
 // lat/longs in e.g. p1.lat etc
-function distance(p1, p2)
+function get_distance(p1, p2)
 {
     var R = 6371000; // Earth's mean radius in meter
     var dLat = rad(p2.lat - p1.lat);
@@ -175,7 +175,7 @@ function distance_from_line(P, line)
 
     if (angle_BAP > 90 && angle_BAP < 270)
     {
-        return distance(A,P);
+        return get_distance(A,P);
     }
 
     // if point P is 'behind' B wrt to A, then return distance from B
@@ -185,12 +185,12 @@ function distance_from_line(P, line)
 
     if (angle_ABP > 90 && angle_ABP < 270)
     {
-        return distance(B,P);
+        return get_distance(B,P);
     }
 
     // ok, so the point P is somewhere between A and B, so return perpendicular distance
 
-    var distance_AB = distance(A, P);
+    var distance_AB = get_distance(A, P);
 
     var d = Math.asin(Math.sin(distance_AB/R)*Math.sin(rad(bearing_AP - bearing_AB))) * R;
 

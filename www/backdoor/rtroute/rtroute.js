@@ -17,7 +17,7 @@ var SVGNS = 'http://www.w3.org/2000/svg';
 
 var PROGRESS_MARGIN = 20;
 var PROGRESS_LEFT_MARGIN = 20;
-var PROGRESS_RIGHT_MARGIN = 50;
+var PROGRESS_RIGHT_MARGIN = 10;
 var PROGRESS_TOP_MARGIN = 20;
 var PROGRESS_BOTTOM_MARGIN = 20;
 
@@ -370,6 +370,8 @@ function update_sensor(msg)
 		    marker.setPopupContent(popup_content(msg));
 
             // store as latest msg
+            // moving current msg to prev_msg
+            sensors[sensor_id].prev_msg = sensors[sensor_id].msg;
 		    sensors[sensor_id].msg = msg; // update entry for this msg
             add_breadcrumb(pos);
 
@@ -661,7 +663,7 @@ function update_segment_distance_vector(sensor)
 
     // Add distance to first stop as distance_vector[0]
 
-    distance_vector.push( { segment_index: 0, distance: distance(P, stops[route[0].stop_id]) } );
+    distance_vector.push( { segment_index: 0, distance: get_distance(P, stops[route[0].stop_id]) } );
 
     // Now add the distances for route segments
     for (var segment_index=1; segment_index<segments-1; segment_index++)
@@ -675,7 +677,7 @@ function update_segment_distance_vector(sensor)
     // And for the 'finished' segment[segments-1] add distance from last stop
 
     distance_vector.push({ segment_index: segments - 1,
-                           distance: distance(P, stops[route[route.length-1].stop_id]) });
+                           distance: get_distance(P, stops[route[route.length-1].stop_id]) });
 
     // Create sorted nearest_segments array of NEAREST_COUNT
     // { segment_index:, distance: } elements
@@ -737,10 +739,25 @@ function distance_to_probabilities(vector)
 
 function update_progress_vector(sensor)
 {
+    var PROGRESS_ERROR = 0.1; // General error to apply to all segments
+                              // in case algorithm is completely wrong
+                              // i.e. background probability is PROGRESS_ERROR/segments
+
     var route = sensor.state.route;
     var segment_index = sensor.state.segment_index;
     var route_profile = sensor.state.route_profile;
     var segment_progress = sensor.state.segment_progress;
+
+    var segment_start_distance = segment_index > 0 ? route_profile[segment_index-1].distance : 0;
+
+    var segment_end_distance = route_profile[segment_index].distance;
+
+    // Here's how far the bus is along its route
+    var progress_distance = segment_start_distance +
+                            segment_progress *
+                            ( segment_end_distance - segment_start_distance);
+
+    progress_distance = Math.floor(progress_distance);
 
     // Initialize final result segment_vector with zeros
     // and then insert the weights of the nearest forward segments
@@ -750,14 +767,146 @@ function update_progress_vector(sensor)
 
     var segment_probability_vector = new Array(segments);
 
+
     for (var i=0; i<segments; i++)
     {
-        segment_probability_vector[i] = 0;
+        segment_probability_vector[i] = PROGRESS_ERROR / segments;
     }
+
+    // hop_distance (m) is how far bus has moved since last data point
+    var hop_distance = sensor.prev_msg ? get_distance(get_point(sensor.prev_msg),
+                                                      get_point(sensor.msg))
+                                       : 0;
+    hop_distance = Math.floor(hop_distance);
+
+
+    // hop_time (s) is time delta since last data point
+    var hop_time = sensor.prev_msg ? (get_date(sensor.msg).getTime() -
+                                      get_date(sensor.prev_msg)
+                                     ) / 1000 :
+                                     0;
+    hop_time = Math.floor(hop_time);
+
+    console.log('hop_time: '+hop_time+' hop_distance: '+hop_distance);
+
+    // Calculate the local averate route segment distance, used for the speed estimate
+    var avg_segment_distance;
+
+    if (segment_index == 0)
+    {
+        avg_segment_distance = 100;
+    }
+    else if (segment_index <= route_profile.length - 3)
+    {
+        avg_segment_distance = (route_profile[segment_index+2].distance -
+                                route_profile[segment_index-1].distance
+                               ) / 3;
+    }
+    else if (segment_index <= route_profile.length - 2)
+    {
+        avg_segment_distance = (route_profile[segment_index+1].distance -
+                                route_profile[segment_index-1].distance
+                               ) / 2;
+    }
+    else
+    {
+        avg_segment_distance = route_profile[segment_index].distance -
+                               route_profile[segment_index-1].distance;
+    }
+
+    avg_segment_distance = Math.floor(avg_segment_distance);
+
+    // Estimate bus speed (m/s)
+    var bus_speed = Math.min(15,Math.max(6.1,(avg_segment_distance - 240)/294 + 6.1));
+
+    // Estimate progress distance based on speed and time since last point
+    var progress_delta = bus_speed * hop_time;
+    progress_delta = Math.floor(progress_delta);
+    console.log('avg seg dist: '+avg_segment_distance+
+                ', bus_speed: '+bus_speed+
+                ', progress_delta: '+progress_delta
+               );
+
+    var STEP_SIZE = 100; // (m) we will divide the progress probabilties into 100m steps
+
+    // we will put some proportionate values into array, which ultimately will be normalized
+    var distance_factors = new Array();
+
+    //
+    var spread = progress_delta;
+
+    // Steps moving forwards, to 1.5 times the actual straight line hop_distance
+    for (var dist = -2 * STEP_SIZE; dist < progress_delta * 1.5; dist += STEP_SIZE)
+    {
+        // let's try a gaussian distribution around progress_delta
+        factor = 1 / Math.pow(Math.E, Math.pow( dist - progress_delta, 2) / (2 * spread * spread));
+
+        distance_factors.push({dist: progress_distance + dist, prob: factor});
+    }
+
+    console.log('progress_distance :'+progress_distance+' hop_distance '+hop_distance);
+    //console.log(JSON.stringify(distance_factors));
+    var str = '';
+    for (var i=0; i<distance_factors.length; i++)
+    {
+        str += '{'+distance_factors[i].dist+','+Math.floor(distance_factors[i].prob*100)/100+'}';
+    }
+    console.log(str);
+
+    var update_segment = 1;
+    var update_factor = 0;
+
+    while (update_segment < segments-1)
+    {
+        var segment_dist_start = route_profile[update_segment-1].distance;
+        var segment_dist_end = route_profile[update_segment].distance;
+
+        //console.log('segment['+update_segment+'] is '+
+        //            segment_dist_start+'..'+segment_dist_end);
+
+        if (distance_factors[update_factor].dist > segment_dist_end)
+        {
+            update_segment++;
+            continue;
+        }
+
+        while (update_factor < distance_factors.length)
+        {
+            var test_dist = distance_factors[update_factor].dist;
+
+            //console.log('trying distance '+update_factor+' '+test_dist);
+
+            if (test_dist <= segment_dist_end)
+            {
+                //console.log('adding distance_factors['+update_factor+'] '+
+                //            distance_factors[update_factor].prob+
+                //            ' to segment_probability_vector['+update_segment+']');
+                segment_probability_vector[update_segment] += distance_factors[update_factor].prob;
+                update_factor++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (update_factor == distance_factors.length)
+        {
+            break;
+        }
+        update_segment++;
+    }
+    //debug using linear_adjust
+    console.log('            prog2 :'+
+                vector_to_string(linear_adjust(segment_probability_vector),' ','('));
 
     //debug this should be relative to distance travelled since last msg
 
     //debug maybe this should be smudged according to the segment_distance_probabilities
+
+    for (var i=0; i<segments; i++)
+    {
+        segment_probability_vector[i] = PROGRESS_ERROR / segments;
+    }
 
     // probability of next segment_index as [offset from prior segment_index, probability
     var ROUTE_PROGRESS_PROB0 = [[0,0.31],[1,0.3],[2,0.2],[3,0.19]]; // from first segment
@@ -810,9 +959,9 @@ function get_segment_progress(sensor)
 
     var next_stop = stops[route[segment_index].stop_id];
 
-    var distance_to_prev_stop = distance(pos, prev_stop);
+    var distance_to_prev_stop = get_distance(pos, prev_stop);
 
-    var distance_to_next_stop = distance(pos, next_stop);
+    var distance_to_next_stop = get_distance(pos, next_stop);
 
     return distance_to_prev_stop / (distance_to_prev_stop + distance_to_next_stop);
 }
@@ -845,7 +994,7 @@ function create_route_profile(route)
 
         var this_stop = stops[route[i].stop_id];
 
-        stop_info.distance = Math.floor(route_profile[i-1].distance + distance(prev_stop, this_stop));
+        stop_info.distance = Math.floor(route_profile[i-1].distance + get_distance(prev_stop, this_stop));
 
         if (i==route.length-1)
         {
@@ -881,11 +1030,20 @@ function softmax(vector)
     return vector.map( x => Math.exp(x) / denominator);
 }
 
-function linear_adjust(vector)
+function linear_adjust(vector, attr)
 {
-    // Each element x -> x/ sum(all x)
-    var denominator =  vector.reduce( (sum, x) => sum + x );
-    return vector.map( x => x / denominator);
+    if (!attr)
+    {
+        // Each element x -> x/ sum(all x)
+        var denominator =  vector.reduce( (sum, x) => sum + x );
+        return vector.map( x => x / denominator);
+    }
+    else
+    {
+        // Each element x -> x/ sum(all x)
+        var denominator =  vector.reduce( (sum, x) => sum + x[attr] );
+        return vector.map(function (x) { x[attr] = x[attr] / denominator; return x });
+    }
 }
 
 // Return printable version of probability vector (array with all elements 0..1)
@@ -957,7 +1115,15 @@ function vector_to_string(vector, zero_value, max_flag, correct_flag, correct_ce
         }
         else // Print value
         {
-            str += (''+Math.floor(n*100)/100+'0').slice(1,4);
+            var n3 = Math.floor(n*100)/100;
+            if (n3==0)
+            {
+                str += '.00';
+            }
+            else
+            {
+                str += (''+Math.floor(n*100)/100+'00').slice(1,4);
+            }
         }
     }
     return str;
