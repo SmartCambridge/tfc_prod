@@ -21,9 +21,24 @@ var PROGRESS_RIGHT_MARGIN = 10;
 var PROGRESS_TOP_MARGIN = 20;
 var PROGRESS_BOTTOM_MARGIN = 20;
 
-// Analyis constants
-var PROGRESS_WEIGHT = 0.3; // progress_vector 0..1 mapped to WEIGHT..1+WEIGHT
+// ******************
+// ANALYSIS CONSTANTS
+//
+// Weight we will apply to the segment probabilities calculated from distance from segments
+var SEGMENT_DISTANCE_WEIGHT = 1.0;
+
+// Weight we will apply to the probabilities calculated based on expected progress distance
+var SEGMENT_PROGRESS_WEIGHT = 0.5; // progress_vector 0..1 mapped to WEIGHT..1+WEIGHT
+
+// The probabilties suggesting BACKWARDS movement (i.e. negative progress_delta) need to
+// be reduced compared to a simple probability distribution around the expected distance.
 var PROGRESS_BACKWARD = 0.2; // adjustment to progress probability if it is backwards
+
+// We can skew the distribution to favor distances LESS than the expected distance rather
+// the further than the expected distance (i.e. buses are more likely to be slower than
+// expected than faster). We do this by adjusting progress probabilities upwards (towards 1.0)
+// by this proportion.
+var PROGRESS_SLOW = 0.5; // e.g. 0.2 becomes 0.2 + (1-0.2)*PROGRESS_SLOW = 0.6;
 
 // Globals
 
@@ -115,6 +130,9 @@ var replay_index = 0; // current index into replay data
 
 // Segment analysis
 var analyze = false;
+
+// Batch replay
+var batch = false;
 
 // *********************************************************
 // Display options
@@ -353,7 +371,8 @@ function vehicle_journey_id_to_route(vehicle_journey_id)
 //        .segment_vector - probability vector for bus on each route segment
 //        .prev_stop_id - atco_code of previous stop passed
 //        .next_stop_id - atco_code of next stop
-
+//        .route_profile - [ {time_secs (s), distance (m), turn(deg)},...]
+//
 // We have received a new data message from an existing sensor
 function update_sensor(msg)
 {
@@ -594,7 +613,8 @@ function update_route_analysis(sensor)
 
     for (var i=0; i < progress_vector.length; i++)
     {
-        segment_product.push((PROGRESS_WEIGHT + progress_vector[i]) * distance_vector[i]);
+        segment_product.push( SEGMENT_PROGRESS_WEIGHT * progress_vector[i] +
+                              SEGMENT_DISTANCE_WEIGHT * distance_vector[i]);
     }
     //console.log('          product :'+vector_to_string(segment_product));
 
@@ -618,6 +638,7 @@ function update_route_analysis(sensor)
     console.log('         RESULT '+
                 (' '+sensor.state.segment_index).slice(-2)+
                 ':'+vector_to_string(segment_vector,'-','<','{',sensor.msg.segment_index));
+    console.log('');
 
     sensor.state.segment_progress = get_segment_progress(sensor);
 
@@ -748,8 +769,6 @@ function update_progress_vector(sensor)
                               // in case algorithm is completely wrong
                               // i.e. background probability is PROGRESS_ERROR/segments
 
-    var step_size = 100; // (m) we will divide the progress probabilties into 100m steps
-
     var DIST_PROB_MAX = 1.5; // How far we will look ahead to calculate distance probabilities
                              // relative to progress_delta (i.e. estimated progress distance)
 
@@ -769,6 +788,21 @@ function update_progress_vector(sensor)
 
     // Note for 'n' stops we have 'n+1' segments, including before start and after finish
     var segments = route.length + 1;
+
+    // Exit early with segment=0 if time < route start
+    var msg_date = get_date(sensor.msg);
+    if ((msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours()) <
+        route_profile[0].time_secs)
+    {
+        var start_vector = new Array(segments);
+        start_vector[0] = 0.9;
+        start_vector[1] = 0.1;
+        for (var i=2; i<segments; i++)
+        {
+            start_vector[i] = 0;
+        }
+        return start_vector;
+    }
 
     // hop_time (s) is time delta since last data point
     var hop_time = sensor.prev_msg ? (get_date(sensor.msg).getTime() -
@@ -869,7 +903,7 @@ function update_progress_vector(sensor)
     // (current) progress_delta.
     // We're using a Gaussian curve (with a high standard deviation) to model probability.
     // we will put some proportionate values into array, which ultimately will be normalized
-    var distance_factors = new Array();
+    var factors = new Array();
 
     // 'spread' is the estimated standard deviation of the probability curve
     var spread = Math.max(MIN_SEGMENT_DISTANCE / 2, progress_delta / 2);
@@ -886,24 +920,34 @@ function update_progress_vector(sensor)
                               Math.pow( dist - (progress_distance + progress_delta), 2) /
                               (2 * spread * spread));
 
+        // Make adjustments for the distance regimes:
+        // (1) Backwards, i.e. dist for this factor is LESS than progress_distance
+        // (2) Between progress_distance and the predicted progress distance - in this area we
+        //     increase the probability because the bus is more likely to be slow than fast.
         if (dist < progress_distance)
         {
             factor = factor * PROGRESS_BACKWARD;
         }
-        distance_factors.push({dist: dist, prob: factor});
+        else if (dist < progress_distance + progress_delta)
+        {
+            factor = factor + PROGRESS_SLOW * (1 - factor);
+        }
+
+        factors.push({dist: dist, prob: factor});
     }
 
     console.log('Estimated progress distance: '+(progress_distance+progress_delta));
 
-    //console.log(JSON.stringify(distance_factors));
+    //console.log(JSON.stringify(factors));
     var str = '';
-    for (var i=0; i<distance_factors.length; i++)
+    for (var i=0; i<factors.length; i++)
     {
-        str += '{'+distance_factors[i].dist+','+Math.floor(distance_factors[i].prob*100)/100+'}';
+        str += '{'+Math.floor(factors[i].dist*10)/10+
+               ','+Math.floor(factors[i].prob*100)/100+'}';
     }
     console.log(str);
 
-    // Ok, so now we have distance_factors as array of {dist: x, prob: y} pairs
+    // Ok, so now we have factors as array of {dist: x, prob: y} pairs
     // *** *** ***
 
     // *** *** ***
@@ -923,12 +967,12 @@ function update_progress_vector(sensor)
     var update_factor = 0;
 
     // current distance_factor overlaps current segment
-    while (update_factor < distance_factors.length && update_segment < segments - 1)
+    while (update_factor < factors.length && update_segment < segments - 1)
     {
         var segment_start = route_profile[update_segment-1].distance;
         var segment_end = route_profile[update_segment].distance;
 
-        factor_start = distance_factors[update_factor].dist - step_size / 2;
+        factor_start = factors[update_factor].dist - step_size / 2;
         var factor_end = factor_start + step_size;
 
         //console.log('trying update factor '+update_factor+
@@ -945,9 +989,9 @@ function update_progress_vector(sensor)
         if (factor_ratio > 0)
         {
             //console.log('factor_ratio is '+factor_ratio+
-            //            ' adding '+distance_factors[update_factor].prob * factor_ratio);
+            //            ' adding '+factors[update_factor].prob * factor_ratio);
 
-            vector[update_segment] += distance_factors[update_factor].prob * factor_ratio;
+            vector[update_segment] += factors[update_factor].prob * factor_ratio;
         }
 
         if (factor_end < segment_end)
@@ -960,7 +1004,7 @@ function update_progress_vector(sensor)
         }
     }
 
-    // Linear adjust so sum is 1
+    // Linear adjust so max is 1 and sum is 1
     var segment_probability_vector = linear_adjust(vector);
 
     //console.log('            prog2 :'+segment_probability_vector,' ','(');
@@ -1606,6 +1650,17 @@ function replay_next_record()
     handle_msg(msg);
 }
 
+// Replay ALL records in a single batch
+function replay_batch()
+{
+    replay_index = 0;
+
+    while (replay_index < recorded_records.length)
+    {
+        handle_msg(recorded_records[replay_index++]);
+    }
+}
+
 // process a single data record
 function handle_msg(msg)
 {
@@ -2188,6 +2243,12 @@ function record_print()
 // This launches an intervalTimer to step through the data records
 function replay_start()
 {
+    if (batch)
+    {
+        replay_batch();
+        return;
+    }
+
     // get start time from text box (js compatible)
     var start_time = new Date(document.getElementById('replay_start').value);
     if (!start_time)
@@ -2228,7 +2289,10 @@ function replay_stop()
     clearInterval(replay_timer);
     // Reset 'replay mode' flag
     replay_on = false;
-    log('Replay stopped at '+replay_time);
+    if (replay_time)
+    {
+        log('Replay stopped at '+replay_time);
+    }
 }
 
 // User has clicked the Replay Step button, so increment to next data record
@@ -2283,7 +2347,7 @@ function click_load_test()
 
     // start replay
     replay_stop(); // stop replay if it is already running
-    replay_start();
+    //replay_start();
 }
 
 // User has clicked on the 'hide map' checkbox.
@@ -2306,5 +2370,12 @@ function click_hide_map()
 function click_analyze()
 {
     analyze = document.getElementById("analyze").checked;
+}
+
+// user has toggled 'batch' checkbox which controls whether replay
+// clock is 'per second' or just steps through data record
+function click_batch()
+{
+    batch = document.getElementById("batch").checked;
 }
 

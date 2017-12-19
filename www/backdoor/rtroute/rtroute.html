@@ -139,6 +139,10 @@ body {
     color: red;
 }
 
+.test_button {
+    background-color: lightpink;
+}
+
 </style>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
@@ -234,7 +238,7 @@ body {
     <input type="button" id="record_print" onclick="record_print()" value="Print"
         title="Print the recorded data to the console"
         ></input><br/>
-    <input type="button" onclick="click_load_test()" value="Run test"
+    <input type="button" class="test_button" onclick="click_load_test()" value="Load test"
         title="Load test SiriVM data and run replay with analysis"
         ></input>
 </div>
@@ -243,6 +247,7 @@ body {
     Show journey: <input id="show_journey" type="checkbox" onclick="click_show_journey()"/>
     Hide map: <input id="hide_map" type="checkbox" onclick="click_hide_map()"/>
     Analyze: <input id="analyze" type="checkbox" onclick="click_analyze()"/><br/>
+    Batch: <input id="batch" type="checkbox" onclick="click_batch()"/><br/>
 
     <button onclick="replay_start()"
         title="Replay test SiriVM data"
