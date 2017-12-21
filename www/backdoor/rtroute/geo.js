@@ -77,7 +77,7 @@ function inside(position, bounds_path, box)
 
 
 // Bearing in degrees from point A -> B (each as {lat: , lng: })
-function bearing(A, B)
+function get_bearing(A, B)
 {
     var a = { lat: rad(A.lat), lng: rad(A.lng) };
     var b = { lat: rad(B.lat), lng: rad(B.lng) };
@@ -90,7 +90,7 @@ function bearing(A, B)
 
 // Return true if bearing A lies between bearings B1 and B2
 // B2 must be CLOCKWISE from B1 i.e. larger if the target zone doesn't include 0
-function bearing_between(a, b1, b2)
+function test_bearing_between(a, b1, b2)
 {
     if (b1 > b2) // zone includes 0
     {
@@ -110,20 +110,26 @@ function angle360(a)
 }
 
 // Bearing of 'outside' bisector of corner from B in line from A->B->C
-function outside_bisector(A,B,C)
+function get_bisector(A,B,C)
 {
-    var bearingAB = bearing(A,B);
+    var track_in = get_bearing(A,B);
 
-    var bearingBC = bearing(B,C);
+    var track_out = get_bearing(B,C);
 
-    return angle360(bearingAB - bearingBC) / 2;
+    var bisector = (track_in + track_out) / 2 + 90;
+
+    var bisector_offset = Math.abs(bisector - track_in);
+
+    if (bisector_offset > 90 && bisector_offset < 270) bisector += 180;
+
+    return angle360(bisector);
 }
 
 // http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
 // Detect whether lines A->B and C->D intersect
 // return { intersect: true/false, position: LatLng (if lines do intersect), progress: 0..1 }
 // where 'progress' is how far the intersection is along the A->B path
-function intersect(line1, line2)
+function get_intersect(line1, line2)
 {
     var A = line1[0],
         B = line1[1],
@@ -152,7 +158,7 @@ function intersect(line1, line2)
 
 // Perpendicular distance of point P {lat:, lng:} from a line [A,B]
 // where A,B are points
-function distance_from_line(P, line)
+function get_distance_from_line(P, line)
 {
 
     // Prepare some values for the calculation
@@ -162,11 +168,11 @@ function distance_from_line(P, line)
 
     var B = line[1];
 
-    var bearing_AP = bearing(A, P);
+    var bearing_AP = get_bearing(A, P);
 
-    var bearing_AB = bearing(A, B);
+    var bearing_AB = get_bearing(A, B);
 
-    var bearing_BP = bearing(B, P);
+    var bearing_BP = get_bearing(B, P);
 
     // if point P is 'behind' A wrt to B, then return distance from A
     var angle_BAP = (bearing_AP - bearing_AB + 360) % 360;
