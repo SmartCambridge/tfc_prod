@@ -3,7 +3,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.03';
+var VERSION = '3.04';
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
@@ -39,6 +39,8 @@ var SEGMENT_TIMETABLE_WEIGHT = 1.0;
 // If bus is in the 'passed' semicircle beyond the segment, the distance is adjusted times
 // this amount plus the segment distance adjust, i.e. segment probability will be lower.
 var SEGMENT_BEYOND_ADJUST = 0.5;
+// Similarly adjust the probability down if BEFORE the segment
+var SEGMENT_BEFORE_ADJUST = 0.5;
 // Distances are adjusted by this amount to stop very short distances like 2m dominating.
 var SEGMENT_DISTANCE_ADJUST = 50;
 
@@ -821,8 +823,12 @@ function segment_distance_to_prob(P, route_profile, segment_index, segment_dista
 
     if (segment_index < route_profile.length)
     {
+
+        // First of all we'll see if the bus is BEYOND the end stop of the segment
+        //
+        // bearing_out is the bearing of the next route segment
         var bearing_out;
-        var bisector;
+
         if (segment_index < route_profile.length - 1)
         {
             bearing_out = route_profile[segment_index+1].bearing_in;
@@ -831,18 +837,59 @@ function segment_distance_to_prob(P, route_profile, segment_index, segment_dista
         {
             bearing_out = route_profile[segment_index].bearing_in;
         }
-        bisector = route_profile[segment_index].bisector;
-        turn = route_profile[segment_index].turn;
-        var bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index], P));
+        // bisector_out is the outer angle bisector of this segment and the next
+        var bisector_out = route_profile[segment_index].bisector;
+        // turn_out is the degrees turned from this segment to the next (clockwise)
+        var turn_out = route_profile[segment_index].turn;
+        // end_bearing_to_bus is the bearing of the bus from the end bus-stop
+        var end_bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index], P));
 
-        var beyond = test_beyond_segment(bearing_to_bus, turn, bearing_out, bisector);
+        var beyond = test_beyond_segment(end_bearing_to_bus, turn_out, bearing_out, bisector_out);
 
         if (!beyond)
         {
                 // We believe the bus is probably NOT beyond the segment
-                prob = SEGMENT_DISTANCE_ADJUST /
-                       ( segment_distance / 2 +
-                         SEGMENT_DISTANCE_ADJUST);
+                //
+                // We can now test if it is BEFORE the start stop of the segment
+                //
+                if (segment_index == 0) // can't be before the 'not yet started' segment 0
+                {
+                    prob = SEGMENT_DISTANCE_ADJUST /
+                           ( segment_distance / 2 +
+                             SEGMENT_DISTANCE_ADJUST);
+                }
+                else
+                {
+                    // route bearing on the run-up towards the segment start bus-stop
+                    var bearing_before = route_profile[segment_index-1].bearing_in;
+                    // outer angle bisector bearing at the segment start bus-stop
+                    var bisector_before = route_profile[segment_index-1].bisector;
+                    // turn at start bus-stop (degrees clockwise, i.e. turn left 10 degrees is 350)
+                    var turn_before = route_profile[segment_index-1].turn;
+                    // bearing of bus from start bus-stop
+                    var start_bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index-1],P));
+
+                    var before = test_before_segment(start_bearing_to_bus,
+                                                     turn_before,
+                                                     bearing_before,
+                                                     bisector_before);
+
+                    if (!before)
+                    {
+                        // Here we are neither BEFORE or BEYOND, so use default probability
+                        prob = SEGMENT_DISTANCE_ADJUST /
+                               ( segment_distance / 2 +
+                                 SEGMENT_DISTANCE_ADJUST);
+                    }
+                    else
+                    {
+                        // We believe we are BEFORE the segment, so adjust the probability
+                        prob = ( SEGMENT_DISTANCE_ADJUST /
+                                 ( segment_distance / 2 +
+                                   SEGMENT_DISTANCE_ADJUST)) * SEGMENT_BEFORE_ADJUST ;
+                    }
+
+                }
         }
         else
         {
@@ -855,18 +902,18 @@ function segment_distance_to_prob(P, route_profile, segment_index, segment_dista
 
         console.log( '{ '+segment_index+
                      ',out='+bearing_out+
-                     ',turn='+turn+
-                     ',bus='+bearing_to_bus+
-                     ',bi='+bisector+
+                     ',turn='+turn_out+
+                     ',bus='+end_bearing_to_bus+
+                     ',bi='+bisector_out+
                      ',dist='+Math.floor(segment_distance)+
                      (beyond ? ',beyond' : '')+
                      ',prob='+prob+'}');
     }
     else // on 'finished' segment
     {
-                prob = SEGMENT_DISTANCE_ADJUST /
-                       ( segment_distance / 2 +
-                         SEGMENT_DISTANCE_ADJUST);
+        prob = SEGMENT_DISTANCE_ADJUST /
+               ( segment_distance / 2 +
+                     SEGMENT_DISTANCE_ADJUST);
     }
     return prob;
 }
@@ -884,13 +931,13 @@ function test_beyond_segment(bearing_to_bus, turn, bearing_out, bisector)
         var angle2 = angle360(bearing_out+90);
         if (test_bearing_between(bearing_to_bus, angle1, angle2))
         {
-            // We believe the bus to have probably PASSED the stop
+            // We believe the bus is probably BEYOND the stop
             beyond = true;
             console.log(' BEYOND <45 turn='+turn);
         }
         else
         {
-            // We believe the bus has probably NOT PASSED the stop
+            // We believe the bus is probably NOT BEYOND the stop
             beyond = false;
             console.log(' NOT BEYOND <45 turn='+turn);
         }
@@ -909,6 +956,48 @@ function test_beyond_segment(bearing_to_bus, turn, bearing_out, bisector)
         console.log( (beyond ? ' BEYOND ' : ' NOT BEYOND ')+ ' >45 turn='+turn);
     }
     return beyond;
+}
+
+// return TRUE if bus is BEFORE segment
+function test_before_segment(bearing_to_bus, turn, bearing_before, bisector)
+{
+    var before; // boolean true if bus is BEFORE segment
+
+    // For a small turn, we use the perpendicular line to next segment either
+    // side of current stop as boundary of considering this stop passed
+    if (turn < 45 || turn > 315)
+    {
+        var angle1 = angle360(bearing_before+90);
+        var angle2 = angle360(bearing_before-90);
+        if (test_bearing_between(bearing_to_bus, angle1, angle2))
+        {
+            // We believe the bus is probably BEFORE the stop
+            before = true;
+            console.log(' BEFORE <45 turn='+turn);
+        }
+        else
+        {
+            // We believe the bus is probably NOT BEFORE the stop
+            before = false;
+            console.log(' NOT BEFORE <45 turn='+turn);
+        }
+    }
+    else // For a larger turn we use the zone from bisector to bearing_out
+    {
+        var bearing_back = angle360(bearing_before+180);
+
+        if (turn < 180)
+        {
+            before = test_bearing_between(bearing_to_bus, bearing_back, bisector);
+        }
+        else
+        {
+            before = test_bearing_between(bearing_to_bus, bisector, bearing_back);
+        }
+
+        console.log( (before ? ' BEFORE ' : ' NOT BEFORE ')+ ' >45 turn='+turn);
+    }
+    return before;
 }
 
 // ******************************************************************************
