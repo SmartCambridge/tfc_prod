@@ -3,7 +3,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.01';
+var VERSION = '3.03';
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
@@ -38,19 +38,25 @@ var SEGMENT_TIMETABLE_WEIGHT = 1.0;
 // Adjustments to the segment distance -> probability algorithm
 // If bus is in the 'passed' semicircle beyond the segment, the distance is adjusted times
 // this amount plus the segment distance adjust, i.e. segment probability will be lower.
-var SEGMENT_PASSED_ADJUST = 0.5;
+var SEGMENT_BEYOND_ADJUST = 0.5;
 // Distances are adjusted by this amount to stop very short distances like 2m dominating.
 var SEGMENT_DISTANCE_ADJUST = 50;
 
 // The probabilties suggesting BACKWARDS movement (i.e. negative progress_delta) need to
 // be reduced compared to a simple probability distribution around the expected distance.
-var PROGRESS_BACKWARD = 0.2; // adjustment to progress probability if it is backwards
+var PROGRESS_BACKWARD_ADJUST = 0.2; // adjustment to progress probability if it is backwards
 
 // We can skew the distribution to favor distances LESS than the expected distance rather
 // the further than the expected distance (i.e. buses are more likely to be slower than
 // expected than faster). We do this by adjusting progress probabilities upwards (towards 1.0)
 // by this proportion.
-var PROGRESS_SLOW = 0.5; // e.g. 0.2 becomes 0.2 + (1-0.2)*PROGRESS_SLOW = 0.6;
+var PROGRESS_SLOW_ADJUST = 0.5; // e.g. 0.2 becomes 0.2 + (1-0.2)*PROGRESS_SLOW_ADJUST = 0.6;
+
+// (m) The progress probability algorithm assigns probabilties to a *distance* profile and
+// then maps that to segments. This would mean very short segments get very low probabilities.
+// We compensate for this by using a 'minimum' segment length (this can be thought of as each
+// stop being equivalent to half of this distance).
+var PROGRESS_MIN_SEGMENT_LENGTH = 150;
 
 // Globals
 
@@ -736,14 +742,7 @@ function update_distance_vector(sensor)
         var prev_stop = stops[route[segment_index-1].stop_id];
         var next_stop = stops[route[segment_index].stop_id];
         var dist = get_distance_from_line(P, [prev_stop,next_stop]);
-        // If the distance from the line == distance from the next stop
-        // then P is *beyond* the next stop (draw a picture...).
-        // In this case we *increase* the effective distance to make the
-        // current segment lower probability than the next segment.
-        //if (Math.abs(dist - get_distance(P,next_stop)) < 1)
-        //{
-        //    dist = SEGMENT_PASSED_ADJUST * dist + SEGMENT_DISTANCE_ADJUST;
-        //}
+
         distance_vector.push({ segment_index: segment_index, distance: dist });
     }
 
@@ -768,7 +767,7 @@ function update_distance_vector(sensor)
     //                        nearest_segments.map( x =>
     //                                              SEGMENT_DISTANCE_ADJUST /
     //                                              ( x.distance/2 + SEGMENT_DISTANCE_ADJUST)));
-    var nearest_probs = segment_distance_to_probs(P, route_profile, nearest_segments);
+    var nearest_probs = segment_distances_to_probs(P, route_profile, nearest_segments);
 
     // Initialize final result segment_vector with zeros
     // and then insert the weights of the nearest segments
@@ -789,10 +788,11 @@ function update_distance_vector(sensor)
 }
 
 // Convert Point, [ {segment_index, distance},... ] to probabilties in same order
-function segment_distance_to_probs(P, route_profile, nearest_segments)
+function segment_distances_to_probs(P, route_profile, nearest_segments)
 {
     var probs = new Array(nearest_segments.length);
 
+    // debug print the 'nearest segments' array to console
     var debug_str = '';
     for (var i=0; i<nearest_segments.length; i++)
     {
@@ -805,106 +805,110 @@ function segment_distance_to_probs(P, route_profile, nearest_segments)
     {
         var segment_index = nearest_segments[i].segment_index;
 
-        var prob; // probability bus is on this segment
+        var segment_distance = nearest_segments[i].distance;
 
-        if (segment_index < route_profile.length)
-        {
-            var bearing_out;
-            var bisector;
-            if (segment_index < route_profile.length - 1)
-            {
-                bearing_out = route_profile[segment_index+1].bearing_in;
-            }
-            else
-            {
-                bearing_out = route_profile[segment_index].bearing_in;
-            }
-            bisector = route_profile[segment_index].bisector;
-            turn = route_profile[segment_index].turn;
-            var bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index], P));
-
-            // debug flag so we can seen what's going on
-            var beyond_stop; // boolean to indicate *probably* beyond this stop
-
-            // For a small turn, we use the perpendicular line to next segment either
-            // side of current stop as boundary of considering this stop passed
-            if (turn < 45 || turn > 315)
-            {
-                var angle1 = angle360(bearing_out-90);
-                var angle2 = angle360(bearing_out+90);
-                if (test_bearing_between(bearing_to_bus, angle1, angle2))
-                {
-                    // We believe the bus to have probably PASSED the stop
-                    beyond_stop = true;
-                    prob = SEGMENT_DISTANCE_ADJUST /
-                           ( nearest_segments[i].distance / 2 +
-                             SEGMENT_DISTANCE_ADJUST);
-                    prob = prob * SEGMENT_PASSED_ADJUST;
-                    console.log('segment_index='+segment_index+' PASSED <45 turn='+turn+', prob='+prob);
-                }
-                else
-                {
-                    // We believe the bus has probably NOT PASSED the stop
-                    beyond_stop = false;
-                    prob = SEGMENT_DISTANCE_ADJUST /
-                           ( nearest_segments[i].distance / 2 +
-                             SEGMENT_DISTANCE_ADJUST);
-                    console.log('segment_index='+segment_index+' NOT PASSED <45 turn='+turn+', prob='+prob);
-                }
-            }
-            else // For a larger turn we use the zone from bisector to bearing_out
-            {
-                if (turn < 180)
-                {
-                    beyond_stop = test_bearing_between(bearing_to_bus, bisector, bearing_out);
-                }
-                else
-                {
-                    beyond_stop = test_bearing_between(bearing_to_bus, bearing_out, bisector);
-                }
-
-                if (beyond_stop)
-                {
-                    // We believe the bus has probably PASSED the stop
-                    prob = SEGMENT_DISTANCE_ADJUST /
-                           ( nearest_segments[i].distance / 2 +
-                             SEGMENT_DISTANCE_ADJUST);
-                    prob = prob * SEGMENT_PASSED_ADJUST;
-                }
-                else
-                {
-                    // We believe the bus has probably NOT passed the stop
-                    prob = SEGMENT_DISTANCE_ADJUST /
-                           ( nearest_segments[i].distance / 2 +
-                             SEGMENT_DISTANCE_ADJUST);
-                }
-                console.log('segment_index='+segment_index+
-                        (beyond_stop ? ' PASSED ' : ' NOT PASSED ')+
-                        ' >45 turn='+turn+', prob='+prob);
-            }
-            debug_str += '{ '+segment_index+
-                         ',out='+bearing_out+
-                         ',turn='+turn+
-                         ',bus='+bearing_to_bus+
-                         ',bi='+bisector+
-                         ',dist='+Math.floor(nearest_segments[i].distance)+
-                         (beyond_stop ? ',beyond' : '')+
-                         ',prob='+prob+'}';
-        }
-        else // on 'finished' segment
-        {
-            prob = SEGMENT_DISTANCE_ADJUST / (nearest_segments[i].distance / 2 + SEGMENT_DISTANCE_ADJUST);
-        }
-
-        probs[i] = prob;
+        //var prob; // probability bus is on this segment
+        probs[i] = segment_distance_to_prob(P, route_profile, segment_index, segment_distance);
     }
     console.log(debug_str);
     return linear_adjust(probs);
+}
 
-    //return linear_adjust(
-    //                        nearest_segments.map( x =>
-    //                                              SEGMENT_DISTANCE_ADJUST /
-    //                                              ( x.distance/2 + SEGMENT_DISTANCE_ADJUST)));
+// Convert a segment_index + segment_distance to probability
+function segment_distance_to_prob(P, route_profile, segment_index, segment_distance)
+{
+    var prob;
+
+    if (segment_index < route_profile.length)
+    {
+        var bearing_out;
+        var bisector;
+        if (segment_index < route_profile.length - 1)
+        {
+            bearing_out = route_profile[segment_index+1].bearing_in;
+        }
+        else
+        {
+            bearing_out = route_profile[segment_index].bearing_in;
+        }
+        bisector = route_profile[segment_index].bisector;
+        turn = route_profile[segment_index].turn;
+        var bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index], P));
+
+        var beyond = test_beyond_segment(bearing_to_bus, turn, bearing_out, bisector);
+
+        if (!beyond)
+        {
+                // We believe the bus is probably NOT beyond the segment
+                prob = SEGMENT_DISTANCE_ADJUST /
+                       ( segment_distance / 2 +
+                         SEGMENT_DISTANCE_ADJUST);
+        }
+        else
+        {
+                // We believe the bus is probably BEYOND the segment
+                prob = ( SEGMENT_DISTANCE_ADJUST /
+                         ( segment_distance / 2 +
+                           SEGMENT_DISTANCE_ADJUST)
+                       ) * SEGMENT_BEYOND_ADJUST;
+        }
+
+        console.log( '{ '+segment_index+
+                     ',out='+bearing_out+
+                     ',turn='+turn+
+                     ',bus='+bearing_to_bus+
+                     ',bi='+bisector+
+                     ',dist='+Math.floor(segment_distance)+
+                     (beyond ? ',beyond' : '')+
+                     ',prob='+prob+'}');
+    }
+    else // on 'finished' segment
+    {
+                prob = SEGMENT_DISTANCE_ADJUST /
+                       ( segment_distance / 2 +
+                         SEGMENT_DISTANCE_ADJUST);
+    }
+    return prob;
+}
+
+// return TRUE is bus is BEYOND segment
+function test_beyond_segment(bearing_to_bus, turn, bearing_out, bisector)
+{
+    var beyond; // boolean true if bus is BEYOND segment
+
+    // For a small turn, we use the perpendicular line to next segment either
+    // side of current stop as boundary of considering this stop passed
+    if (turn < 45 || turn > 315)
+    {
+        var angle1 = angle360(bearing_out-90);
+        var angle2 = angle360(bearing_out+90);
+        if (test_bearing_between(bearing_to_bus, angle1, angle2))
+        {
+            // We believe the bus to have probably PASSED the stop
+            beyond = true;
+            console.log(' BEYOND <45 turn='+turn);
+        }
+        else
+        {
+            // We believe the bus has probably NOT PASSED the stop
+            beyond = false;
+            console.log(' NOT BEYOND <45 turn='+turn);
+        }
+    }
+    else // For a larger turn we use the zone from bisector to bearing_out
+    {
+        if (turn < 180)
+        {
+            beyond = test_bearing_between(bearing_to_bus, bisector, bearing_out);
+        }
+        else
+        {
+            beyond = test_bearing_between(bearing_to_bus, bearing_out, bisector);
+        }
+
+        console.log( (beyond ? ' BEYOND ' : ' NOT BEYOND ')+ ' >45 turn='+turn);
+    }
+    return beyond;
 }
 
 // ******************************************************************************
@@ -1066,7 +1070,7 @@ function update_progress_vector(sensor)
              dist < progress_distance + progress_delta * DIST_PROB_MAX;
              dist += step_size)
     {
-        // let's try a gaussian distribution around progress_delta
+        // let's try a gaussian distribution around progress_delta (which we will skew below)
         factor = 1 / Math.pow(Math.E,
                               Math.pow( dist - (progress_distance + progress_delta), 2) /
                               (2 * spread * spread));
@@ -1077,11 +1081,11 @@ function update_progress_vector(sensor)
         //     increase the probability because the bus is more likely to be slow than fast.
         if (dist < progress_distance)
         {
-            factor = factor * PROGRESS_BACKWARD;
+            factor = factor * PROGRESS_BACKWARD_ADJUST;
         }
         else if (dist < progress_distance + progress_delta)
         {
-            factor = factor + PROGRESS_SLOW * (1 - factor);
+            factor = factor + PROGRESS_SLOW_ADJUST * (1 - factor);
         }
 
         factors.push({dist: dist, prob: factor});
@@ -1104,8 +1108,8 @@ function update_progress_vector(sensor)
     // *** *** ***
     // Next step is to apply those factors to the 'vector' array
 
-    // Initialize final result segment_vector with zeros
-    // and then insert the weights of the nearest forward segments
+    // Initialize final result segment_vector with default small values
+    // and then insert the weights of the segments within range
     var vector = new Array(segments);
 
     // create 'background' error values
@@ -1120,9 +1124,11 @@ function update_progress_vector(sensor)
     // current distance_factor overlaps current segment
     while (update_factor < factors.length && update_segment < segments - 1)
     {
+        // segment_start and segment_end are the route distance boundaries of current segment
         var segment_start = route_profile[update_segment-1].distance;
         var segment_end = route_profile[update_segment].distance;
 
+        // factor_start and factor_end are the boundaries of the current probability factor
         factor_start = factors[update_factor].dist - step_size / 2;
         var factor_end = factor_start + step_size;
 
@@ -1132,17 +1138,25 @@ function update_progress_vector(sensor)
         //            ' ('+segment_start+'..'+segment_end+')'
         //            );
 
+        // Here we calculate the boundaries of the overlap between the segment and factor
         var overlap_start = Math.max(factor_start, segment_start);
         var overlap_end = Math.min(factor_end, segment_end);
 
+        // factor_ratio is the proportion of the current factor assignable to the segment
         var factor_ratio = (overlap_end - overlap_start) / step_size;
 
         if (factor_ratio > 0)
         {
             //console.log('factor_ratio is '+factor_ratio+
             //            ' adding '+factors[update_factor].prob * factor_ratio);
+            // If the segment is shorter than PROGRESS_MIN_SEGMENT_LENGTH then we
+            // increase the probability being assigned using the min/actual length ratio
+            var segment_length = segment_end - segment_start;
+            var segment_length_adjustment = Math.max(PROGRESS_MIN_SEGMENT_LENGTH/segment_length,1);
 
-            vector[update_segment] += factors[update_factor].prob * factor_ratio;
+            vector[update_segment] += factors[update_factor].prob *
+                                      factor_ratio *
+                                      segment_length_adjustment;
         }
 
         if (factor_end < segment_end)
@@ -1289,6 +1303,8 @@ function create_route_profile(route)
         }
         route_profile.push(stop_info);
     }
+
+    // debug print route profile to console
     for (var i=0; i<route_profile.length; i++)
     {
         console.log(i+' '+JSON.stringify(route_profile[i]));
@@ -2548,6 +2564,18 @@ function click_show_journey()
 
 function click_load_test()
 {
+
+    var debug_str = 'rtroute '+VERSION+' '+(new Date())+'\n';
+    debug_str += 'SEGMENT_DISTANCE_WEIGHT='+SEGMENT_DISTANCE_WEIGHT;
+    debug_str += ' SEGMENT_PROGRESS_WEIGHT='+SEGMENT_PROGRESS_WEIGHT;
+    debug_str += ' SEGMENT_TIMETABLE_WEIGHT='+SEGMENT_TIMETABLE_WEIGHT;
+    debug_str += ' SEGMENT_BEYOND_ADJUST='+SEGMENT_BEYOND_ADJUST;
+    debug_str += ' SEGMENT_DISTANCE_ADJUST='+SEGMENT_DISTANCE_ADJUST;
+    debug_str += ' PROGRESS_BACKWARD_ADJUST='+PROGRESS_BACKWARD_ADJUST;
+    debug_str += ' PROGRESS_SLOW_ADJUST='+PROGRESS_SLOW_ADJUST;
+    debug_str += ' PROGRESS_MIN_SEGMENT_LENGTH='+PROGRESS_MIN_SEGMENT_LENGTH;
+    console.log(debug_str);
+
     // transfer test records into 'recorded_records' store for replay
     recorded_records = [];
     for (var i=0; i<rtroute_trip.length; i++)
