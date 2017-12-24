@@ -1,9 +1,10 @@
+"use strict";
 // ***************************************************************************
 // *******************  Page and map code ************************************
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.04';
+var VERSION = '3.05';
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
@@ -17,11 +18,10 @@ var OLD_DATA_RECORD = 60; // time (s) threshold where a data record is considere
 
 var SVGNS = 'http://www.w3.org/2000/svg';
 
-var PROGRESS_MARGIN = 20;
-var PROGRESS_LEFT_MARGIN = 20;
-var PROGRESS_RIGHT_MARGIN = 10;
-var PROGRESS_TOP_MARGIN = 20;
-var PROGRESS_BOTTOM_MARGIN = 20;
+var DRAW_PROGRESS_LEFT_MARGIN = 5;
+var DRAW_PROGRESS_RIGHT_MARGIN = 5;
+var DRAW_PROGRESS_TOP_MARGIN = 20;
+var DRAW_PROGRESS_BOTTOM_MARGIN = 10;
 
 // ******************
 // ANALYSIS CONSTANTS
@@ -60,8 +60,11 @@ var PROGRESS_SLOW_ADJUST = 0.5; // e.g. 0.2 becomes 0.2 + (1-0.2)*PROGRESS_SLOW_
 // stop being equivalent to half of this distance).
 var PROGRESS_MIN_SEGMENT_LENGTH = 150;
 
+// *************************************************************
+// *************************************************************
 // Globals
-
+// *************************************************************
+// *************************************************************
 var map;       // Leaflet map
 var map_tiles; // map tiles layer
 
@@ -75,8 +78,13 @@ var clock_time; // the JS Date 'current time', either now() or replay_time
 
 var log_div; // page div element containing the log
 
-var progress_div; // page div element containing the progress visualization
-var progress_svg; // SVG element within progress_div
+var page_progress = {}; // All the 'progress' page elements and page-related global vars
+//    .div -- page div element to hold progress visualization
+//    .svg -- svg element within div for drawn elements
+//    .annotations -- array with element for each route segment derived from data segment_index annotations
+//       .box -- the svg rect
+//    .route_profile -- the route_profile currently being displayed
+//
 var progress_update_elements = []; // these are the SVG elements we delete and create each update
 
 var PROGRESS_X_START; // pixel dimensions of progress visual route draw area
@@ -154,6 +162,10 @@ var analyze = false;
 // Batch replay
 var batch = false;
 
+// Annotate (i.e. the user adds the 'correct' segments to the data)
+var annotate_auto = false;
+var annotate_manual = false;
+
 // *********************************************************
 // Display options
 
@@ -218,17 +230,17 @@ function init()
     log_div = document.getElementById('log_div');
 
     // initialize progress div
-    progress_div = document.getElementById('progress_div');
+    page_progress.div = document.getElementById('progress_div');
 
-    progress_svg = document.createElementNS(SVGNS, 'svg');
-    progress_svg.setAttribute('width',progress_div.clientWidth);
-    progress_svg.setAttribute('height',progress_div.clientHeight);
+    page_progress.svg = document.createElementNS(SVGNS, 'svg');
+    page_progress.svg.setAttribute('width',page_progress.div.clientWidth);
+    page_progress.svg.setAttribute('height',page_progress.div.clientHeight);
 
-    progress_div.appendChild(progress_svg);
-    PROGRESS_X_START = PROGRESS_LEFT_MARGIN;
-    PROGRESS_X_FINISH = progress_div.clientWidth - PROGRESS_RIGHT_MARGIN;
-    PROGRESS_Y_START = PROGRESS_TOP_MARGIN;
-    PROGRESS_Y_FINISH = progress_div.clientHeight - PROGRESS_BOTTOM_MARGIN;
+    page_progress.div.appendChild(page_progress.svg);
+    PROGRESS_X_START = DRAW_PROGRESS_LEFT_MARGIN;
+    PROGRESS_X_FINISH = page_progress.div.clientWidth - DRAW_PROGRESS_RIGHT_MARGIN;
+    PROGRESS_Y_START = DRAW_PROGRESS_TOP_MARGIN;
+    PROGRESS_Y_FINISH = page_progress.div.clientHeight - DRAW_PROGRESS_BOTTOM_MARGIN;
 
 
     // initialize map
@@ -260,10 +272,10 @@ function init()
 
     setInterval(check_old_records, OLD_TIMER_INTERVAL*1000);
 
-    // listener to detect 'keydown' while in map_only mode
+    // listener to detect ESC 'keydown' while in map_only mode to escape back to normal
     document.onkeydown = function(evt) {
             evt = evt || window.event;
-            if (map_only)
+            if (map_only && evt.keyCode == 27)
             {
                 page_normal();
             }
@@ -390,9 +402,8 @@ function vehicle_journey_id_to_route(vehicle_journey_id)
 //    .state
 //        .route        - array of stop records
 //        .segment_index  - the index of the NEXT STOP in the ROUTE
+//        .segment_progress - 0..1 proportion of segment travelled so far
 //        .segment_vector - probability vector for bus on each route segment
-//        .prev_stop_id - atco_code of previous stop passed
-//        .next_stop_id - atco_code of next stop
 //        .route_profile - [ {time_secs (s), distance (m), turn(deg)},...]
 //
 // We have received a new data message from an existing sensor
@@ -492,15 +503,13 @@ function init_state(sensor)
     // We have a user checkbox to control bus<->segment tracking
     if (analyze)
     {
-        var data_segment_index = sensor.msg.segment_index;
-
         init_route_analysis(sensor);
 
         draw_progress_init(sensor); // add full route
 
         draw_progress_update(sensor); // add moving markers
 
-        log_analysis(sensor, data_segment_index);
+        log_analysis(sensor);
     }
 
     // For TESTING we annotate the actual sensor msg with the segment_index
@@ -508,15 +517,18 @@ function init_state(sensor)
 
 }
 
-function log_analysis(sensor, data_segment_index)
+// Write messages to in-page log when segment-probability errors occur
+function log_analysis(sensor)
 {
-    if (data_segment_index == null)
+    var annotated_segment_index = sensor.msg.segment_index; // array of 'correct' segment_index values
+
+    if (annotated_segment_index == null)
     {
         log(hh_mm_ss(get_msg_date(sensor.msg))+' segment_index '+sensor.state.segment_index);
     }
     else
     {
-        if (!data_segment_index.includes(sensor.state.segment_index))
+        if (!annotated_segment_index.includes(sensor.state.segment_index))
         {
             log('<span style="color: red">'+
                 hh_mm_ss(get_msg_date(sensor.msg))+
@@ -539,13 +551,11 @@ function update_state(sensor)
     // We have a user checkbox to control bus<->segment tracking
     if (analyze)
     {
-        var data_segment_index = sensor.msg.segment_index;
-
         update_route_analysis(sensor);
 
         draw_progress_update(sensor);
 
-        log_analysis(sensor, data_segment_index);
+        log_analysis(sensor);
     }
 
     // For TESTING we annotate the actual sensor msg with the segment_index
@@ -605,6 +615,9 @@ function init_route_analysis(sensor)
     sensor.state.segment_index = 0;
     // segment_progress is estimate of progress along current route segment 0..1
     sensor.state.segment_progress = 0;
+
+    // Highlight the current route segment for this bus
+    draw_route_segment(sensor);
 }
 
 // *****************************************************************
@@ -620,6 +633,9 @@ function init_route_analysis(sensor)
 //
 function update_route_analysis(sensor)
 {
+    // shuffle current segment_index to prev_segment_index (previous)
+    sensor.state.prev_segment_index = sensor.state.segment_index;
+
     // If sensor doesn't have a vehicle_journey_id then
     // there's nothing we can do, so return
     if (!sensor.state.vehicle_journey_id)
@@ -630,7 +646,8 @@ function update_route_analysis(sensor)
     // Get PROGRESS vector
     var progress_vector = update_progress_vector(sensor);
 
-    console.log(hh_mm_ss(get_msg_date(sensor.msg))+' progress :'+vector_to_string(progress_vector,' ','('));
+    console.log(hh_mm_ss(get_msg_date(sensor.msg))+
+                ' progress :'+vector_to_string(progress_vector,' ','('));
 
     // Get SEGMENT DISTANCE vector
     var distance_vector = update_distance_vector(sensor);
@@ -1160,9 +1177,9 @@ function update_progress_vector(sensor)
              dist += step_size)
     {
         // let's try a gaussian distribution around progress_delta (which we will skew below)
-        factor = 1 / Math.pow(Math.E,
-                              Math.pow( dist - (progress_distance + progress_delta), 2) /
-                              (2 * spread * spread));
+        var factor = 1 / Math.pow(Math.E,
+                                  Math.pow( dist - (progress_distance + progress_delta), 2) /
+                                          (2 * spread * spread));
 
         // Make adjustments for the distance regimes:
         // (1) Backwards, i.e. dist for this factor is LESS than progress_distance
@@ -1218,7 +1235,7 @@ function update_progress_vector(sensor)
         var segment_end = route_profile[update_segment].distance;
 
         // factor_start and factor_end are the boundaries of the current probability factor
-        factor_start = factors[update_factor].dist - step_size / 2;
+        var factor_start = factors[update_factor].dist - step_size / 2;
         var factor_end = factor_start + step_size;
 
         //console.log('trying update factor '+update_factor+
@@ -1386,7 +1403,7 @@ function create_route_profile(route)
         else
         {
             var next_stop = stops[route[i+1].stop_id];
-            bearing_out = get_bearing(this_stop, next_stop);
+            var bearing_out = get_bearing(this_stop, next_stop);
             stop_info.turn = Math.floor(angle360(bearing_out - stop_info.bearing_in));
             stop_info.bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
         }
@@ -1523,27 +1540,35 @@ function get_seconds(time)
 // and delete the previous line if needed.
 function draw_route_segment(sensor)
 {
-    //debug instead of warping to segment_index 1, we could draw a circle around route[0]
     // highlight line on map of next route segment
-    var segment_index = sensor.state.segment_index > 0 ? sensor.state.segment_index : 1;
+    //
+    var segment_index = sensor.state.segment_index;
 
-    var prev_stop_id = sensor.state.prev_stop_id;
-
-    var next_stop_id = sensor.state.next_stop_id;
-
-    sensor.state.prev_stop_id = sensor.state.route[segment_index - 1].stop_id;
-
-    sensor.state.next_stop_id = sensor.state.route[segment_index].stop_id;
-
-    if (prev_stop_id != sensor.state.prev_stop_id || next_stop_id != sensor.state.next_stop_id)
+    if (segment_index != sensor.state.prev_segment_index)
     {
-        if (sensor.state.route_segment_line)
+        // if prior map highlight exists, remove it
+        if (sensor.state.route_highlight)
         {
-            map.removeLayer(sensor.state.route_segment_line);
+            map.removeLayer(sensor.state.route_highlight);
         }
-        sensor.state.route_segment_line = draw_line(stops[sensor.state.prev_stop_id],
-                                                stops[sensor.state.next_stop_id],
-                                                'green');
+        // If pre-start of route, highlight first stop
+        if (segment_index == 0)
+        {
+            var stop = sensor.state.route_profile[segment_index];
+            sensor.state.route_highlight = draw_circle(stop, 40, 'green');
+        }
+        // If post-finish on route, highlight last stop
+        else if (segment_index == sensor.state.route_profile.length)
+        {
+            var stop = sensor.state.route_profile[segment_index-1];
+            sensor.state.route_highlight = draw_circle(stop, 40, 'green');
+        }
+        else
+        {
+            var prev_stop = sensor.state.route_profile[sensor.state.segment_index-1];
+            var stop = sensor.state.route_profile[sensor.state.segment_index];
+            sensor.state.route_highlight = draw_line(prev_stop, stop, 'green');
+        }
     }
 }
 
@@ -1627,7 +1652,7 @@ function get_xml_digits(xml, units)
     {
         return 0;
     }
-    start = end - 1;
+    var start = end - 1;
     // slide 'start' backwards until it points to non-digit
     while (/[0-9]/.test(xml.slice(start, start+1)))
     {
@@ -1734,7 +1759,7 @@ function draw_progress_init(sensor)
     start_line.setAttribute('y2', PROGRESS_Y_START);
     start_line.setAttribute('stroke', 'black');
 
-    progress_svg.appendChild(start_line);
+    page_progress.svg.appendChild(start_line);
 
     var finish_line = document.createElementNS(SVGNS, 'line');
 
@@ -1744,7 +1769,7 @@ function draw_progress_init(sensor)
     finish_line.setAttribute('y2', PROGRESS_Y_FINISH);
     finish_line.setAttribute('stroke', 'black');
 
-    progress_svg.appendChild(finish_line);
+    page_progress.svg.appendChild(finish_line);
 
     if (!sensor || !sensor.state.route)
     {
@@ -1776,7 +1801,17 @@ function draw_progress_init(sensor)
         line.setAttribute('x2', x2);
         line.setAttribute('y2', y);
         line.setAttribute('stroke', 'black');
-        progress_svg.appendChild(line);
+        page_progress.svg.appendChild(line);
+    }
+
+    // draw segment analysis boxes
+    // create page_progress 'globals' needed for draw and update of page
+    page_progress.annotations = new Array(route_profile.length+1);
+    page_progress.route_profile = route_profile;
+
+    for (var i=0; i<route_profile.length+1;i++)
+    {
+        add_annotation(i);
     }
 }
 
@@ -1796,7 +1831,7 @@ function draw_progress_update(sensor)
     // Remove previous update elements
     for (var i=0; i<progress_update_elements.length; i++)
     {
-        progress_svg.removeChild(progress_update_elements[i]);
+        page_progress.svg.removeChild(progress_update_elements[i]);
     }
 
     progress_update_elements = [];
@@ -1822,7 +1857,7 @@ function draw_progress_update(sensor)
         rect.setAttributeNS(null, 'width', w);
         rect.setAttributeNS(null, 'height', 9);
 
-        progress_svg.appendChild(rect);
+        page_progress.svg.appendChild(rect);
     }
     else if (segment_index == route_profile.length+1) // finished route
     {
@@ -1833,7 +1868,7 @@ function draw_progress_update(sensor)
         rect.setAttributeNS(null, 'width', w);
         rect.setAttributeNS(null, 'height', 9);
 
-        progress_svg.appendChild(rect);
+        page_progress.svg.appendChild(rect);
     }
     else
     {
@@ -1854,7 +1889,7 @@ function draw_progress_update(sensor)
         rect.setAttributeNS(null, 'width', w);
         rect.setAttributeNS(null, 'height', segment_height-1);
 
-        progress_svg.appendChild(rect);
+        page_progress.svg.appendChild(rect);
     }
 
     progress_update_elements.push(rect);
@@ -1873,7 +1908,7 @@ function draw_progress_update(sensor)
     progress_line.setAttribute('y2', segment_progress_y);
     progress_line.setAttribute('stroke', 'black');
 
-    progress_svg.appendChild(progress_line);
+    page_progress.svg.appendChild(progress_line);
 
     progress_update_elements.push(progress_line);
 
@@ -1885,8 +1920,116 @@ function draw_progress_update(sensor)
     progress_icon.setAttributeNS(null, 'width', 20);
     progress_icon.setAttributeNS(null, 'height', 20);
 
-    progress_svg.appendChild(progress_icon);
+    page_progress.svg.appendChild(progress_icon);
     progress_update_elements.push(progress_icon);
+
+    // update segment annotations
+    // we color the boxes green if they are in the 'annotated' segment_index of the msg
+    for (var i=0; i<page_progress.annotations.length; i++)
+    {
+        if (sensor.msg.segment_index && sensor.msg.segment_index.includes(i))
+        {
+            page_progress.annotations[i].box.setAttributeNS(null,'fill','#88ff88');
+        }
+        else
+        {
+            page_progress.annotations[i].box.setAttributeNS(null,'fill','white');
+        }
+    }
+
+    // Draw segment_index progress indicator next to annotation boxes
+    draw_annotation_pointer(segment_index);
+}
+
+// Add an 'annotation' box to the progress visualization
+function add_annotation(segment_index)
+{
+    var x = DRAW_PROGRESS_LEFT_MARGIN + 10;
+    var box_height = 10; // height of segment box (ipx)
+    var box_width = 10;
+    var box_top_margin = 3; // vertical space between boxes
+
+    var y = DRAW_PROGRESS_TOP_MARGIN + segment_index*(box_height+box_top_margin);
+    var box = document.createElementNS(SVGNS,'rect');
+    box.setAttributeNS(null, 'x', x);
+    box.setAttributeNS(null, 'y', y);
+    box.setAttributeNS(null, 'height', box_height);
+    box.setAttributeNS(null, 'width', box_width);
+    box.setAttributeNS(null, 'stroke', 'black');
+    box.setAttributeNS(null, 'fill', 'white');
+    box.addEventListener('mouseover', draw_progress_mouseover_callback(segment_index));
+    box.addEventListener('mouseout', draw_progress_mouseout_callback(segment_index));
+    page_progress.svg.appendChild(box);
+    page_progress.annotations[segment_index] = { box: box };
+}
+
+function draw_annotation_pointer(segment_index)
+{
+    var x = DRAW_PROGRESS_LEFT_MARGIN + 2;
+    var box_height = 10; // height of segment box (ipx)
+    var box_width = 10;
+    var box_top_margin = 3; // vertical space between boxes
+    var y = DRAW_PROGRESS_TOP_MARGIN + segment_index*(box_height+box_top_margin);
+
+    // if there's an existing segment pointer, remove that one
+    if (page_progress.annotation_pointer)
+    {
+        page_progress.svg.removeChild(page_progress.annotation_pointer);
+    }
+    // Create pointer triangle pointing at the segment annotation box
+    page_progress.annotation_pointer = document.createElementNS(SVGNS,'polygon');
+    var points = x+','+y+' ';
+    points += x+','+(y+box_height)+' ';
+    points += (x+8)+','+(y + box_height/2);
+    page_progress.annotation_pointer.setAttributeNS(null, 'points', points);
+    page_progress.annotation_pointer.setAttributeNS(null, 'fill', 'yellow');
+    page_progress.svg.appendChild(page_progress.annotation_pointer);
+}
+
+// Create mouseover/mouseout callbacks for the progress annotate boxes
+function draw_progress_mouseover_callback(i)
+{
+    return function () { draw_progress_mouseover(i); };
+}
+
+function draw_progress_mouseout_callback(i)
+{
+    return function () { draw_progress_mouseout(i); };
+}
+
+//debug errors on segment 0 and segment 1
+// User hovers mouse in/out of annotation box
+function draw_progress_mouseover(segment_index)
+{
+    if (page_progress.highlight_segment)
+    {
+        map.removeLayer(page_progress.highlight_segment);
+    }
+    if (segment_index == 0)
+    {
+        page_progress.highlight_segment = draw_circle(page_progress.route_profile[segment_index],
+                                                      40,
+                                                      'yellow');
+    } else if (segment_index == page_progress.route_profile.length)
+    {
+        page_progress.highlight_segment = draw_circle(page_progress.route_profile[segment_index-1],
+                                                      40,
+                                                      'yellow');
+    }
+    else
+    {
+        page_progress.highlight_segment = draw_line(page_progress.route_profile[segment_index-1],
+                                                    page_progress.route_profile[segment_index],
+                                                    'yellow');
+    }
+}
+
+function draw_progress_mouseout(segment_index)
+{
+    if (page_progress.highlight_segment)
+    {
+        map.removeLayer(page_progress.highlight_segment);
+    }
 }
 
 // ********************************************************************************
@@ -2028,7 +2171,7 @@ function check_old_records()
             return;
     }
 
-    for (sensor_id in sensors)
+    for (var sensor_id in sensors)
     {
         update_old_status(sensors[sensor_id]);
     }
@@ -2651,6 +2794,7 @@ function click_show_journey()
     document.getElementById('analyze').checked = analyze;
 }
 
+// Load the test data
 function click_load_test()
 {
 
@@ -2686,7 +2830,9 @@ function click_load_test()
 
     // start replay
     replay_stop(); // stop replay if it is already running
-    //replay_start();
+
+    // replay only the first record
+    replay_next_record();
 }
 
 // User has clicked on the 'hide map' checkbox.
@@ -2716,5 +2862,39 @@ function click_analyze()
 function click_batch()
 {
     batch = document.getElementById("batch").checked;
+}
+
+// User has clicked an annotate option
+//
+// The sensor data can be 'annotated' with the correct segments, which will be
+// added to the data record as a property "segment_index": [x,y,x] where x,y,x are
+// the selected values.
+//
+// The annotation can be "automatic" or "manual", the modes of which are mutually exclusive.
+//
+// "Automatic" annotation uses the segment probability algorithm to generate the 'correct'
+// segment_index (e.g. 7) and add it to the data record (i.e. segment_index: [7] ).  This
+// is a good way to create an initial set of values that can then be hand-corrected if needed.
+//
+// "Manual" annotation expects the user to click on the segment boxes in the progress visualization
+// to insert the correct data.
+function click_annotate_auto()
+{
+    annotate_auto = document.getElementById("annotate_auto").checked;
+    if (annotate_auto)
+    {
+        annotate_manual = false;
+        document.getElementById("annotate_manual").checked = false;
+    }
+}
+
+function click_annotate_manual()
+{
+    annotate_manual = document.getElementById("annotate_manual").checked;
+    if (annotate_manual)
+    {
+        annotate_auto = false;
+        document.getElementById("annotate_auto").checked = false;
+    }
 }
 
