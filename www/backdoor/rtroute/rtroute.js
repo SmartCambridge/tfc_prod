@@ -512,9 +512,12 @@ function init_state(sensor)
         log_analysis(sensor);
     }
 
-    // For TESTING we annotate the actual sensor msg with the segment_index
-    //sensor.msg.segment_index = sensor.state.segment_index;
-
+    // Auto Annotation - we add calculated segment index to the msg, so we
+    // can subsequently save these records and use as annotated data.
+    if (annotate_auto)
+    {
+        sensor.msg.segment_index = [ sensor.state.segment_index ];
+    }
 }
 
 // Write messages to in-page log when segment-probability errors occur
@@ -533,7 +536,7 @@ function log_analysis(sensor)
             log('<span style="color: red">'+
                 hh_mm_ss(get_msg_date(sensor.msg))+
                 ' wrong segment_index '+sensor.state.segment_index+
-                ' should be '+data_segment_index.toString()+
+                ' should be '+annotated_segment_index.toString()+
                 '</span>');
         }
     }
@@ -558,8 +561,12 @@ function update_state(sensor)
         log_analysis(sensor);
     }
 
-    // For TESTING we annotate the actual sensor msg with the segment_index
-    //sensor.msg.segment_index = sensor.state.segment_index;
+    // Auto Annotation - we add calculated segment index to the msg, so we
+    // can subsequently save these records and use as annotated data.
+    if (annotate_auto)
+    {
+        sensor.msg.segment_index = [ sensor.state.segment_index ];
+    }
 
 }
 
@@ -1924,10 +1931,19 @@ function draw_progress_update(sensor)
     progress_update_elements.push(progress_icon);
 
     // update segment annotations
+    update_annotations(sensor.msg);
+
+    // Draw segment_index progress indicator next to annotation boxes
+    update_annotation_pointer(sensor.msg, segment_index);
+}
+
+// color in the annotation boxes on the progress visualization
+function update_annotations(msg)
+{
     // we color the boxes green if they are in the 'annotated' segment_index of the msg
     for (var i=0; i<page_progress.annotations.length; i++)
     {
-        if (sensor.msg.segment_index && sensor.msg.segment_index.includes(i))
+        if (msg.segment_index && msg.segment_index.includes(i))
         {
             page_progress.annotations[i].box.setAttributeNS(null,'fill','#88ff88');
         }
@@ -1936,16 +1952,13 @@ function draw_progress_update(sensor)
             page_progress.annotations[i].box.setAttributeNS(null,'fill','white');
         }
     }
-
-    // Draw segment_index progress indicator next to annotation boxes
-    draw_annotation_pointer(segment_index);
 }
 
 // Add an 'annotation' box to the progress visualization
 function add_annotation(segment_index)
 {
     var x = DRAW_PROGRESS_LEFT_MARGIN + 10;
-    var box_height = 10; // height of segment box (ipx)
+    var box_height = 10; // height of segment box (px)
     var box_width = 10;
     var box_top_margin = 3; // vertical space between boxes
 
@@ -1957,16 +1970,19 @@ function add_annotation(segment_index)
     box.setAttributeNS(null, 'width', box_width);
     box.setAttributeNS(null, 'stroke', 'black');
     box.setAttributeNS(null, 'fill', 'white');
-    box.addEventListener('mouseover', draw_progress_mouseover_callback(segment_index));
-    box.addEventListener('mouseout', draw_progress_mouseout_callback(segment_index));
+    box.addEventListener('mouseover', function () { annotate_mouseover(segment_index); });
+    box.addEventListener('mouseout', function () {annotate_mouseout(segment_index); });
+    box.addEventListener('click', function () {annotate_click(segment_index); });
     page_progress.svg.appendChild(box);
     page_progress.annotations[segment_index] = { box: box };
 }
 
-function draw_annotation_pointer(segment_index)
+// Draw the 'progress indicator' for current segment_index adjacent to
+// the annotation boxes in the progress visualization
+function update_annotation_pointer(msg, segment_index)
 {
     var x = DRAW_PROGRESS_LEFT_MARGIN + 2;
-    var box_height = 10; // height of segment box (ipx)
+    var box_height = 10; // height of segment box (px)
     var box_width = 10;
     var box_top_margin = 3; // vertical space between boxes
     var y = DRAW_PROGRESS_TOP_MARGIN + segment_index*(box_height+box_top_margin);
@@ -1982,24 +1998,24 @@ function draw_annotation_pointer(segment_index)
     points += x+','+(y+box_height)+' ';
     points += (x+8)+','+(y + box_height/2);
     page_progress.annotation_pointer.setAttributeNS(null, 'points', points);
-    page_progress.annotation_pointer.setAttributeNS(null, 'fill', 'yellow');
+    var pointer_color = 'yellow';
+    if (msg.segment_index)
+    {
+        if (msg.segment_index.includes(segment_index))
+        {
+            pointer_color ='green';
+        }
+        else
+        {
+            pointer_color = 'red';
+        }
+    }
+    page_progress.annotation_pointer.setAttributeNS(null, 'fill', pointer_color);
     page_progress.svg.appendChild(page_progress.annotation_pointer);
 }
 
-// Create mouseover/mouseout callbacks for the progress annotate boxes
-function draw_progress_mouseover_callback(i)
-{
-    return function () { draw_progress_mouseover(i); };
-}
-
-function draw_progress_mouseout_callback(i)
-{
-    return function () { draw_progress_mouseout(i); };
-}
-
-//debug errors on segment 0 and segment 1
 // User hovers mouse in/out of annotation box
-function draw_progress_mouseover(segment_index)
+function annotate_mouseover(segment_index)
 {
     if (page_progress.highlight_segment)
     {
@@ -2024,11 +2040,45 @@ function draw_progress_mouseover(segment_index)
     }
 }
 
-function draw_progress_mouseout(segment_index)
+// User mouse has moved out of annotation box so de-highlight segment
+function annotate_mouseout(segment_index)
 {
     if (page_progress.highlight_segment)
     {
         map.removeLayer(page_progress.highlight_segment);
+    }
+}
+
+//User has clicked on annotation box, so update msg segment_index annotation (if annotate_manual)
+function annotate_click(segment_index)
+{
+    if (annotate_manual)
+    {
+        var msg = recorded_records[replay_index-1];
+        if (!msg.segment_index)
+        {
+            // if no segment_index property in data record then create [ segment_index ]
+            msg.segment_index = [ segment_index ];
+        }
+        else if (!msg.segment_index.includes(segment_index))
+        {
+            // if existing segment_index array but not including this entry then add
+            msg.segment_index.push(segment_index);
+        }
+        else
+        {
+            // if existing segment_index array including this entry then remove
+            var segments = [];
+            for (var i=0; i < msg.segment_index.length; i++)
+            {
+                if (msg.segment_index[i] != segment_index)
+                {
+                    segments.push(msg.segment_index[i]);
+                }
+            }
+            msg.segment_index = segments;
+        }
+        update_annotations(msg);
     }
 }
 
@@ -2680,15 +2730,21 @@ function record_clear()
 
 function record_print()
 {
-    log_clear();
-    var prev_log_append = log_append;
-    log_append = true;
-    log('Printing '+recorded_records.length+' recorded records '+new Date());
+    log('Printing '+recorded_records.length+' recorded records to console');
+    var msgs = '[\n';
     for (var i=0; i<recorded_records.length; i++)
     {
-        log(JSON.stringify(recorded_records[i]),'div');
+        msgs += JSON.stringify(recorded_records[i]);
+        if (i < recorded_records.length-1)
+        {
+            msgs += ',\n';
+        }
+        else
+        {
+            msgs += '\n]';
+        }
     }
-    log_append = prev_log_append;
+    console.log(msgs);
 }
 
 // ***********************
@@ -2883,6 +2939,7 @@ function click_annotate_auto()
     annotate_auto = document.getElementById("annotate_auto").checked;
     if (annotate_auto)
     {
+        log('On replay, data records will be annotated with segment_index');
         annotate_manual = false;
         document.getElementById("annotate_manual").checked = false;
     }
@@ -2893,6 +2950,7 @@ function click_annotate_manual()
     annotate_manual = document.getElementById("annotate_manual").checked;
     if (annotate_manual)
     {
+        log('On replay, you can click the annotation boxes to update the segment_index annotations');
         annotate_auto = false;
         document.getElementById("annotate_auto").checked = false;
     }
