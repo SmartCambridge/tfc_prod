@@ -162,8 +162,15 @@ body {
 <!-- create js object rtroute_stops (all stops used in above journeys) -->
 <script type="text/javascript" src="rtroute_stops.js"></script>
 
+<!-- Create object to store test data from following files -->
+<script type="text/javascript">
+var test_data = {};
+</script>
+
 <!-- create array of sirivm js objects rtroute_trip (one sample journey) -->
-<script type="text/javascript" src="rtroute_trip2.js"></script>
+<script type="text/javascript" src="bus4_2017-11-20-06-02_annotated.js"></script>
+<script type="text/javascript" src="bus4_2017-11-20-06-22_annotated.js"></script>
+<script type="text/javascript" src="bus4_2017-11-20-06-42_annotated.js"></script>
 
 <!-- WebSockets library to connect to RTMonitor -->
 <script src="sockjs.min.js"></script>
@@ -237,10 +244,10 @@ body {
         ></input>
     <input type="button" id="record_print" onclick="record_print()" value="Print"
         title="Print the recorded data to the console"
-        ></input><br/>
-    <input type="button" class="test_button" onclick="click_load_test()" value="Load test"
-        title="Load test SiriVM data and run replay with analysis"
         ></input>
+</div>
+<!-- TEST BUTTONS are added by javascript into this div -->
+<div id="test_buttons">
 </div>
 <div class="control_heading">Route analysis</div>
 <div class="control_box">

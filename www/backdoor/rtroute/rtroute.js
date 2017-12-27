@@ -4,7 +4,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.05';
+var VERSION = '3.06';
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
@@ -75,6 +75,7 @@ var debug = urlparams.has('debug');
 var mapbounds;
 
 var clock_time; // the JS Date 'current time', either now() or replay_time
+var clock_timer; // the intervaltimer to update the clock in real time (not during replay)
 
 var log_div; // page div element containing the log
 
@@ -155,6 +156,7 @@ var replay_on = false; // Replay mode on|off
 var replay_interval = 1; // Replay step interval (seconds)
 var replay_speedup = 10; // relative speed of replay time to real time
 var replay_index = 0; // current index into replay data
+var replay_errors = 0; // simple count of errors during replay
 
 // Segment analysis
 var analyze = false;
@@ -260,8 +262,8 @@ function init()
 
     // initialize clock
 
-    update_clock();
-    setInterval(update_clock, 1000);
+    update_clock(new Date());
+    clock_timer = setInterval(function () { update_clock(new Date()); }, 1000);
 
     // initialize UI checkboxes
 
@@ -292,6 +294,8 @@ function init()
     draw_stops();
 
     draw_progress_init();
+
+    load_tests();
 
 } // end init()
 
@@ -364,6 +368,31 @@ function load_journeys()
 
 }
 
+// Create the control pane 'test buttons'
+function load_tests()
+{
+    // get DIV to add buttons to
+    var test_buttons = document.getElementById('test_buttons');
+
+    for (var test_name in test_data)
+    {
+        if (test_data.hasOwnProperty(test_name))
+        {
+            var test_button = document.createElement('input');
+            test_button.setAttribute('type', 'button');
+            test_button.setAttribute('class', 'test_button');
+            test_button.setAttribute('value', test_name);
+            test_button.onclick = (function (x)
+                                   {
+                                       return function () { load_test_data(x); };
+                                   }
+                                  )(test_name);
+
+            test_buttons.appendChild(test_button);
+        }
+    }
+}
+
 // ************************************************************************************
 // ************************    TIMETABLE API SHIM    **********************************
 // ************************************************************************************
@@ -407,7 +436,7 @@ function vehicle_journey_id_to_route(vehicle_journey_id)
 //        .route_profile - [ {time_secs (s), distance (m), turn(deg)},...]
 //
 // We have received a new data message from an existing sensor
-function update_sensor(msg)
+function update_sensor(msg, clock_time)
 {
 		// existing sensor data record has arrived
 
@@ -433,12 +462,12 @@ function update_sensor(msg)
 
             var sensor = sensors[sensor_id];
 
-            update_state(sensor);
+            update_state(sensor, clock_time);
 		}
 }
 
 // We have received data from a previously unseen sensor, so initialize
-function create_sensor(msg)
+function create_sensor(msg, clock_time)
 {
     // new sensor, create marker
     log(' ** New '+msg[RECORD_INDEX]);
@@ -471,11 +500,11 @@ function create_sensor(msg)
 
     sensors[sensor_id] = sensor;
 
-    init_state(sensor);
+    init_state(sensor, clock_time);
 }
 
 // Initialize sensor state (e.g. for bus, vehicle_journey_id, segment_index)
-function init_state(sensor)
+function init_state(sensor, clock_time)
 {
     //log('Initializing '+sensor.sensor_id);
 
@@ -498,7 +527,7 @@ function init_state(sensor)
     sensor.state.route_profile = create_route_profile(sensor.state.route);
 
     // flag if this record is OLD or NEW
-    init_old_status(sensor);
+    init_old_status(sensor, clock_time);
 
     // We have a user checkbox to control bus<->segment tracking
     if (analyze)
@@ -538,18 +567,20 @@ function log_analysis(sensor)
                 ' wrong segment_index '+sensor.state.segment_index+
                 ' should be '+annotated_segment_index.toString()+
                 '</span>');
+            // update the global replay 'error' count
+            replay_errors++;
         }
     }
 }
 
 // Update sensor state
 
-function update_state(sensor)
+function update_state(sensor, clock_time)
 {
     //log('Updating '+sensor.sensor_id);
 
     // flag if this record is OLD or NEW
-    update_old_status(sensor);
+    update_old_status(sensor, clock_time);
 
     // We have a user checkbox to control bus<->segment tracking
     if (analyze)
@@ -574,12 +605,12 @@ function update_state(sensor)
 // Note that 'current time' is the JS date value in global 'clock_time'
 // so that this function works equally well during replay of old data.
 //
-function init_old_status(sensor)
+function init_old_status(sensor, clock_time)
 {
-    update_old_status(sensor);
+    update_old_status(sensor, clock_time);
 }
 
-function update_old_status(sensor)
+function update_old_status(sensor, clock_time)
 {
     var data_timestamp = get_msg_date(sensor.msg); // will hold Date from sensor
 
@@ -1466,7 +1497,7 @@ function vector_to_string(vector, zero_value, max_flag, correct_flag, correct_ce
         max_flag = '[';
     }
 
-    if (!correct_flag)
+    if (!correct_flag || !correct_cells)
     {
         correct_cells = [];
     }
@@ -2095,7 +2126,7 @@ function handle_records(websock_data)
     //console.log('handle_records'+json['request_data'].length);
     for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++)
     {
-	    handle_msg(incoming_data[RECORDS_ARRAY][i]);
+	    handle_msg(incoming_data[RECORDS_ARRAY][i], new Date());
     }
 } // end function handle_records
 
@@ -2106,33 +2137,23 @@ function replay_timestep()
     // move replay_time forwards by the current timestep
     replay_time.setSeconds(replay_time.getSeconds() + replay_interval*replay_speedup);
 
-    var current_index = replay_index;
-
-    // skip earlier records
+    update_clock(replay_time);
 
     while ( replay_index < recorded_records.length &&
             get_msg_date(recorded_records[replay_index]) < replay_time)
     {
-        replay_index++;
-    }
-
-    if ( replay_index < recorded_records.length
-         && replay_index > current_index)
-    {
-        var msg = recorded_records[replay_index-1];
+        var msg = recorded_records[replay_index];
 
         var time_str = hh_mm_ss(get_msg_date(msg));
 
-        var next_time_str = (replay_index < recorded_records.length - 1)
-                            ? hh_mm_ss(get_msg_date(recorded_records[replay_index]))
-                            : '--end of records--';
-        //log('replay record '+(replay_index-1)+' '+time_str+' next: '+next_time_str);
+        handle_msg(msg, replay_time);
 
-        handle_msg(msg);
+        replay_index++;
     }
 
     if (replay_index == recorded_records.length)
     {
+        log('Replay completed, errors: '+replay_errors);
         replay_stop();
     }
 }
@@ -2143,6 +2164,7 @@ function replay_next_record()
     // do nothing if we've reached the end of recorded_records
     if (replay_index >= recorded_records.length)
     {
+        log('Replay completed, errors: '+replay_errors);
         return;
     }
 
@@ -2150,9 +2172,9 @@ function replay_next_record()
 
     replay_time = get_msg_date(msg);
 
-    update_clock();
+    update_clock(replay_time);
 
-    handle_msg(msg);
+    handle_msg(msg, replay_time);
 }
 
 // Replay ALL records in a single batch
@@ -2160,14 +2182,21 @@ function replay_batch()
 {
     replay_index = 0;
 
+    replay_errors = 0;
+
     while (replay_index < recorded_records.length)
     {
-        handle_msg(recorded_records[replay_index++]);
+        var msg = recorded_records[replay_index++];
+        replay_time = get_msg_date(msg);
+        update_clock(replay_time);
+        handle_msg(msg, replay_time);
     }
+
+    log('Batch replay completed, errors: '+replay_errors);
 }
 
 // process a single data record
-function handle_msg(msg)
+function handle_msg(msg, clock_time)
 {
     // add to recorded_data if recording is on
 
@@ -2182,32 +2211,26 @@ function handle_msg(msg)
     // otherwise create new entry.
     if (sensors.hasOwnProperty(sensor_id))
     {
-        update_sensor(msg);
+        update_sensor(msg, clock_time);
     }
     else
     {
-        create_sensor(msg);
+        create_sensor(msg, clock_time);
     }
 }
 
 // update realtime clock on page
 // called via intervalTimer in init()
-function update_clock()
+function update_clock(time)
 {
-    if (replay_on)
-    {
-        clock_time = replay_time;
-    }
-    else
-    {
-        clock_time = new Date();
-    }
-    document.getElementById('clock').innerHTML = hh_mm_ss(clock_time);
+    clock_time = time;
+    document.getElementById('clock').innerHTML = hh_mm_ss(time);
+    check_old_records(time);
 }
 
 // watchdog function to flag 'old' data records
 // records are stored in 'sensors' object
-function check_old_records()
+function check_old_records(clock_time)
 {
     //console.log('checking for old data records..,');
 
@@ -2223,7 +2246,7 @@ function check_old_records()
 
     for (var sensor_id in sensors)
     {
-        update_old_status(sensors[sensor_id]);
+        update_old_status(sensors[sensor_id], clock_time);
     }
 }
 
@@ -2754,6 +2777,9 @@ function record_print()
 // This launches an intervalTimer to step through the data records
 function replay_start()
 {
+    // kill the real-time clock
+    clearInterval(clock_timer);
+
     if (batch)
     {
         replay_batch();
@@ -2776,6 +2802,8 @@ function replay_start()
         replay_time = start_time;
 
         replay_index = 0;
+
+        replay_errors = 0;
 
         // set 'replay mode' flag
         replay_on = true;
@@ -2851,10 +2879,13 @@ function click_show_journey()
 }
 
 // Load the test data
-function click_load_test()
+function load_test_data(test_name)
 {
 
-    var debug_str = 'rtroute '+VERSION+' '+(new Date())+'\n';
+    // kill the real-time clock
+    clearInterval(clock_timer);
+
+    var debug_str = 'rtroute '+VERSION+' test: '+test_name+' '+(new Date())+'\n';
     debug_str += 'SEGMENT_DISTANCE_WEIGHT='+SEGMENT_DISTANCE_WEIGHT;
     debug_str += ' SEGMENT_PROGRESS_WEIGHT='+SEGMENT_PROGRESS_WEIGHT;
     debug_str += ' SEGMENT_TIMETABLE_WEIGHT='+SEGMENT_TIMETABLE_WEIGHT;
@@ -2865,16 +2896,18 @@ function click_load_test()
     debug_str += ' PROGRESS_MIN_SEGMENT_LENGTH='+PROGRESS_MIN_SEGMENT_LENGTH;
     console.log(debug_str);
 
+    var source_records = test_data[test_name];
+
     // transfer test records into 'recorded_records' store for replay
     recorded_records = [];
-    for (var i=0; i<rtroute_trip.length; i++)
+    for (var i=0; i<source_records.length; i++)
     {
-        recorded_records.push(Object.assign({},rtroute_trip[i]));
+        recorded_records.push(Object.assign({},source_records[i]));
     }
 
     replay_index = 0;
 
-    log('Loaded test trip');
+    log('Loaded test records '+test_name);
 
     // turn analyze on
     analyze = true;
