@@ -68,8 +68,6 @@ var PROGRESS_MIN_SEGMENT_LENGTH = 150;
 var map;       // Leaflet map
 var map_tiles; // map tiles layer
 
-var DEBUG_VEHICLE_JOURNEY_ID = "20-4-_-y08-1-51-T0";
-
 var urlparams = new URLSearchParams(window.location.search);
 var debug = urlparams.has('debug');
 var mapbounds;
@@ -115,7 +113,8 @@ var stops = {};
 // becomes:
 // journeys['20-4-_-y08-1-98-T2'] = { route: [ ... {above record} ] }
 var journeys = {};
-var journeys_count = 0;
+var journey_start_times = {}; // holds lists of journeys by start time
+var current_journey_id = 0; // holds 'vehicle_journey_id' of route currently being analyzed
 
 // Trip data (from rtroutes_trip.js)
 //  { "Delay": "PT0S",
@@ -277,9 +276,14 @@ function init()
     // listener to detect ESC 'keydown' while in map_only mode to escape back to normal
     document.onkeydown = function(evt) {
             evt = evt || window.event;
-            if (map_only && evt.keyCode == 27)
+            if (map_only && evt.keyCode == 27) // ESC to escape from map-only view
             {
                 page_normal();
+            }
+            else if (evt.keyCode == 9) // TAB for replay_step
+            {
+                evt.preventDefault();
+                replay_step();
             }
     };
 
@@ -313,8 +317,18 @@ function load_stops()
 }
 
 // Load the rtroute_journeys array (from rtroute_journeys.js) into journeys dictionary
+// journey
+//   .route = [
+//      {vehicle_journey_id:'20-4-_-y08-1-98-T2',order:1,time:'11:22:00',stop_id:'0500SCAMB011'},
+//      ...
+//      ]
 function load_journeys()
 {
+    journeys = {};
+    journey_start_times = {};
+
+    var journeys_count = 0;
+
     // Iterate through all the vehicle_journey_id/stop_id/time/order... records
     for (var i=0; i<rtroute_journeys.length; i++)
     {
@@ -353,19 +367,151 @@ function load_journeys()
         }
         else
         {
+            //console.log('Starting new journey with '+JSON.stringify(journey_stop));
+
             // Create a new journey entry with this vehicle_journey_id
             // Start with route of just this current stop
             var new_route = [];
             new_route[stop_index] = journey_stop;
 
+            var journey_id = journey_stop.vehicle_journey_id;
+
             // Add this route to a new journeys entry
-            journeys[journey_stop.vehicle_journey_id] = {route: new_route};
+            journeys[journey_id] = {route: new_route};
 
             journeys_count++; // keep track of total number of journeys
+
+            // Add this journey to the journey_start_time dictionary
+            //
+            var journey_start_time = journey_stop.time;
+
+            if (journey_start_times.hasOwnProperty(journey_start_time))
+            {
+                //console.log('Additional journey '+journey_id+' at start time '+journey_start_time);
+
+                // Existing start time, so append this vehicle_journey_id
+                journey_start_times[journey_start_time].push(journey_id);
+            }
+            else
+            {
+                // New start time, so create entry with list of just this journey_id
+                journey_start_times[journey_start_time] = [ journey_id ];
+            }
         }
     }
     log(journeys_count + ' journeys created');
 
+    // For debug see how many journeys are exact duplicates
+    //
+    var unique_journeys = 0;
+
+    console.log('Checking for duplicate journeys in '+
+                Object.keys(journey_start_times).length+' start times');
+
+    var print_timetable = []; // accumulate start time debug messages to sort and print
+
+    // Iterate through all start times
+    for (var start_time in journey_start_times)
+    {
+        if (journey_start_times.hasOwnProperty(start_time))
+        {
+            var unique_this_start_time;
+            var journey_ids = journey_start_times[start_time][0];
+
+            if (journey_start_times[start_time].length == 1)
+            {
+                unique_journeys++;
+                unique_this_start_time = 1;
+            }
+            else
+            {
+                unique_this_start_time = 1;
+                unique_journeys++; // for the first journey at this start time
+                // For this start time, iterate through additional journeys
+                for (var j=1; j<journey_start_times[start_time].length; j++)
+                {
+                    journey_ids += ' '+journey_start_times[start_time][j];
+
+                    if (unique_journey(journey_start_times[start_time],j))
+                    {
+                        unique_journeys++;
+                        unique_this_start_time++;
+                        // If this jounrney different than others at this start time then print
+                        //console.log(start_time+' '+
+                        //            journey_to_string(journey_start_times[start_time][j]));
+                    }
+                }
+            }
+            // If multiple different journeys at this start time then print the first
+            //if (unique_this_start_time>1)
+            //{
+            //    console.log(start_time+' '+
+            //                journey_to_string(journey_start_times[start_time][0]));
+            //}
+
+            print_timetable.push('Start '+start_time+
+                        ' ('+unique_this_start_time+' unique) '+
+                        journey_ids
+                       );
+        }
+    }
+    console.log('Total unique journeys: '+unique_journeys);
+    console.log(print_timetable.sort().join('\n'));
+
+}
+
+// return true if journey_ids[index] is unique journey compared to journey_ids[0..index-1]
+function unique_journey(journey_ids, index)
+{
+    for (var i=0; i<index; i++)
+    {
+        if (same_journey(journey_ids[i],journey_ids[index]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// return true if journey_id_a and journey_id_b represent the same route
+function same_journey(journey_id_a, journey_id_b)
+{
+    var route_a = journeys[journey_id_a].route;
+    var route_b = journeys[journey_id_b].route;
+
+    if (route_a.length != route_b.length)
+    {
+        return false;
+    }
+
+    for (var i=0; i<route_a.length; i++)
+    {
+        if (route_a[i].time != route_b[i].time)
+        {
+            return false;
+        }
+
+        if (route_a[i].stop_id != route_b[i].stop_id)
+        {
+            return false;
+        }
+    }
+
+    //console.log('Identical journeys '+journeys[journey_id_a].route[0].time+
+    //            ' '+journey_id_a+
+    //            ' '+journey_id_b);
+    return true;
+}
+
+function journey_to_string(journey_id)
+{
+    var route = journeys[journey_id].route;
+    var str = journey_id;
+    for (var i=0; i<route.length; i++)
+    {
+        str += ' { '+route[i].time+', '+route[i].stop_id+'}';
+    }
+    return str;
 }
 
 // Create the control pane 'test buttons'
@@ -399,7 +545,29 @@ function load_tests()
 //debug Given a sirivm msg, return the vehicle journey_id
 function sirivm_to_vehicle_journey_id(msg)
 {
-    return DEBUG_VEHICLE_JOURNEY_ID;
+    switch (msg['OriginAimedDepartureTime'])
+    {
+        case '2017-11-20T06:02:00+00:00':
+            return '20-4-_-y08-1-51-T0';
+
+        case '2017-11-20T06:22:00+00:00':
+            return '20-4-_-y08-1-1-T0';
+
+        case '2017-11-20T06:42:00+00:00':
+            return '20-4-_-y08-1-2-T0';
+
+        case '2017-11-20T07:22:00+00:00':
+            return '20-4-_-y08-1-4-T0';
+
+        case '2017-11-20T07:42:00+00:00':
+            return '20-4-_-y08-1-5-T0';
+
+        default:
+            log('<span style="color: red">Vehicle departure time not recognized</span>');
+
+    }
+
+    return 0;
 }
 
 function vehicle_journey_id_to_journey(vehicle_journey_id)
@@ -2499,6 +2667,11 @@ function draw_journey(vehicle_journey_id)
 // User has un-checked 'Show Journey'
 function hide_journey(vehicle_journey_id)
 {
+    if (!vehicle_journey_id)
+    {
+        return;
+    }
+
     var journey = vehicle_journey_id_to_journey(vehicle_journey_id);
     if (journey.poly_line)
     {
@@ -2835,7 +3008,7 @@ function replay_stop()
 }
 
 // User has clicked the Replay Step button, so increment to next data record
-function click_replay_step()
+function replay_step()
 {
     clearInterval(replay_timer);
     // if not paused, initialize the replay time to the chosen start time
@@ -2867,12 +3040,12 @@ function click_show_journey()
     if (show_journey)
     {
         analyze = true;
-        draw_journey(DEBUG_VEHICLE_JOURNEY_ID);
+        draw_journey(current_journey_id);
     }
     else
     {
         analyze = false;
-        hide_journey(DEBUG_VEHICLE_JOURNEY_ID);
+        hide_journey(current_journey_id);
     }
     // set analyze checkbox appropriately
     document.getElementById('analyze').checked = analyze;
@@ -2914,8 +3087,17 @@ function load_test_data(test_name)
     document.getElementById('analyze').checked = true;
 
     // show the test journey
+    //
+    // Remove the current journey if displayed
+    hide_journey(current_journey_id);
+
     document.getElementById("show_journey").checked = true;
-    draw_journey(DEBUG_VEHICLE_JOURNEY_ID);
+
+    current_journey_id = sirivm_to_vehicle_journey_id(recorded_records[0]);
+
+    log('Current vehicle_journey_id now '+current_journey_id);
+
+    draw_journey(current_journey_id);
 
     // start replay
     replay_stop(); // stop replay if it is already running
