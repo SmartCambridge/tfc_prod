@@ -100,6 +100,18 @@ var log_data = false;
 // *********************************************************
 // RTRoutes globals
 
+// Sensor data - dictionary of sensors by sensor_id
+var sensors = {};
+// Where each sensor:
+// sensor
+//    .msg              - the most recent data message received for this sensor
+//    .state
+//        .route        - array of stop records
+//        .segment_index  - the index of the NEXT STOP in the ROUTE
+//        .segment_progress - 0..1 proportion of segment travelled so far
+//        .segment_vector - probability vector for bus on each route segment
+//        .route_profile - [ {time_secs (s), distance (m), turn(deg)},...]
+
 // Local dictionary of STOPS keyed on stop_id
 // Sample stop record in rtroute_stops:
 // { stop_id:'0500CCITY055', lat:52.2114061236, lng:0.10481260687, common_name:'Storey\'s Way'},
@@ -173,9 +185,6 @@ var annotate_manual = false;
 var breadcrumbs = false; // location 'breadcrumbs' will be dropped as things move
 
 var map_only = false; // page is in "only display map" mode
-
-// *****************
-var sensors = {};
 
 // Here we define the 'data record format' of the incoming websocket feed
 var RECORD_INDEX = 'VehicleRef';  // data record property that is primary key
@@ -2360,7 +2369,9 @@ function replay_batch()
         handle_msg(msg, replay_time);
     }
 
-    log('Batch replay completed, errors: '+replay_errors);
+    log('Batch replay completed, errors: '+
+        replay_errors+"/"+recorded_records.length+
+        ' ('+Math.floor(1000*replay_errors/recorded_records.length)/10+'%)');
 }
 
 // process a single data record
@@ -3055,8 +3066,14 @@ function click_show_journey()
 function load_test_data(test_name)
 {
 
-    // kill the real-time clock
+    // kill the real-time clock in case it is running
     clearInterval(clock_timer);
+
+    // kill the replay clock if it is running
+    clearInterval(replay_timer);
+
+    // Scrub all the sensor data
+    sensors = {};
 
     var debug_str = 'rtroute '+VERSION+' test: '+test_name+' '+(new Date())+'\n';
     debug_str += 'SEGMENT_DISTANCE_WEIGHT='+SEGMENT_DISTANCE_WEIGHT;
@@ -3069,6 +3086,8 @@ function load_test_data(test_name)
     debug_str += ' PROGRESS_MIN_SEGMENT_LENGTH='+PROGRESS_MIN_SEGMENT_LENGTH;
     console.log(debug_str);
 
+    // Load the relevant data records into the 'recorded_records' array for playback
+    //debug we can replace this with a GET from the server, particularly when we have API
     var source_records = test_data[test_name];
 
     // transfer test records into 'recorded_records' store for replay
