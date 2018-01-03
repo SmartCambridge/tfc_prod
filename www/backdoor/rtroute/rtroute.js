@@ -223,6 +223,7 @@ var bus_stop_icon = L.icon({
 // ************************
 // User 'draw polygon' global vars
 var poly_draw = false; // true when user is drawing polygon
+var poly_start; // first marker of drawn polygon
 var poly_markers = [];
 var poly_line; // open line around polygon
 var poly_close; // line between poly last point and start, closing polygon
@@ -578,7 +579,7 @@ function sirivm_to_vehicle_journey_id(msg)
             return '20-4-_-y08-1-5-T0';
 
         default:
-            log('<span style="color: red">Vehicle departure time not recognized</span>');
+            //log('<span style="color: red">Vehicle departure time not recognized</span>');
 
     }
 
@@ -710,9 +711,6 @@ function init_state(sensor, clock_time)
 
     sensor.state.segment_index = 0;
 
-    // Create array of { time: (seconds), distance: (meters) } for route, with start at {0,0}
-    sensor.state.route_profile = create_route_profile(sensor.state.route);
-
     // flag if this record is OLD or NEW
     init_old_status(sensor, clock_time);
 
@@ -840,6 +838,9 @@ function init_route_analysis(sensor)
     sensor.state.segment_index = 0;
     // segment_progress is estimate of progress along current route segment 0..1
     sensor.state.segment_progress = 0;
+
+    // Create array of { time: (seconds), distance: (meters) } for route, with start at {0,0}
+    sensor.state.route_profile = create_route_profile(sensor.state.route);
 
     // Highlight the current route segment for this bus
     draw_route_segment(sensor);
@@ -2637,6 +2638,11 @@ function sock_connect(method)
                 if (json_msg.msg_type != null && json_msg.msg_type == "rt_nok")
                 {
                     log('<span class="log_error">** '+e.data+'</span>');
+                    return;
+                }
+                if (json_msg.msg_type != null && json_msg.msg_type == "rt_connect_ok")
+                {
+                    log('Connected OK');
                     return;
                 }
                 if (log_data)
