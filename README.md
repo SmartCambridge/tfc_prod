@@ -394,6 +394,29 @@ Test by browsing to a locally served nginx test page:
 https://tfc-app3.cl.cam.ac.uk/test_proxy
 ```
 
+### Configure https access for smartcambridge.org
+
+Install LetsEncrypt certbot:
+
+```
+sudo apt-get update
+sudo apt-get install software-properties-common
+sudo add-apt-repository ppa:certbot/certbot
+sudo apt-get update
+sudo apt-get install python-certbot-nginx 
+```
+
+Run certbot, generate a certificate for smartcambridge.org, www.smartcambridge.org,  carrier.csi.cam.ac.uk
+
+Disable stand-alone SSl configuration:
+
+```
+rm /etc/nginx/sites-available/tfc_prod_ssl.conf
+```
+
+Note that doing this will _prevent_ direct ssl access via the underlying 
+server name.
+
 ### Configure email (for Monit alerts)
 
 Get the ```ssmtp.conf``` file (from tfc_prod@tfc-app2.cl.cam.ac.uk:~/tfc_prod/ssmtp/ssmtp.conf)
