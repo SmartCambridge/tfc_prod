@@ -4,7 +4,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.08a';
+var VERSION = '3.09';
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
