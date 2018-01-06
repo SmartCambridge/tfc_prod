@@ -4,7 +4,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.10'; // segment_progress (not path_progress)
+var VERSION = '3.09';
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
 
@@ -29,11 +29,8 @@ var DRAW_PROGRESS_BOTTOM_MARGIN = 10;
 // Weight applied to the SEGMENT DISTANCE segment probabilities
 var SEGMENT_DISTANCE_WEIGHT = 1.0;
 
-// Weight applied to the PATH PROGRESS segment probabilities
-var PATH_PROGRESS_WEIGHT = 0.5; // progress_vector 0..1 mapped to WEIGHT..1+WEIGHT
-
-// Weight applied to SEGMENT PROGRESS probabilities
-var SEGMENT_PROGRESS_WEIGHT = 2.0;
+// Weight applied to the PROGRESS segment probabilities
+var SEGMENT_PROGRESS_WEIGHT = 0.5; // progress_vector 0..1 mapped to WEIGHT..1+WEIGHT
 
 // Weight applied to the TIMETABLE segment probabilities
 var SEGMENT_TIMETABLE_WEIGHT = 1.0;
@@ -872,13 +869,10 @@ function update_route_analysis(sensor)
         return;
     }
 
-    var segments = sensor.state.route_profile.length + 1; // number of segments is stops+1
-                                                    // to include start/finish
-
     // Get PROGRESS vector
-    var segment_progress_vector = update_segment_progress_vector(sensor);
+    var progress_vector = update_progress_vector(sensor);
     // Add progress vector to state
-    sensor.state.segment_progress_vector = segment_progress_vector;
+    sensor.state.progress_vector = progress_vector;
 
     // Get SEGMENT DISTANCE vector
     var distance_vector = update_distance_vector(sensor);
@@ -893,10 +887,10 @@ function update_route_analysis(sensor)
     // Combine vectors into overall SEGMENT PROBABILITY VECTOR (segment_vector)
     var segment_sum = [];
 
-    for (var i=0; i < segments; i++)
+    for (var i=0; i < progress_vector.length; i++)
     {
         segment_sum.push( SEGMENT_DISTANCE_WEIGHT * distance_vector[i] +
-                          SEGMENT_PROGRESS_WEIGHT * segment_progress_vector[i] +
+                          SEGMENT_PROGRESS_WEIGHT * progress_vector[i] +
                           SEGMENT_TIMETABLE_WEIGHT * timetable_vector[i]
                         );
     }
@@ -910,7 +904,7 @@ function update_route_analysis(sensor)
     sensor.state.segment_index = max_index(segment_vector);
 
     console.log(hh_mm_ss(get_msg_date(sensor.msg))+
-                ' progress :'+vector_to_string(segment_progress_vector,' ','('));
+                ' progress :'+vector_to_string(progress_vector,' ','('));
 
     console.log('         distance :'+vector_to_string(distance_vector,' ','('));
 
@@ -1262,164 +1256,21 @@ function test_before_segment(bearing_to_bus, turn, bearing_before, bisector)
 
 // ******************************************************************************
 // ******************************************************************************
-// ******************************************************************************
-// SEGMENT PROGRESS VECTOR ANALYSIS
+// PROGRESS VECTOR ANALYSIS
 // Calculate segment probability vector based on PROGRESS along route
 // Projects bus position forwards using predicted speed and time between records
 // ******************************************************************************
 
-function update_segment_progress_vector(sensor)
-{
-    var SEGMENT_PROGRESS_ERROR = 0.1; // Default value where segments not within progress
-
-    var SEGMENT_MIN_HOP_DISTANCE = 50; // (m) If bus has hopped less than this, then use hop_distance
-                               // as progress_delta
-
-    var SEGMENT_MIN_LENGTH = 150; // (m), if route segment seems shorter then this, then use this.
-
-    var SEGMENT_PROGRESS_MAX = 1.3; // Multiplier of 'progress_delta' to assign as possible segments
-
-    var MIN_HOP_DISTANCE = 50; // (m) If bus has hopped less than this, then use hop_distance
-                               // as progress_delta
-
-    var MIN_SEGMENT_DISTANCE = 150; // (m), if route segment seems shorter then this, then use this.
-
-    var segment_index = sensor.state.segment_index;
-    var route_profile = sensor.state.route_profile;
-    var segment_progress = sensor.state.segment_progress;
-    var segments = route_profile.length + 1;
-
-    console.log('segment_progress starting at '+segment_index+' ('+(Math.floor(segment_progress*100)/100)+')');
-
-    //debug maybe only do this in timetable_vector
-    // Exit early with segment=0 if time < route start
-    var msg_date = get_msg_date(sensor.msg);
-    if ((msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours()) <
-        route_profile[0].time_secs)
-    {
-        var start_vector = new Array(segments);
-        start_vector[0] = 0.9;
-        start_vector[1] = 0.1;
-        for (var i=2; i<segments; i++)
-        {
-            start_vector[i] = 0;
-        }
-        return start_vector;
-    }
-    // hop_time (s) is time delta since last data point
-    var hop_time = sensor.prev_msg ? (get_msg_date(sensor.msg).getTime() -
-                                      get_msg_date(sensor.prev_msg)
-                                     ) / 1000 :
-                                     0;
-    hop_time = Math.floor(hop_time);
-
-    // hop_distance (m) is how far bus has moved since last data point
-    var hop_distance = sensor.prev_msg ? get_distance(get_msg_point(sensor.prev_msg),
-                                                      get_msg_point(sensor.msg))
-                                       : 0;
-    hop_distance = Math.floor(hop_distance);
-
-    // Here's how far the bus is along its route
-    var segment_start_distance = segment_index > 0 ? route_profile[segment_index-1].distance : 0;
-
-    var segment_end_distance = route_profile[segment_index].distance;
-
-    var progress_distance = segment_start_distance +
-                            segment_progress *
-                            ( segment_end_distance - segment_start_distance);
-    progress_distance = Math.floor(progress_distance);
-
-    console.log(hh_mm_ss(get_msg_date(sensor.msg))+
-                ' segment_index: '+segment_index+
-                ' progress_distance: '+progress_distance+
-                ' hop_time: '+hop_time+
-                ' hop_distance: '+hop_distance);
-
-    // *** *** ***
-    // Estimate PROGRESS DELTA (the distance along route the bus has moved since last data record)
-
-    var progress_delta = Math.floor(hop_distance); // The route distance we are predicting
-                                                   // (we will update this below)
-
-    var hop_max_progress = SEGMENT_PROGRESS_MAX;
-
-    // If bus appears to have moved very little, we will use hop distance as the estimated progress_delta
-    if (hop_distance < SEGMENT_MIN_HOP_DISTANCE)
-    {
-        console.log('          SHORT HOP, (using hop distance) progress_delta: '+progress_delta);
-    }
-    else
-    {
-        var bus_speed = progress_speed(segment_index, route_profile);
-
-        // Estimate progress distance based on speed and time since last point
-        // with upward adjustment to (hop_distance+5%) if that is larger. I.e.
-        // progress_delta must be AT LEAST hop_distance (this occurs when bus is
-        // unusually fast, typically on straight road so adjustment makes sense).
-        progress_delta = Math.max(bus_speed * hop_time, hop_distance * 1.05);
-        // print some development info
-        if (progress_delta > bus_speed * hop_time)
-        {
-            console.log('         FAST HOP, using hop_distance+5% as progress_delta');
-            hop_max_progress = 1.1;
-        }
-        // remove decimals for easy printing
-        progress_delta = Math.floor(progress_delta);
-        console.log('         bus_speed: '+(Math.floor(bus_speed*100)/100)+
-                    ', progress_delta: '+progress_delta
-                   );
-    }
-
-    // ****************************
-    // Now we have:
-    // progress_distance: distance along route BEFORE we got this latest data record.
-    // progress_delta: estimate for how further along the route we have progressed in hop_time
-    //
-    // ****************************
-
-    // Print some development info to js console
-    console.log('          Estimated progress distance: '+(progress_distance+progress_delta));
-
-    // Initialize final result segment_vector with default small values
-    // and then insert the weights of the segments within range
-    var vector = new Array(segments);
-
-    // create 'background' error values
-    for (var i=0; i<segments; i++)
-    {
-        vector[i] = SEGMENT_PROGRESS_ERROR;
-    }
-
-    // Update all the segment probabilities with range of progress_delta
-
-    var update_segment = Math.max(segment_index,1); // The index of the current segment we are considering
-
-    while (update_segment < segments &&
-           route_profile[update_segment-1].distance < progress_distance + progress_delta * hop_max_progress)
-    {
-        vector[update_segment++] = 1;
-    }
-
-    return linear_adjust(vector);
-}
-
-
-// ******************************************************************************
-// PATH PROGRESS VECTOR ANALYSIS
-// Calculate segment probability vector based on PROGRESS along path
-// Projects bus position forwards using predicted speed and time between records
-// ******************************************************************************
-
-function update_path_progress_vector(sensor)
+function update_progress_vector(sensor)
 {
     // CONSTANTS used in the algorithm
     var PROGRESS_ERROR = 0.1; // General error to apply to all segments
                               // in case algorithm is completely wrong
                               // i.e. background probability is PROGRESS_ERROR/segments
 
-    // How far we will look ahead to calculate distance probabilities
-    // relative to progress_delta (i.e. estimated progress distance)
-    var PROGRESS_MAX = 2;
+    // 3.07 var PROGRESS_MAX = 1.5; // How far we will look ahead to calculate distance probabilities
+                             // relative to progress_delta (i.e. estimated progress distance)
+    var PROGRESS_MAX = 2; // 3.08
 
     var MIN_HOP_DISTANCE = 50; // (m) If bus has hopped less than this, then use hop_distance
                                // as progress_delta
@@ -1544,17 +1395,17 @@ function update_path_progress_vector(sensor)
     // arbitrarily modelling distance and time in 10 steps
     var step_distance = progress_delta / PROGRESS_STEPS;
 
-    var step_time = hop_time / PROGRESS_STEPS;
+    var step_time = hop_time / PROGRESS_STEPS; // 3.08
 
     // Steps forwards 'hop_max_progress' times the hop_time
-    for (var i=0; i<PROGRESS_STEPS * hop_max_progress; i++)
+    for (var i=0; i<PROGRESS_STEPS * hop_max_progress; i++) // 3.08
     {
         // let's try a gaussian distribution around progress_delta (which we will skew below)
-        var progress_time = i * step_time;
+        var progress_time = i * step_time; // 3.08
 
-        var factor = 1 / Math.pow(Math.E, Math.pow( hop_time - progress_time, 2) / (2 * spread * spread));
+        var factor = 1 / Math.pow(Math.E, Math.pow( hop_time - progress_time, 2) / (2 * spread * spread)); //3.08
 
-        factors.push({time: progress_time, prob: factor});
+        factors.push({time: progress_time, prob: factor}); // 3.08
     }
 
     // Print some development info to js console
@@ -1562,7 +1413,7 @@ function update_path_progress_vector(sensor)
     var str = '';
     for (var i=0; i<factors.length; i++)
     {
-        str += '{ time: '+Math.floor(factors[i].time*10)/10+
+        str += '{ time: '+Math.floor(factors[i].time*10)/10+ // 3.08
                ', prob: '+Math.floor(factors[i].prob*100)/100+'}';
     }
     console.log(str);
@@ -1583,9 +1434,9 @@ function update_path_progress_vector(sensor)
         vector[i] = PROGRESS_ERROR / segments;
     }
 
-    var update_segment = Math.max(segment_index,1); // The index of the current segment we are considering
+    var update_segment = Math.max(segment_index,1); // 3.08 The index of the current segment we are considering
     var update_factor = 0; // The index of the current factor we are considering
-    var factor_start = progress_distance; // The distance (since start of route) at which we are considering current factor
+    var factor_start = progress_distance; // 3.08 The distance (since start of route) at which we are considering current factor
 
     // Here is the main part of this analysis.
     // The 'factors' calculated earlier are now apportioned to the relevant segments
