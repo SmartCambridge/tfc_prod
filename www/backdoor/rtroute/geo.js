@@ -116,6 +116,12 @@ function get_bisector(A,B,C)
 
     var track_out = get_bearing(B,C);
 
+    return get_angle_bisector(track_in, track_out);
+}
+
+// As above except for angles instead of points
+function get_angle_bisector(track_in, track_out)
+{
     var bisector = (track_in + track_out) / 2 + 90;
 
     var bisector_offset = Math.abs(bisector - track_in);

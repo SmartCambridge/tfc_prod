@@ -1242,18 +1242,33 @@ function test_before_segment(bearing_to_bus, turn, bearing_before, bisector)
             //console.log(' NOT BEFORE <45 turn='+turn);
         }
     }
-    else // For a larger turn we use the zone from bisector to bearing_out
+    else // For a larger turn we use a region between bisectors:
     {
-        var bearing_back = angle360(bearing_before+180);
+        // For a larger turn we treat as 'before' the area between the outer bisector
+        // and midway between the inner bisector and the bearing_before.
+        var inner_boundary = angle360(bearing_before+180);
 
-        if (turn < 180)
+        if (turn < 135 || turn > 225) // i.e. turn is >45 and <135
         {
-            before = test_bearing_between(bearing_to_bus, bearing_back, bisector);
+            inner_boundary = get_angle_bisector(inner_boundary, bisector);
         }
-        else
+        //var bearing_back = get_angle_bisector(bisector, bearing_before);
+
+        if (turn < 180) // turn left
         {
-            before = test_bearing_between(bearing_to_bus, bisector, bearing_back);
+            // note test_bearing_between always checks CLOCKWISE
+            before = test_bearing_between(bearing_to_bus, inner_boundary, bisector);
         }
+        else // turn right
+        {
+            before = test_bearing_between(bearing_to_bus, bisector, inner_boundary);
+        }
+
+        console.log('BEFORE '+before+
+                ', turn: '+turn+
+                ', inner_boundary: '+Math.floor(inner_boundary)+
+                ', bisector: '+Math.floor(bisector)+
+                ', bearing_to_bus: '+Math.floor(bearing_to_bus));
 
         //console.log( (before ? ' BEFORE ' : ' NOT BEFORE ')+ ' >45 turn='+turn);
     }
