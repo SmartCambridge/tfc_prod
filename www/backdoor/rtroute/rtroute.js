@@ -4,7 +4,9 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.10'; // segment_progress (not path_progress)
+var VERSION = '3.10';
+            // 3.11 improve timetable vector from prior start stub
+            // 3.10 segment_progress (not path_progress)
             // 3.09 progess (still as 'path progress')
             // 3.08 added stops to progress
             // 3.04 'before' function added to segment distance
@@ -956,7 +958,7 @@ function max_index(vector)
 //debug hardcoded to first segment
 function init_segment_distance_vector(sensor)
 {
-    return update_segment_distance_vector(sensor);
+    //return update_segment_distance_vector(sensor);
 
     var route = sensor.state.route;
 
