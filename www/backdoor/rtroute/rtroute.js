@@ -4,7 +4,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.10';
+var VERSION = '3.11';
             // 3.11 improve timetable vector from prior start stub
             // 3.10 segment_progress (not path_progress)
             // 3.09 progess (still as 'path progress')
@@ -35,18 +35,27 @@ var DRAW_PROGRESS_BOTTOM_MARGIN = 10;
 // ******************
 // ANALYSIS CONSTANTS
 //
+// Currently we have seperate weights for the 'initial' phase (when we first hear from the sensor)
+// and the regular update phase.
+//
+// The weights are applied to the probability vectors provided by each analysis algorithm.
+//
 // Weight applied to the SEGMENT DISTANCE segment probabilities
 var SEGMENT_DISTANCE_WEIGHT = 0.25;
+var INIT_SEGMENT_DISTANCE_WEIGHT = 0.4;
 
 // Weight applied to the PATH PROGRESS segment probabilities
 // Note this version of rtroute does NOT use path progress
 var PATH_PROGRESS_WEIGHT = 0.0;
+var INIT_PATH_PROGRESS_WEIGTH = 0.0;
 
 // Weight applied to SEGMENT PROGRESS probabilities
 var SEGMENT_PROGRESS_WEIGHT = 0.5;
+var INIT_SEGMENT_PROGRESS_WEIGHT = 0.0;
 
 // Weight applied to the TIMETABLE segment probabilities
 var SEGMENT_TIMETABLE_WEIGHT = 0.25;
+var INIT_SEGMENT_TIMETABLE_WEIGHT = 0.6;
 
 // Adjustments to the segment distance -> probability algorithm
 // If bus is in the 'passed' semicircle beyond the segment, the distance is adjusted times
@@ -171,6 +180,7 @@ var replay_interval = 1; // Replay step interval (seconds)
 var replay_speedup = 10; // relative speed of replay time to real time
 var replay_index = 0; // current index into replay data
 var replay_errors = 0; // simple count of errors during replay
+var replay_stop_on_error = false; // stop the replay if annotation doesn't match analysis
 
 // Segment analysis
 var analyze = false;
@@ -837,15 +847,45 @@ function update_old_status(sensor, clock_time)
 //debug hardcoded to 0
 function init_route_analysis(sensor)
 {
-    // segment_index is the index of the current route segment, also index of NEXT STOP in route
-    sensor.state.segment_index = 0;
-    // segment_progress is estimate of progress along current route segment 0..1
-    sensor.state.segment_progress = 0;
+    var segments = sensor.state.route.length + 1;
 
     // Create array of { time: (seconds), distance: (meters) } for route, with start at {0,0}
     sensor.state.route_profile = create_route_profile(sensor.state.route);
 
-    // Highlight the current route segment for this bus
+    var distance_vector = init_segment_distance_vector(sensor);
+
+    sensor.state.distance_vector = distance_vector;
+
+    var timetable_vector = init_timetable_vector(sensor);
+
+    sensor.state.timetable_vector = timetable_vector;
+
+    // Combine vectors into overall SEGMENT PROBABILITY VECTOR (segment_vector)
+    var segment_vector = [];
+
+    for (var i=0; i < segments; i++)
+    {
+        segment_vector.push( INIT_SEGMENT_DISTANCE_WEIGHT * distance_vector[i] +
+                             INIT_SEGMENT_TIMETABLE_WEIGHT * timetable_vector[i]
+                           );
+    }
+
+    // Set sensor.state.segment_index to segment with highest probability
+    sensor.state.segment_index = max_index(segment_vector);
+
+    console.log(hh_mm_ss(get_msg_date(sensor.msg))+
+                ' distance :'+vector_to_string(distance_vector,' ','('));
+
+    console.log('        timetable :'+vector_to_string(timetable_vector,' ','('));
+
+    console.log('(INIT)   RESULT '+
+                (' '+sensor.state.segment_index).slice(-2)+
+                ':'+vector_to_string(segment_vector,'-','<','{',sensor.msg.segment_index));
+    console.log('');
+
+    // segment_progress is 0..1 along current segment (segment_index)
+    sensor.state.segment_progress = get_segment_progress(sensor);
+
     draw_route_segment(sensor);
 }
 
@@ -891,18 +931,15 @@ function update_route_analysis(sensor)
     sensor.state.timetable_vector = timetable_vector;
 
     // Combine vectors into overall SEGMENT PROBABILITY VECTOR (segment_vector)
-    var segment_sum = [];
+    var segment_vector = [];
 
     for (var i=0; i < segments; i++)
     {
-        segment_sum.push( SEGMENT_DISTANCE_WEIGHT * distance_vector[i] +
-                          SEGMENT_PROGRESS_WEIGHT * segment_progress_vector[i] +
-                          SEGMENT_TIMETABLE_WEIGHT * timetable_vector[i]
-                        );
+        segment_vector.push( SEGMENT_DISTANCE_WEIGHT * distance_vector[i] +
+                            SEGMENT_PROGRESS_WEIGHT * segment_progress_vector[i] +
+                            SEGMENT_TIMETABLE_WEIGHT * timetable_vector[i]
+                           );
     }
-    //console.log('          product :'+vector_to_string(segment_sum));
-
-    var segment_vector = segment_sum; //linear_adjust(segment_sum);
 
     sensor.state.segment_vector = segment_vector;
 
@@ -958,7 +995,8 @@ function max_index(vector)
 //debug hardcoded to first segment
 function init_segment_distance_vector(sensor)
 {
-    //return update_segment_distance_vector(sensor);
+    console.log('Segment distance INIT');
+    return update_segment_distance_vector(sensor);
 
     var route = sensor.state.route;
 
@@ -1224,6 +1262,10 @@ function test_before_segment(bearing_to_bus, turn, bearing_before, bisector)
 {
     var before; // boolean true if bus is BEFORE segment
 
+    console.log('test_before_segment bus:'+bearing_to_bus+
+                'turn: '+turn+
+                'bearing_before: '+bearing_before+
+                'bisector: '+bisector);
     // For a small turn, we use the perpendicular line to next segment either
     // side of current stop as boundary of considering this stop passed
     if (turn < 45 || turn > 315)
@@ -1733,14 +1775,21 @@ function progress_speed(segment_index, route_profile)
 
 function init_timetable_vector(sensor)
 {
+    console.log('Timetable vector INIT');
     return update_timetable_vector(sensor);
 }
 
 function update_timetable_vector(sensor)
 {
-    var segments = sensor.state.route_profile.length + 1;
+    var TIMETABLE_ERROR = 0.08; // General background value for likelihood
+
+    var TIME_AHEAD_SECONDS = 120; // How far ahead of schedule do we think the bus can be
+
+    var TIME_BEHIND_SECONDS = 600; // How far behind schedule can the bus be
 
     var route_profile = sensor.state.route_profile;
+
+    var segments = route_profile.length + 1;
 
     // get JS date() of data record
     var msg_date = get_msg_date(sensor.msg);
@@ -1748,17 +1797,59 @@ function update_timetable_vector(sensor)
     // convert to time-of-day in seconds since midnight (as in route_profile)
     var msg_secs = msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours();
 
-    var before_start = msg_secs + 60 < route_profile[0].time_secs; // allow 60 seconds error
+    var before_start = msg_secs < route_profile[0].time_secs;
 
     var vector = new Array(segments);
 
-    vector[0] = before_start ? 0.9 : 0;
-    vector[1] = before_start ? 0.1 : 0;
-    for (var i=2; i<segments; i++)
+    vector[0] = before_start ? 1.0 : TIMETABLE_ERROR;
+
+    var error = before_start ? 0.02 : TIMETABLE_ERROR; // our likelihood of error is low before start
+
+    var segment_index = 1;
+
+    var segment_start_time = route_profile[0].time_secs;
+
+    var segment_finish_time;
+
+    //console.log('before_start='+before_start+' msg_secs='+msg_secs);
+
+    while (segment_index < segments)
     {
-        vector[i] = 0;
+        //console.log('segment_start_time='+segment_start_time);
+
+        if (segment_index == segments - 1) // if finished route
+        {
+            console.log('finished route');
+            if (msg_secs > segment_start_time)
+            {
+                vector[segment_index] = 1;
+                //console.log('bus finished');
+            }
+            else
+            {
+                vector[segment_index] = error;
+                //console.log('bus not finished'); //debug we need margin of error here
+            }
+        }
+        else
+        {
+            segment_finish_time = route_profile[segment_index].time_secs;
+            //console.log('segment_finish_time='+segment_finish_time);
+            if ((msg_secs > segment_start_time - TIME_AHEAD_SECONDS) &&
+                (msg_secs < segment_finish_time + TIME_BEHIND_SECONDS))
+            {
+                vector[segment_index] = 1;
+            }
+            else
+            {
+                vector[segment_index] = error;
+            }
+            segment_start_time = segment_finish_time;
+        }
+        //console.log('vector['+segment_index+']='+vector[segment_index])
+        segment_index++;
     }
-    return vector;
+    return linear_adjust(vector);
 }
 
 // ******************************************************************************
@@ -1818,8 +1909,8 @@ function create_route_profile(route)
                          lat: stops[route[0].stop_id].lat,
                          lng: stops[route[0].stop_id].lng,
                          turn: 0,
-                         bearing_in: 0,
-                         bisector: 0 });
+                         bearing_in: 0, // we will update this to match next segment
+                         bisector: 0 });// and will correct this to perpendicular
 
     // iterate along route, creating a time/distance/turn value for each stop
     for (var i=1; i<route.length; i++)
@@ -1853,6 +1944,10 @@ function create_route_profile(route)
         }
         route_profile.push(stop_info);
     }
+
+    // Now correct values at start
+    route_profile[0].bearing_in = route_profile[1].bearing_in;
+    route_profile[0].bisector = angle360(route_profile[0].bearing_in+90);
 
     // debug print route profile to console
     for (var i=0; i<route_profile.length; i++)
@@ -2303,7 +2398,7 @@ function draw_progress_update(sensor)
 
         page_progress.svg.appendChild(rect);
     }
-    else if (segment_index == route_profile.length+1) // finished route
+    else if (segment_index == route_profile.length) // finished route
     {
         segment_top = PROGRESS_Y_FINISH + 1;
 
@@ -2586,19 +2681,30 @@ function replay_next_record()
 // Replay ALL records in a single batch
 function replay_batch()
 {
-    replay_index = 0;
-
-    replay_errors = 0;
+    if (replay_index >= recorded_records.length)
+    {
+        replay_index = 0;
+        replay_errors = 0;
+    }
 
     while (replay_index < recorded_records.length)
     {
+        var prev_replay_errors = replay_errors;
+        // get the next record to process
         var msg = recorded_records[replay_index++];
+        // update the displayed clock with time of this data record
         replay_time = get_msg_date(msg);
         update_clock(replay_time);
+        // Process this data record
         handle_msg(msg, replay_time);
+        // replay_errors will have been updated
+        if (replay_stop_on_error && prev_replay_errors != replay_errors)
+        {
+            break;
+        }
     }
 
-    log('Batch replay completed, errors: '+
+    log('Batch replay paused/completed, errors: '+
         replay_errors+"/"+recorded_records.length+
         ' ('+Math.floor(1000*replay_errors/recorded_records.length)/10+'%)');
 }
@@ -3332,6 +3438,7 @@ function load_test_data(test_name)
     }
 
     replay_index = 0;
+    replay_errors = 0;
 
     log('Loaded test records '+test_name);
 
@@ -3422,5 +3529,12 @@ function click_annotate_manual()
         annotate_auto = false;
         document.getElementById("annotate_auto").checked = false;
     }
+}
+
+// User has clicked 'Pause on error' checkbox which will cause the batch analysis to stop
+// when the calculated segment_index does not match the annotation
+function click_replay_stop_on_error()
+{
+    replay_stop_on_error = document.getElementById("replay_stop_on_error").checked;
 }
 
