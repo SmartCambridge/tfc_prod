@@ -4,11 +4,13 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.11';
+var VERSION = '3.12';
+            // 3.12 added 'pattern_starting' sensor state variable 0..1
             // 3.11 improve timetable vector from prior start stub
             // 3.10 segment_progress (not path_progress)
             // 3.09 progess (still as 'path progress')
-            // 3.08 added stops to progress
+            // 3.08 added stop delay to (path) progress
+            // 3.06 more work on (path) progress vector
             // 3.04 'before' function added to segment distance
             // 3.03 'beyond' function added to segment distance
             // 3.01 added basic timetable vector (binary started /not started)
@@ -57,6 +59,29 @@ var INIT_SEGMENT_PROGRESS_WEIGHT = 0.0;
 var SEGMENT_TIMETABLE_WEIGHT = 0.25;
 var INIT_SEGMENT_TIMETABLE_WEIGHT = 0.6;
 
+// PATTERN_WEIGHTS, i.e. the probability vector weights to apply given a macro pattern
+//
+// Current the only dimension is 'pattern_starting' 0..1
+var PATTERN_WEIGHTS_INIT = 2;
+var PATTERN_WEIGHTS_STARTING = 5;
+var PATTERN_WEIGHTS = [
+    // init = 0
+    [
+        { segment_distance_weight: 0.25, segment_progress_weight: 0.5, segment_timetable_weight: 0.25 },
+        { segment_distance_weight: 0.25, segment_progress_weight: 0.5, segment_timetable_weight: 0.25 },
+        { segment_distance_weight: 0.25, segment_progress_weight: 0.5, segment_timetable_weight: 0.25 },
+        { segment_distance_weight: 0.25, segment_progress_weight: 0.5, segment_timetable_weight: 0.25 },
+        { segment_distance_weight: 0.25, segment_progress_weight: 0.5, segment_timetable_weight: 0.25 }
+    ],
+    // init = 1
+    [
+        { segment_distance_weight: 0.4, segment_progress_weight: 0.0, segment_timetable_weight: 0.6 },
+        { segment_distance_weight: 0.4, segment_progress_weight: 0.0, segment_timetable_weight: 0.6 },
+        { segment_distance_weight: 0.4, segment_progress_weight: 0.0, segment_timetable_weight: 0.6 },
+        { segment_distance_weight: 0.3, segment_progress_weight: 0.0, segment_timetable_weight: 0.7 },
+        { segment_distance_weight: 0.3, segment_progress_weight: 0.0, segment_timetable_weight: 0.7 }
+    ]];
+
 // Adjustments to the segment distance -> probability algorithm
 // If bus is in the 'passed' semicircle beyond the segment, the distance is adjusted times
 // this amount plus the segment distance adjust, i.e. segment probability will be lower.
@@ -64,13 +89,13 @@ var SEGMENT_BEYOND_ADJUST = 0.5;
 // Similarly adjust the probability down if BEFORE the segment
 var SEGMENT_BEFORE_ADJUST = 0.5;
 // Bus distances from segments are adjusted upwards by this amount to stop very short distances like 2m dominating.
-var SEGMENT_DISTANCE_ADJUST = 50;
+var SEGMENT_DISTANCE_ADJUST = 50; // (m)
 
-// (m) The progress probability algorithm assigns probabilties to a *distance* profile and
+// The progress probability algorithm assigns probabilties to a *distance* profile and
 // then maps that to segments. This would mean very short segments get very low probabilities.
 // We compensate for this by using a 'minimum' segment length (this can be thought of as each
 // stop being equivalent to half of this distance).
-var PROGRESS_MIN_SEGMENT_LENGTH = 150;
+var PROGRESS_MIN_SEGMENT_LENGTH = 150; // (m)
 
 // *************************************************************
 // *************************************************************
@@ -123,6 +148,14 @@ var sensors = {};
 //        .segment_progress - 0..1 proportion of segment travelled so far
 //        .segment_vector - probability vector for bus on each route segment
 //        .route_profile - [ {time_secs (s), distance (m), turn(deg)},...]
+//        .segment_distance_weight - weight to apply to segment_distance_vector
+//        .segment_progress_weight - weight to apply to segment_progress_vector
+//        .segment_timetable_weight - weight to apply to segment_timetable_vector
+//        .segment_progress_vector - latest calculated segment probabilties based on expected progress
+//        .segment_distance_vector - latest calculated segment probabilties based on segment proximity
+//        .segment_timetable_vector - latest calculated segment probabilities based on timetable
+//        .pattern_starting - 0..1 - in the 'start phase' of the journey (will bias weight to timetable)
+
 
 // Local dictionary of STOPS keyed on stop_id
 // Sample stop record in rtroute_stops:
@@ -621,21 +654,6 @@ function vehicle_journey_id_to_route(vehicle_journey_id)
 // ************************************************************************************
 // ************************************************************************************
 
-// We maintain the 'state' of a sensor as we progress:
-//
-// sensor
-//    .msg              - the most recent data message received for this sensor
-//    .state
-//        .route        - array of stop records
-//        .segment_index  - the index of the NEXT STOP in the ROUTE
-//        .segment_progress - 0..1 proportion of segment travelled so far
-//        .segment_vector - probability vector for bus on each route segment
-//        .route_profile - [ {time_secs (s), distance (m), turn(deg)},...]
-//        .progress_vector - latest calculated segment probabilties based on expected progress
-//        .distance_vector - latest calculated segment probabilties based on segment proximity
-//        .timetable_vector - latest calculated segment probabilities based on timetable
-//
-
 // We have received a new data message from an existing sensor, so analyze and update state
 function update_sensor(msg, clock_time)
 {
@@ -722,7 +740,7 @@ function init_state(sensor, clock_time)
 
     //debug detect when route not found
 
-    sensor.state.segment_index = 0;
+    //sensor.state.segment_index = 0;
 
     // flag if this record is OLD or NEW
     init_old_status(sensor, clock_time);
@@ -844,29 +862,37 @@ function update_old_status(sensor, clock_time)
     }
 }
 
-//debug hardcoded to 0
+// Initial route analysis (e.g. when first data record from sensor)
 function init_route_analysis(sensor)
 {
     var segments = sensor.state.route.length + 1;
 
+    //sensor.state.segment_distance_weight = INIT_SEGMENT_DISTANCE_WEIGHT;
+
+    //sensor.state.segment_progress_weight = INIT_SEGMENT_PROGRESS_WEIGHT;
+
+    //sensor.state.segment_timetable_weight = INIT_SEGMENT_TIMETABLE_WEIGHT;
+
     // Create array of { time: (seconds), distance: (meters) } for route, with start at {0,0}
     sensor.state.route_profile = create_route_profile(sensor.state.route);
 
-    var distance_vector = init_segment_distance_vector(sensor);
+    set_weights(sensor);
 
-    sensor.state.distance_vector = distance_vector;
+    var segment_distance_vector = init_segment_distance_vector(sensor);
 
-    var timetable_vector = init_timetable_vector(sensor);
+    sensor.state.segment_distance_vector = segment_distance_vector;
 
-    sensor.state.timetable_vector = timetable_vector;
+    var segment_timetable_vector = init_segment_timetable_vector(sensor);
+
+    sensor.state.segment_timetable_vector = segment_timetable_vector;
 
     // Combine vectors into overall SEGMENT PROBABILITY VECTOR (segment_vector)
     var segment_vector = [];
 
     for (var i=0; i < segments; i++)
     {
-        segment_vector.push( INIT_SEGMENT_DISTANCE_WEIGHT * distance_vector[i] +
-                             INIT_SEGMENT_TIMETABLE_WEIGHT * timetable_vector[i]
+        segment_vector.push( sensor.state.segment_distance_weight * segment_distance_vector[i] +
+                             sensor.state.segment_timetable_weight * segment_timetable_vector[i]
                            );
     }
 
@@ -874,9 +900,9 @@ function init_route_analysis(sensor)
     sensor.state.segment_index = max_index(segment_vector);
 
     console.log(hh_mm_ss(get_msg_date(sensor.msg))+
-                ' distance :'+vector_to_string(distance_vector,' ','('));
+                ' distance :'+vector_to_string(segment_distance_vector,' ','('));
 
-    console.log('        timetable :'+vector_to_string(timetable_vector,' ','('));
+    console.log('        timetable :'+vector_to_string(segment_timetable_vector,' ','('));
 
     console.log('(INIT)   RESULT '+
                 (' '+sensor.state.segment_index).slice(-2)+
@@ -915,29 +941,31 @@ function update_route_analysis(sensor)
     var segments = sensor.state.route_profile.length + 1; // number of segments is stops+1
                                                     // to include start/finish
 
+    set_weights(sensor);
+
     // Get PROGRESS vector
     var segment_progress_vector = update_segment_progress_vector(sensor);
     // Add progress vector to state
     sensor.state.segment_progress_vector = segment_progress_vector;
 
     // Get SEGMENT DISTANCE vector
-    var distance_vector = update_segment_distance_vector(sensor);
-    // Add distance_vector to state
-    sensor.state.distance_vector = distance_vector;
+    var segment_distance_vector = update_segment_distance_vector(sensor);
+    // Add segment_distance_vector to state
+    sensor.state.segment_distance_vector = segment_distance_vector;
 
     // Get TIMETABLE vector
-    var timetable_vector = update_timetable_vector(sensor);
-    // Add timetable_vector to state
-    sensor.state.timetable_vector = timetable_vector;
+    var segment_timetable_vector = update_segment_timetable_vector(sensor);
+    // Add segment_timetable_vector to state
+    sensor.state.segment_timetable_vector = segment_timetable_vector;
 
     // Combine vectors into overall SEGMENT PROBABILITY VECTOR (segment_vector)
     var segment_vector = [];
 
     for (var i=0; i < segments; i++)
     {
-        segment_vector.push( SEGMENT_DISTANCE_WEIGHT * distance_vector[i] +
-                            SEGMENT_PROGRESS_WEIGHT * segment_progress_vector[i] +
-                            SEGMENT_TIMETABLE_WEIGHT * timetable_vector[i]
+        segment_vector.push( sensor.state.segment_distance_weight * segment_distance_vector[i] +
+                             sensor.state.segment_progress_weight * segment_progress_vector[i] +
+                             sensor.state.segment_timetable_weight * segment_timetable_vector[i]
                            );
     }
 
@@ -949,9 +977,9 @@ function update_route_analysis(sensor)
     console.log(hh_mm_ss(get_msg_date(sensor.msg))+
                 ' progress :'+vector_to_string(segment_progress_vector,' ','('));
 
-    console.log('         distance :'+vector_to_string(distance_vector,' ','('));
+    console.log('         distance :'+vector_to_string(segment_distance_vector,' ','('));
 
-    console.log('        timetable :'+vector_to_string(timetable_vector,' ','('));
+    console.log('        timetable :'+vector_to_string(segment_timetable_vector,' ','('));
 
     console.log('         RESULT '+
                 (' '+sensor.state.segment_index).slice(-2)+
@@ -980,6 +1008,70 @@ function max_index(vector)
     }
 
     return max_index;
+}
+
+// ******************************************************************************
+// ******************************************************************************
+// SET_WEIGHTS
+// Here we identify a macro 'pattern' and set the appropriate weights for the
+// probability vectors
+//
+function set_weights(sensor)
+{
+    // convert starting 0..1 into an array index into PATTERN_WEIGHTS
+    var starting_index = Math.round(pattern_starting(sensor) * (PATTERN_WEIGHTS_STARTING-1));
+
+    var init_index = Math.round(pattern_init(sensor) * (PATTERN_WEIGHTS_INIT-1));
+
+    var weights = PATTERN_WEIGHTS[init_index][starting_index];
+
+    console.log('init['+init_index+'], starting['+starting_index+'] '+JSON.stringify(weights));
+
+    sensor.state.segment_distance_weight = weights.segment_distance_weight;
+
+    sensor.state.segment_progress_weight = weights.segment_progress_weight;
+
+    sensor.state.segment_timetable_weight = weights.segment_timetable_weight;
+}
+
+// Return a value 0..1 according to whether this bus is in the 'starting route' phase
+// I.e. in the main, are we around the start time
+function pattern_starting(sensor)
+{
+    //debug this needs fixing for routes that span midnight
+    var STARTING_PERIOD = 600; // Treat first 10 mins from start time as 'starting period'
+
+    var route_profile = sensor.state.route_profile;
+    var route_start_seconds = route_profile[0].time_secs;
+    var route_finish_seconds = route_profile[route_profile.length-1].time_secs;
+    var sensor_day_seconds = get_msg_day_seconds(sensor.msg);
+
+    if (sensor_day_seconds < route_start_seconds)
+    {
+        return 1.0;
+    }
+    if (sensor_day_seconds < route_start_seconds + STARTING_PERIOD)
+    {
+        return 0.8;
+    }
+    // If over a third of way into journey, pattern_starting = 0
+    if (sensor_day_seconds > route_start_seconds + (route_finish_seconds - route_start_seconds)/3)
+    {
+        return 0.0;
+    }
+    //default
+    return 0.4;
+}
+
+// Here is a stub for an 'init' pattern, returns 0..1
+// Basically 1 if there is no prior progress_vector, otherwise zero
+function pattern_init(sensor)
+{
+    if (!sensor.state.segment_progress_vector)
+    {
+        return 1.0;
+    }
+    return 0.0;
 }
 
 // ******************************************************************************
@@ -1028,12 +1120,12 @@ function update_segment_distance_vector(sensor)
 
     var segments = route.length + 1;
 
-    // Create distance_vector array of { segment_index:, distance: }
-    var distance_vector = [];
+    // Create segment_distance_vector array of { segment_index:, distance: }
+    var segment_distance_vector = [];
 
-    // Add distance to first stop as distance_vector[0]
+    // Add distance to first stop as segment_distance_vector[0]
 
-    distance_vector.push( { segment_index: 0, distance: get_distance(P, stops[route[0].stop_id]) } );
+    segment_distance_vector.push( { segment_index: 0, distance: get_distance(P, stops[route[0].stop_id]) } );
 
     // Now add the distances for route segments
     for (var segment_index=1; segment_index<segments-1; segment_index++)
@@ -1043,19 +1135,19 @@ function update_segment_distance_vector(sensor)
         var next_stop = stops[route[segment_index].stop_id];
         var dist = get_distance_from_line(P, [prev_stop,next_stop]);
 
-        distance_vector.push({ segment_index: segment_index, distance: dist });
+        segment_distance_vector.push({ segment_index: segment_index, distance: dist });
     }
 
     // And for the 'finished' segment[segments-1] add distance from last stop
 
     //debug use route_profile
     // Add distance to last stop (for 'finished' segment)
-    distance_vector.push({ segment_index: segments - 1,
+    segment_distance_vector.push({ segment_index: segments - 1,
                            distance: get_distance(P, stops[route[route.length-1].stop_id]) });
 
     // Create sorted nearest_segments array of NEAREST_COUNT
     // { segment_index:, distance: } elements
-    var nearest_segments = distance_vector
+    var nearest_segments = segment_distance_vector
                                 .slice() // create copy
                                 .sort((a,b) => Math.floor(a.distance - b.distance))
                                 .slice(0,NEAREST_COUNT);
@@ -1262,10 +1354,10 @@ function test_before_segment(bearing_to_bus, turn, bearing_before, bisector)
 {
     var before; // boolean true if bus is BEFORE segment
 
-    console.log('test_before_segment bus:'+bearing_to_bus+
-                'turn: '+turn+
-                'bearing_before: '+bearing_before+
-                'bisector: '+bisector);
+    //console.log('test_before_segment bus:'+bearing_to_bus+
+    //            ', turn: '+turn+
+    //            ', bearing_before: '+bearing_before+
+    //            ', bisector: '+bisector);
     // For a small turn, we use the perpendicular line to next segment either
     // side of current stop as boundary of considering this stop passed
     if (turn < 45 || turn > 315)
@@ -1307,11 +1399,11 @@ function test_before_segment(bearing_to_bus, turn, bearing_before, bisector)
             before = test_bearing_between(bearing_to_bus, bisector, inner_boundary);
         }
 
-        console.log('BEFORE '+before+
-                ', turn: '+turn+
-                ', inner_boundary: '+Math.floor(inner_boundary)+
-                ', bisector: '+Math.floor(bisector)+
-                ', bearing_to_bus: '+Math.floor(bearing_to_bus));
+        //console.log('BEFORE '+before+
+        //        ', turn: '+turn+
+        //        ', inner_boundary: '+Math.floor(inner_boundary)+
+        //        ', bisector: '+Math.floor(bisector)+
+        //        ', bearing_to_bus: '+Math.floor(bearing_to_bus));
 
         //console.log( (before ? ' BEFORE ' : ' NOT BEFORE ')+ ' >45 turn='+turn);
     }
@@ -1347,7 +1439,7 @@ function update_segment_progress_vector(sensor)
     var segment_progress = sensor.state.segment_progress;
     var segments = route_profile.length + 1;
 
-    //debug maybe only do this in timetable_vector
+    //debug maybe only do this in segment_timetable_vector
     // Exit early with segment=0 if time < route start
     var msg_date = get_msg_date(sensor.msg);
     if ((msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours()) <
@@ -1447,6 +1539,11 @@ function update_segment_progress_vector(sensor)
 
     var update_segment = Math.max(segment_index,1); // The index of the current segment we are considering
 
+    if (segment_index == 0)
+    {
+        vector[0] = 1;
+    }
+
     while (update_segment < segments &&
            route_profile[update_segment-1].distance < progress_distance + progress_delta * hop_max_progress)
     {
@@ -1499,7 +1596,7 @@ function update_path_progress_vector(sensor)
     // Note for 'n' stops we have 'n+1' segments, including before start and after finish
     var segments = route.length + 1;
 
-    //debug maybe only do this in timetable_vector
+    //debug maybe only do this in segment_timetable_vector
     // Exit early with segment=0 if time < route start
     var msg_date = get_msg_date(sensor.msg);
     if ((msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours()) <
@@ -1773,13 +1870,13 @@ function progress_speed(segment_index, route_profile)
 // Calculate segment probability vector based on TIMETABLE
 // ******************************************************************************
 
-function init_timetable_vector(sensor)
+function init_segment_timetable_vector(sensor)
 {
     console.log('Timetable vector INIT');
-    return update_timetable_vector(sensor);
+    return update_segment_timetable_vector(sensor);
 }
 
-function update_timetable_vector(sensor)
+function update_segment_timetable_vector(sensor)
 {
     var TIMETABLE_ERROR = 0.08; // General background value for likelihood
 
@@ -1801,13 +1898,11 @@ function update_timetable_vector(sensor)
 
     var vector = new Array(segments);
 
-    vector[0] = before_start ? 1.0 : TIMETABLE_ERROR;
+    var error = before_start ? TIMETABLE_ERROR / 5 : TIMETABLE_ERROR; // our likelihood of error is low before start
 
-    var error = before_start ? 0.02 : TIMETABLE_ERROR; // our likelihood of error is low before start
+    var segment_index = 0; // segment_index zero is 'before start'
 
-    var segment_index = 1;
-
-    var segment_start_time = route_profile[0].time_secs;
+    var segment_start_time = -24*60*60; // we don't have a 'start time' for segment zero, so use negative number
 
     var segment_finish_time;
 
@@ -1819,7 +1914,6 @@ function update_timetable_vector(sensor)
 
         if (segment_index == segments - 1) // if finished route
         {
-            console.log('finished route');
             if (msg_secs > segment_start_time)
             {
                 vector[segment_index] = 1;
@@ -2130,6 +2224,13 @@ function get_msg_date(msg)
             break;
     }
     return null;
+}
+
+// Return the integer number of 'seconds since midnight' of timestamp in this data record
+function get_msg_day_seconds(msg)
+{
+    var msg_date = get_msg_date(msg);
+    return msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours();
 }
 
 // ***********************************************************
