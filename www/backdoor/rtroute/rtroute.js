@@ -351,7 +351,7 @@ function init()
     // build journeys dictionary keyed on vehicle_journey_id
     load_journeys();
 
-    draw_stops();
+    draw_stops(stops);
 
     draw_progress_init();
 
@@ -3050,7 +3050,7 @@ function sock_send_str(msg)
 // ****************************************************************************************
 
 // Draw the (test) stops on the map and provide a custom marker for each with a popup
-function draw_stops()
+function draw_stops(stops)
 {
     for (var stop_id in stops)
     {
@@ -3063,7 +3063,10 @@ function draw_stops()
             var popup = L.popup({ closeOnClick: false,
                                   autoClose: false,
                                   offset: L.point(0,-25)})
-                .setContent(stop.common_name);
+                .setContent(stop.common_name+'<br/>'+
+                            stop.stop_id+'<br/>'+
+                            stop.lat+'<br/>'+
+                            stop.lng);
 
             bus_stop_marker.bindPopup(popup);
             // store marker for future manipulation of popup
