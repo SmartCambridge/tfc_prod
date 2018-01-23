@@ -143,6 +143,14 @@ body {
     background-color: lightpink;
 }
 
+.toggle_option {
+    display: inline-block;
+    border: 2px solid #cccccc;
+    background-color: #e8e8e8;
+    border-style: outset;
+    border-radius: 3px;
+}
+
 </style>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
@@ -160,7 +168,7 @@ body {
 <script type="text/javascript" src="rtroute_journeys.js"></script>
 
 <!-- create js object rtroute_stops (all stops used in above journeys) -->
-<script type="text/javascript" src="rtroute_stops.js"></script>
+<script type="text/javascript" src="rtroute_stops_cam.js"></script>
 
 <!-- Create object to store test data from following files -->
 <script type="text/javascript">
@@ -222,15 +230,15 @@ var test_data = {};
     <input type="button" id="clear_markers" onclick="clear_markers()" value="Clear icons"
         title="Remove any sensor icons that have been drawn on the map"
         ></input>
-    Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/>
+    <div class='toggle_option'>Breadcrumbs: <input id="breadcrumbs" type="checkbox" onclick="click_breadcrumbs()"/></div>
     <input type="button" id="clear_crumbs" onclick="clear_crumbs()" value="Clear breadcrumbs"
         title="Remove any breadcrumbs that have been drawn on the map"
         ></input>
 </div>
 <div class="control_heading">Console log options</div>
 <div class="control_box">
-    Log oldest to newest: <input id="log_append" type="checkbox" onclick="click_log_append()"/>
-    Log data records: <input id="log_data" type="checkbox" onclick="click_log_data()"/>
+    <div class="toggle_option">Log oldest top: <input id="log_append" type="checkbox" onclick="click_log_append()"/></div>
+    <div class="toggle_option">Log data records: <input id="log_data" type="checkbox" onclick="click_log_data()"/></div>
     <input type="button" onclick="log_clear()"
         title="Clear log"
         value="Clear"
@@ -253,12 +261,15 @@ var test_data = {};
 </div>
 <div class="control_heading">Route analysis</div>
 <div class="control_box">
-    Show journey: <input id="show_journey" type="checkbox" onclick="click_show_journey()"/>
-    Hide map: <input id="hide_map" type="checkbox" onclick="click_hide_map()"/>
-    Analyze: <input id="analyze" type="checkbox" onclick="click_analyze()"/>
-    Batch: <input id="batch" type="checkbox" onclick="click_batch()"/>
-    Annotate&nbsp;(Auto:<input id="annotate_auto" type="checkbox" onclick="click_annotate_auto()"/>&nbsp;
-    Manual:<input id="annotate_manual" type="checkbox" onclick="click_annotate_manual()"/>)<br/>
+    <div class="toggle_option">Show journey: <input id="show_journey" type="checkbox" onclick="click_show_journey()"/></div>
+    <div class="toggle_option">Hide map: <input id="hide_map" type="checkbox" onclick="click_hide_map()"/></div>
+    <div class="toggle_option">Analyze: <input id="analyze" type="checkbox" onclick="click_analyze()"/></div>
+    <div class="toggle_option">Batch: <input id="batch" type="checkbox" onclick="click_batch()"/></div>
+    <div class="toggle_option">Annotate&nbsp;(Auto:<input id="annotate_auto" type="checkbox" onclick="click_annotate_auto()"/>&nbsp;
+    Manual:<input id="annotate_manual" type="checkbox" onclick="click_annotate_manual()"/>)</div>
+    <div class="toggle_option">Pause error: 
+        <input id="replay_stop_on_error" type="checkbox" onclick="click_replay_stop_on_error()"/></div>
+    <br/>
 
     <button onclick="replay_start()"
         title="Replay test SiriVM data"
