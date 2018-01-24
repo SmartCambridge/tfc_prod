@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '3.12';
+var VERSION = '4.01';
+            // 4.01 adding timetable API call to lookup sirivm->route
             // 3.12 added 'pattern_starting' sensor state variable 0..1
             // 3.11 improve timetable vector from prior start stub
             // 3.10 segment_progress (not path_progress)
@@ -18,6 +19,8 @@ var VERSION = '3.12';
             // 1.00 initial development of 'segment distance vector'
 
 var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
+
+var TIMETABLE_URI = 'http://tfc-app3.cl.cam.ac.uk/transport/api';
 
 var LOG_TRUNCATE = 200; // we'll limit the log to this many messages
 
@@ -604,6 +607,32 @@ function load_tests()
 // ************************************************************************************
 // ************************    TIMETABLE API SHIM    **********************************
 // ************************************************************************************
+
+// Query (GET) the timetable API
+function sirivm_to_route_profile(msg)
+{
+    var qs = '?departure_stop_id='+encodeURIComponent(msg['OriginRef']);
+    qs += '&departure_time='+encodeURIComponent(msg['OriginAimedDepartureTime']);
+    qs += '&expand_journey=true';
+
+    var uri = TIMETABLE_URI+'/departure_to_journey/'+qs;
+
+    console.log('3 sirivm_to_route_profile '+uri);
+
+    var xhr = new XMLHttpRequest();
+
+    xhr.open("GET", uri, true);
+
+    xhr.send();
+
+    xhr.onreadystatechange = function() {//Call a function when the state changes.
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
+        {
+            console.log(xhr.responseText);
+        }
+    }
+}
+
 //debug Given a sirivm msg, return the vehicle journey_id
 function sirivm_to_vehicle_journey_id(msg)
 {
@@ -3076,7 +3105,7 @@ function draw_stops(stops)
 }
 
 // Draw the straight lines between stops on the selected journey
-// The journey stops data is stored in 'journeys' created at startup
+// The journey stops data is stored in ' journeys' created at startup
 function draw_journey(vehicle_journey_id)
 {
     // if it's already drawn, remove it and redraw
@@ -3317,6 +3346,10 @@ function draw_poly()
 // user clicked on 'journey' in sensor popup
 function click_journey(sensor_id)
 {
+    console.log('clock_journey');
+    sirivm_to_route_profile(sensors[sensor_id].msg);
+    return;
+
     var vehicle_journey_id = sensors[sensor_id].state.vehicle_journey_id;
     if (!vehicle_journey_id)
     {
