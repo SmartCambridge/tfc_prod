@@ -629,7 +629,7 @@ function get_route_profile(sensor)
         if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
         {
             console.log('got route profile for '+sensor_id);
-            init_route_profile(responseText);
+            add_api_route_profile(sensor_id, responseText);
             handle_route_profile(sensor);
         }
     }
@@ -637,16 +637,18 @@ function get_route_profile(sensor)
 
 // Convert the data returned by the API into a route_profile
 //
-function init_route_profile(api_response)
+function add_api_route_profile(sensor_id, api_response)
 {
     var route = JSON.parse(api_response).results[0].timetable;
-    return create_route_profile(route);
+    sensors[sensor_id].state.route_profile = create_route_profile(route);
 }
 
 // Now that (possibly asynchronously) we have new sensor.state.route_profile, do
 // initial processing of the first message
 function handle_route_profile(sensor)
 {
+    draw_route_profile(sensor);
+
     //console.log(JSON.stringify(sensor.state.route_profile));
     // We have a user checkbox to control bus<->segment tracking
     if (analyze)
@@ -2006,6 +2008,7 @@ function create_route_profile(route)
 
     // add first element for start stop at time=timetabled, distance=zero
     route_profile.push({ time_secs: get_seconds(route[0].time),
+                         time: route[0].time,
                          stop_id: route[0].stop_id,
                          distance: 0,
                          lat: stops[route[0].stop_id].lat,
@@ -2017,36 +2020,38 @@ function create_route_profile(route)
     // iterate along route, creating a time/distance/turn value for each stop
     for (var i=1; i<route.length; i++)
     {
-        var stop_info = {};
+        var route_element = {};
 
-        stop_info.time_secs = get_seconds(route[i].time);
+        route_element.time_secs = get_seconds(route[i].time);
 
-        stop_info.stop_id = route[i].stop_id;
+        route_element.stop_id = route[i].stop_id;
 
-        stop_info.lat = stops[route[i].stop_id].lat;
-        stop_info.lng = stops[route[i].stop_id].lng;
+        route_element.time = route[i].time;
+
+        route_element.lat = stops[route[i].stop_id].lat;
+        route_element.lng = stops[route[i].stop_id].lng;
 
         var prev_stop = stops[route[i-1].stop_id];
 
         var this_stop = stops[route[i].stop_id];
 
-        stop_info.bearing_in = Math.floor(get_bearing(prev_stop, this_stop));
+        route_element.bearing_in = Math.floor(get_bearing(prev_stop, this_stop));
 
-        stop_info.distance = Math.floor(route_profile[i-1].distance + get_distance(prev_stop, this_stop));
+        route_element.distance = Math.floor(route_profile[i-1].distance + get_distance(prev_stop, this_stop));
 
         if (i==route.length-1)
         {
-            stop_info.turn = 0;
-            stop_info.bisector = angle360(stop_info.bearing_in + 90);
+            route_element.turn = 0;
+            route_element.bisector = angle360(route_element.bearing_in + 90);
         }
         else
         {
             var next_stop = stops[route[i+1].stop_id];
             var bearing_out = get_bearing(this_stop, next_stop);
-            stop_info.turn = Math.floor(angle360(bearing_out - stop_info.bearing_in));
-            stop_info.bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
+            route_element.turn = Math.floor(angle360(bearing_out - route_element.bearing_in));
+            route_element.bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
         }
-        route_profile.push(stop_info);
+        route_profile.push(route_element);
     }
 
     // Now correct values at start
