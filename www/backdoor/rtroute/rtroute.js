@@ -4,7 +4,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.02';
+var VERSION = '4.02a';
             // 4.02 restructure to use sensor.state.route_profile and not .route
             // 4.01 adding timetable API call to lookup sirivm->route
             // 3.12 added 'pattern_starting' sensor state variable 0..1
@@ -164,8 +164,10 @@ var sensors = {};
 // Sample stop record in rtroute_stops:
 // { stop_id:'0500CCITY055', lat:52.2114061236, lng:0.10481260687, common_name:'Storey\'s Way'},
 // becomes
-// stops['0500CCITY055'] = {this stop record}
-var stops = {};
+// stops_cache['0500CCITY055'] = {this stop record}
+var stops_cache = {};
+
+var stops_drawn; // boolean whether stops are drawn on map or not
 
 // Local cache dictionary of JOURNEYS keyed on vehicle_journey_id
 // Sample journey data record in rtroutes_journeys:
@@ -355,7 +357,7 @@ function init()
     // build journeys dictionary keyed on vehicle_journey_id
     load_journeys();
 
-    draw_stops(stops);
+    //draw_stops(stops_cache);
 
     draw_progress_init();
 
@@ -372,8 +374,39 @@ function load_stops()
 {
     for (var i=0; i<rtroute_stops.length; i++)
     {
-        stops[rtroute_stops[i].stop_id] = rtroute_stops[i];
+        load_stop(rtroute_stops[i]);
     }
+}
+
+function load_stop(stop)
+{
+    if (!stop.stop_id)
+    {
+        stop.stop_id = stop['atco_code'];
+    }
+
+    stop.lat = stop['latitude'];
+
+    stop.lng = stop['longitude'];
+
+    var bus_stop_marker = L.marker([stop.lat, stop.lng],
+                                   {icon: bus_stop_icon});
+    var popup = L.popup({ closeOnClick: false,
+                          autoClose: false,
+                          offset: L.point(0,-25)})
+        .setContent(stop.common_name+'<br/>'+
+                    stop.stop_id+'<br/>'+
+                    stop.lat+'<br/>'+
+                    stop.lng);
+
+    bus_stop_marker.bindPopup(popup);
+    stop.marker = bus_stop_marker;
+    stops_cache[stop.stop_id] = stop;
+}
+
+function stops_cache_miss(stop_id)
+{
+    return !stops_cache.hasOwnProperty(stop_id);
 }
 
 // Load the rtroute_journeys array (from rtroute_journeys.js) into journeys dictionary
@@ -395,7 +428,7 @@ function load_journeys()
         var journey_stop = rtroute_journeys[i];
         var stop_index = journey_stop.order - 1; // order goes 1..n, stop_index starts at 0
         var vehicle_journey_id = journey_stop.vehicle_journey_id;
-        var stop = stops[journey_stop.stop_id];
+        var stop = stops_cache[journey_stop.stop_id];
 
         // For a given row of that data, either create a new journey or add to existing
         if (journeys.hasOwnProperty(vehicle_journey_id))
@@ -593,10 +626,12 @@ function load_tests()
 // Query (GET) the timetable API
 function get_route_profile(sensor)
 {
-    console.log('get_route_profile '+sensor.sensor_id);
+    //console.log('get_route_profile '+sensor.sensor_id);
+
+    var sensor_id = sensor.sensor_id;
 
     // We will see if we find a route_profile in the 'journeys' cache
-    var route_profile = cached_route_profile(sensor.msg);
+    var route_profile = cached_route_profile(sensor);
 
     if (route_profile)
     {
@@ -617,7 +652,8 @@ function get_route_profile(sensor)
 
     var uri = TIMETABLE_URI+'/departure_to_journey/'+qs;
 
-    console.log('getting route_profile '+stop_id+' '+hh_mm_ss(new Date(departure_time)));
+    console.log('get_route_profile: getting '+sensor.sensor_id+
+                ' route_profile '+stop_id+' @ '+hh_mm_ss(new Date(departure_time)));
 
     var xhr = new XMLHttpRequest();
 
@@ -628,8 +664,8 @@ function get_route_profile(sensor)
     xhr.onreadystatechange = function() {//Call a function when the state changes.
         if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
         {
-            console.log('got route profile for '+sensor_id);
-            add_api_route_profile(sensor_id, responseText);
+            //console.log('got route profile for '+sensor_id);
+            add_api_route_profile(sensor_id, stop_id, departure_time, xhr.responseText);
             handle_route_profile(sensor);
         }
     }
@@ -637,17 +673,81 @@ function get_route_profile(sensor)
 
 // Convert the data returned by the API into a route_profile
 //
-function add_api_route_profile(sensor_id, api_response)
+function add_api_route_profile(sensor_id, stop_id, departure_time, api_response)
 {
-    var route = JSON.parse(api_response).results[0].timetable;
-    sensors[sensor_id].state.route_profile = create_route_profile(route);
+    var api_data;
+    try
+    {
+        api_data = JSON.parse(api_response);
+    }
+    catch (e)
+    {
+        console.log('add_api_route_profile: failed to parse API response for '+
+                    sensor_id+' origin '+stop_id+' @ '+departure_time);
+        console.log(api_response);
+        return;
+    }
+
+    var sensor = sensors[sensor_id];
+
+    if (!api_data.results)
+    {
+        console.log('add_api_route_profile: null results for '+
+                    sensor_id+' origin '+stop_id+' @ '+departure_time);
+        console.log(api_response);
+        if (sensor)
+        {
+            sensor.state.route_profile = null;
+        }
+        return;
+    }
+    if (!api_data.results[0])
+    {
+        console.log('add_api_route_profile: empty results for '+
+                    sensor_id+' "'+sensor.msg['LineRef']+'" origin '+stop_id+' @ '+departure_time);
+
+        console.log(api_response);
+        if (sensor)
+        {
+            sensor.state.route_profile = null;
+        }
+        return;
+    }
+    if (api_data.results.length > 1)
+    {
+        console.log('add_api_route_profile: '+
+                    api_data.results.length+' results for '+
+                    sensor_id+' "'+sensor.msg['LineRef']+'" origin '+stop_id+' @ '+departure_time);
+        if (sensor)
+        {
+            sensor.state.route_profile = null;
+        }
+        return;
+    }
+    if (!api_data.results[0].timetable)
+    {
+        console.log('add_api_route_profile: no timetable for '+sensor_id);
+        console.log(api_response);
+        if (sensor)
+        {
+            sensor.state.route_profile = null;
+        }
+        return;
+    }
+    var route = api_data.results[0].timetable;
+    sensor.state.route_profile = create_route_profile(sensor, route);
 }
 
 // Now that (possibly asynchronously) we have new sensor.state.route_profile, do
 // initial processing of the first message
 function handle_route_profile(sensor)
 {
-    draw_route_profile(sensor);
+    if (!sensor.state.route_profile)
+    {
+        return;
+    }
+
+    //draw_route_profile(sensor);
 
     //console.log(JSON.stringify(sensor.state.route_profile));
     // We have a user checkbox to control bus<->segment tracking
@@ -671,29 +771,29 @@ function handle_route_profile(sensor)
 }
 
 //debug Given a sirivm msg, return the vehicle journey_id
-function cached_route_profile(msg)
+function cached_route_profile(sensor)
 {
-    if (msg['OriginRef'] != '0500SCAMB011')
+    if (sensor.msg['OriginRef'] != '0500SCAMB011')
     {
         return 0;
     }
 
-    switch (msg['OriginAimedDepartureTime'])
+    switch (sensor.msg['OriginAimedDepartureTime'])
     {
         case '2017-11-20T06:02:00+00:00':
-            return create_route_profile(journeys['20-4-_-y08-1-51-T0'].route);
+            return create_route_profile(sensor, journeys['20-4-_-y08-1-51-T0'].route);
 
         case '2017-11-20T06:22:00+00:00':
-            return create_route_profile(journeys['20-4-_-y08-1-1-T0'].route);
+            return create_route_profile(sensor, journeys['20-4-_-y08-1-1-T0'].route);
 
         case '2017-11-20T06:42:00+00:00':
-            return create_route_profile(journeys['20-4-_-y08-1-2-T0'].route);
+            return create_route_profile(sensor, journeys['20-4-_-y08-1-2-T0'].route);
 
         case '2017-11-20T07:22:00+00:00':
-            return create_route_profile(journeys['20-4-_-y08-1-4-T0'].route);
+            return create_route_profile(sensor, journeys['20-4-_-y08-1-4-T0'].route);
 
         case '2017-11-20T07:42:00+00:00':
-            return create_route_profile(journeys['20-4-_-y08-1-5-T0'].route);
+            return create_route_profile(sensor, journeys['20-4-_-y08-1-5-T0'].route);
 
         default:
             //log('<span style="color: red">Vehicle departure time not recognized</span>');
@@ -715,7 +815,7 @@ function cached_route_profile(msg)
 function update_sensor(msg, clock_time)
 {
 		// existing sensor data record has arrived
-        console.log('update_sensor '+clock_time);
+        //console.log('update_sensor '+clock_time);
 
         var sensor_id = msg[RECORD_INDEX];
 
@@ -827,7 +927,7 @@ function log_analysis(sensor)
 
 function update_state(sensor, clock_time)
 {
-    console.log('Updating '+sensor.sensor_id+', analyze='+analyze);
+    //console.log('Updating '+sensor.sensor_id+', analyze='+analyze);
 
     // flag if this record is OLD or NEW
     update_old_status(sensor, clock_time);
@@ -1136,14 +1236,14 @@ function update_segment_distance_vector(sensor)
 
     console.log('update_segment_distance_vector route_profile[0]='+JSON.stringify(route_profile[0]));
 
-    segment_distance_vector.push( { segment_index: 0, distance: get_distance(P, stops[route_profile[0].stop_id]) } );
+    segment_distance_vector.push( { segment_index: 0, distance: get_distance(P, stops_cache[route_profile[0].stop_id]) } );
 
     // Now add the distances for route segments
     for (var segment_index=1; segment_index<segments-1; segment_index++)
     {
         //debug use route_profile
-        var prev_stop = stops[route_profile[segment_index-1].stop_id];
-        var next_stop = stops[route_profile[segment_index].stop_id];
+        var prev_stop = stops_cache[route_profile[segment_index-1].stop_id];
+        var next_stop = stops_cache[route_profile[segment_index].stop_id];
         var dist = get_distance_from_line(P, [prev_stop,next_stop]);
 
         segment_distance_vector.push({ segment_index: segment_index, distance: dist });
@@ -1154,7 +1254,7 @@ function update_segment_distance_vector(sensor)
     //debug use route_profile
     // Add distance to last stop (for 'finished' segment)
     segment_distance_vector.push({ segment_index: segments - 1,
-                           distance: get_distance(P, stops[route_profile[route_profile.length-1].stop_id]) });
+                           distance: get_distance(P, stops_cache[route_profile[route_profile.length-1].stop_id]) });
 
     // Create sorted nearest_segments array of NEAREST_COUNT
     // { segment_index:, distance: } elements
@@ -1912,7 +2012,8 @@ function update_segment_timetable_vector(sensor)
 
     var segment_index = 0; // segment_index zero is 'before start'
 
-    var segment_start_time = -24*60*60; // we don't have a 'start time' for segment zero, so use negative number
+    var segment_start_time = -24*60*60; // we don't have a 'start time' for segment zero,
+                                        // so use negative number
 
     var segment_finish_time;
 
@@ -1978,9 +2079,9 @@ function get_segment_progress(sensor)
 
     var segment_index = sensor.state.segment_index;
 
-    var prev_stop = stops[route_profile[segment_index - 1].stop_id];
+    var prev_stop = stops_cache[route_profile[segment_index - 1].stop_id];
 
-    var next_stop = stops[route_profile[segment_index].stop_id];
+    var next_stop = stops_cache[route_profile[segment_index].stop_id];
 
     var distance_to_prev_stop = get_distance(pos, prev_stop);
 
@@ -1998,71 +2099,101 @@ function get_segment_progress(sensor)
 //    {"time_secs":21840, // timetabled time-of-day in seconds since midnight at this stop
 //     "lat": 52.123,     // latitiude of stop
 //     "lng": -0.1234,    // longitude of stop
-//     "bearing_in": 138, // bearing of vector approaching this stop
+//     "bearing_in": 138, // bearing of vector approaching this stop (== bearing of current segment)
 //     "bisector": 68,    // bearing at mid-point of OUTER angle of turn
 //     "distance":178,    // length (m) of route segment approaching this stop
 //     "turn":39},...     // angle of turn in route from this stop to next (0..360) clockwise
-function create_route_profile(route)
+function create_route_profile(sensor, route)
 {
     var route_profile = [];
 
-    // add first element for start stop at time=timetabled, distance=zero
-    route_profile.push({ time_secs: get_seconds(route[0].time),
-                         time: route[0].time,
-                         stop_id: route[0].stop_id,
-                         distance: 0,
-                         lat: stops[route[0].stop_id].lat,
-                         lng: stops[route[0].stop_id].lng,
-                         turn: 0,
-                         bearing_in: 0, // we will update this to match next segment
-                         bisector: 0 });// and will correct this to perpendicular
-
     // iterate along route, creating a time/distance/turn value for each stop
-    for (var i=1; i<route.length; i++)
+    for (var i=0; i<route.length; i++)
     {
+        var stop_id = route[i].stop_id ? route[i].stop_id : route[i].stop['atco_code'];
+
+        //debug skip stops not in cache
+        // i(this will be an error when we have stop data included in timetable API)
+        if (stops_cache_miss(stop_id))
+        {
+            load_stop(route[i].stop);
+            //console.log('stops cache miss for '+route[i].stop_id);
+            //continue;
+        }
+
         var route_element = {};
 
         route_element.time_secs = get_seconds(route[i].time);
 
-        route_element.stop_id = route[i].stop_id;
+        route_element.stop_id = stop_id;
 
         route_element.time = route[i].time;
 
-        route_element.lat = stops[route[i].stop_id].lat;
-        route_element.lng = stops[route[i].stop_id].lng;
+        route_element.lat = stops_cache[stop_id].lat;
+        route_element.lng = stops_cache[stop_id].lng;
 
-        var prev_stop = stops[route[i-1].stop_id];
-
-        var this_stop = stops[route[i].stop_id];
-
-        route_element.bearing_in = Math.floor(get_bearing(prev_stop, this_stop));
-
-        route_element.distance = Math.floor(route_profile[i-1].distance + get_distance(prev_stop, this_stop));
-
-        if (i==route.length-1)
+        // note we are using this route_profile (not route) for the previous stop
+        // in case we are ignoring stops not in stops_cache
+        if (route_profile.length == 0)
         {
-            route_element.turn = 0;
-            route_element.bisector = angle360(route_element.bearing_in + 90);
+            // add first element for start stop at time=timetabled, distance=zero
+            route_element.distance = 0;
         }
         else
         {
-            var next_stop = stops[route[i+1].stop_id];
-            var bearing_out = get_bearing(this_stop, next_stop);
-            route_element.turn = Math.floor(angle360(bearing_out - route_element.bearing_in));
-            route_element.bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
+            var prev_stop = stops_cache[route_profile[route_profile.length-1].stop_id];
+
+            var this_stop = stops_cache[stop_id];
+
+            route_element.distance =
+                Math.floor( route_profile[route_profile.length-1].distance +
+                            get_distance(prev_stop, this_stop));
+
+            route_element.bearing_in = Math.floor(get_bearing(prev_stop, this_stop));
         }
+
         route_profile.push(route_element);
     }
 
-    // Now correct values at start
+    if (route_profile.length < 2)
+    {
+        console.log('create_route_profile: '+sensor.sensor_id+' stops_cache total miss?');
+        return null;
+    }
+
+    // Now provide correct values at route_profile[0]
     route_profile[0].bearing_in = route_profile[1].bearing_in;
     route_profile[0].bisector = angle360(route_profile[0].bearing_in+90);
 
-    // debug print route profile to console
-    for (var i=0; i<route_profile.length; i++)
+    // Add .turn and .bisector to each element of route_profile
+    for (var i=1; i < route_profile.length; i++)
     {
-        console.log(i+' '+JSON.stringify(route_profile[i]));
+        if (i==route_profile.length-1)
+        {
+            route_profile[i].turn = 0;
+            route_profile[i].bisector = angle360(route_profile[i].bearing_in + 90);
+        }
+        else
+        {
+            var prev_stop = stops_cache[route_profile[i-1].stop_id];
+            var this_stop = stops_cache[route_profile[i].stop_id];
+            var next_stop = stops_cache[route_profile[i+1].stop_id];
+            var bearing_out = get_bearing(this_stop, next_stop);
+            route_profile[i].turn = Math.floor(angle360(bearing_out - route_profile[i].bearing_in));
+            route_profile[i].bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
+        }
     }
+
+    // debug print route profile to console
+    //for (var i=0; i<route_profile.length; i++)
+    //{
+    //    console.log(i+' '+JSON.stringify(route_profile[i]));
+    //}
+    console.log('create_route_profile: '+sensor.sensor_id+' '+
+                route_profile[0].stop_id+' @ '+route_profile[0].time+' to '+
+                route_profile[route_profile.length-1].stop_id+' @ '+
+                route_profile[route_profile.length-1].time+
+                (route.length == route_profile.length ? ' OK' : ' truncated'));
     //console.log(JSON.stringify(route_profile));
     return route_profile;
 }
@@ -3073,25 +3204,32 @@ function draw_stops(stops)
     {
         if (stops.hasOwnProperty(stop_id))
         {
-            var stop = stops[stop_id];
-            var bus_stop_marker = L.marker([stop.lat, stop.lng],
-                                           {icon: bus_stop_icon})
-                .addTo(map);
-            var popup = L.popup({ closeOnClick: false,
-                                  autoClose: false,
-                                  offset: L.point(0,-25)})
-                .setContent(stop.common_name+'<br/>'+
-                            stop.stop_id+'<br/>'+
-                            stop.lat+'<br/>'+
-                            stop.lng);
-
-            bus_stop_marker.bindPopup(popup);
-            // store marker for future manipulation of popup
-            stops[stop_id].marker = bus_stop_marker;
+            stops[stop_id].marker.addTo(map);
         }
     }
+    stops_drawn = true;
 }
 
+function hide_stops(stops)
+{
+    for (var stop_id in stops)
+    {
+        if (stops.hasOwnProperty(stop_id))
+        {
+            map.removeLayer(stops[stop_id].marker);
+        }
+    }
+    stops_drawn = false;
+}
+
+function stop_content(stop, sensor)
+{
+    var name = stop.common_name;
+    var time = stop.time;
+    var line = sensor.msg['LineRef'];
+    return name+'</br>'+
+           '"'+line+'": '+ time;
+}
 // Draw the straight lines between stops on the selected journey
 // Updates drawn_routes[sensor_id] data structure:
 // drawn_routes[sensor_id]
@@ -3100,6 +3238,18 @@ function draw_stops(stops)
 function draw_route_profile(sensor)
 {
     var sensor_id = sensor.sensor_id;
+
+    if (!sensor.state)
+    {
+        console.log('draw_route_profile: No state for '+sensor_id);
+        return;
+    }
+
+    if (!sensor.state.route_profile)
+    {
+        console.log('draw_route_profile: No route_profile for '+sensor_id);
+        return;
+    }
 
     // if it's already drawn, remove it and redraw
     remove_drawn_route(sensor_id);
@@ -3119,10 +3269,12 @@ function draw_route_profile(sensor)
 
     for (var i=0; i<route_profile.length; i++)
     {
-        var stop = stops[route_profile[i].stop_id];
+        var stop = stops_cache[route_profile[i].stop_id];
+
+        stop.time = route_profile[i].time;
 
         // update stop popup with time for this journey
-        stop.marker.setPopupContent(stop.common_name+'</br>'+route_profile[i].time);
+        stop.marker.setPopupContent(stop_content(stop, sensor));
 
         // add journey segment to map
         var p = new L.LatLng(stop.lat, stop.lng);
@@ -3131,7 +3283,7 @@ function draw_route_profile(sensor)
         // Add an arrow from previous stop to this stop
         if (i > 0)
         {
-            var prev_stop = stops[route_profile[i - 1].stop_id];
+            var prev_stop = stops_cache[route_profile[i - 1].stop_id];
             var diffLat = stop.lat - prev_stop.lat;
             var diffLng = stop.lng - prev_stop.lng;
             var center = [prev_stop.lat + diffLat/2, prev_stop.lng + diffLng/2];
@@ -3203,6 +3355,19 @@ function click_breadcrumbs()
     breadcrumbs = document.getElementById("breadcrumbs").checked == true;
 }
 
+// toggle the 'draw_stops' function that draws a stop icon at each stop lat,lng
+function click_stops()
+{
+    if (document.getElementById("draw_stops").checked)
+    {
+        draw_stops(stops_cache);
+    }
+    else
+    {
+        hide_stops(stops_cache);
+    }
+}
+
 // switch the console log between newest msg on top vs newest on bottom
 function click_log_append()
 {
@@ -3223,7 +3388,7 @@ function click_log_data()
 function clear_markers()
 {
     //console.log('clear_markers');
-    for (sensor_id in sensors)
+    for (var sensor_id in sensors)
     {
         if (sensors[sensor_id]['marker'])
         {
@@ -3357,7 +3522,7 @@ function draw_poly()
 // user clicked on 'journey' in sensor popup
 function click_journey(sensor_id)
 {
-    draw_route_profile(sensor_id);
+    draw_route_profile(sensors[sensor_id]);
 }
 
 // user clicked on 'more' in sensor popup
