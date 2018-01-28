@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.02a';
+var VERSION = '4.03';
+            // 4.03 using stop -> journeys API
             // 4.02 restructure to use sensor.state.route_profile and not .route
             // 4.01 adding timetable API call to lookup sirivm->route
             // 3.12 added 'pattern_starting' sensor state variable 0..1
@@ -394,10 +395,7 @@ function load_stop(stop)
     var popup = L.popup({ closeOnClick: false,
                           autoClose: false,
                           offset: L.point(0,-25)})
-        .setContent(stop.common_name+'<br/>'+
-                    stop.stop_id+'<br/>'+
-                    stop.lat+'<br/>'+
-                    stop.lng);
+        .setContent(stop_content(stop));
 
     bus_stop_marker.bindPopup(popup);
     stop.marker = bus_stop_marker;
@@ -620,8 +618,90 @@ function load_tests()
 }
 
 // ************************************************************************************
-// ************************    TIMETABLE API SHIM    **********************************
+// ************************    TRANSPORT API         **********************************
 // ************************************************************************************
+
+function get_stop_journeys(stop_id)
+{
+    var datetime_from = hh_mm_ss(new Date());
+
+    var qs = '?stop_id='+encodeURIComponent(stop_id);
+    qs += '&datetime_from='+encodeURIComponent(datetime_from);
+    qs += '&expand_journey=true';
+
+    var uri = TIMETABLE_URI+'/journeys_by_time_and_stop/'+qs;
+
+    console.log('get_stop_journeys: getting '+stop_id+
+                ' @ '+datetime_from);
+
+    var xhr = new XMLHttpRequest();
+
+    xhr.open("GET", uri, true);
+
+    xhr.send();
+
+    xhr.onreadystatechange = function() {//Call a function when the state changes.
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
+        {
+            //console.log('got route profile for '+sensor_id);
+            add_api_stop_journeys(stop_id, datetime_from, xhr.responseText);
+            handle_stop_journeys(stop_id);
+        }
+    }
+}
+
+// Update a stop.journeys property with the data from the transport API
+function add_api_stop_journeys(stop_id, datetime_from, api_response)
+{
+    var api_data;
+    try
+    {
+        api_data = JSON.parse(api_response);
+    }
+    catch (e)
+    {
+        console.log('add_api_stop_journeys: failed to parse API response for '+
+                    stop_id+' @ '+datetime_from);
+        console.log(api_response);
+        return;
+    }
+
+    var stop = stops_cache[stop_id];
+
+    if (!stop)
+    {
+        console.log('add_api_stop_journeys: '+stop+' not in cache');
+        return;
+    }
+
+    if (!api_data.results)
+    {
+        console.log('add_api_stop_journeys: null results for '+
+                    stop_id+' @ '+datetime_from);
+        console.log(api_response);
+        stop.journeys = null;
+        return;
+    }
+
+    if (!api_data.results[0])
+    {
+        console.log('add_api_stop_journeys: empty results for '+
+                    stop_id+' @ '+datetime_from);
+        stop.journeys = null;
+
+        return;
+    }
+
+    console.log('add_api_stop_journeys: processing '+api_data.results.length+' journeys');
+    stop.journeys = null;
+}
+
+// Deal with a stop that now has an updated 'journeys' property
+//
+function handle_stop_journeys(stop_id)
+{
+    console.log('handle_stop_journeys: '+stop_id);
+}
 
 // Query (GET) the timetable API
 function get_route_profile(sensor)
@@ -3222,14 +3302,29 @@ function hide_stops(stops)
     stops_drawn = false;
 }
 
+// return a string with the stop popup content, sensor can be null
 function stop_content(stop, sensor)
 {
     var name = stop.common_name;
     var time = stop.time;
-    var line = sensor.msg['LineRef'];
-    return name+'</br>'+
-           '"'+line+'": '+ time;
+    var line = sensor ? sensor.msg['LineRef'] : '';
+    var stop_id = stop.stop_id;
+    var lat = Math.floor(stop.lat*100000)/100000;
+    var lng = Math.floor(stop.lng*100000)/100000;
+
+    return name+'<br/>'+
+           (time ? '"'+line+'": '+ time +'<br/>' : '')+
+           stop_id+'<br/>'+
+           lat+'<br/>'+
+           lng+'<br/>'+
+           '<a href="#" onclick="click_stop_journeys(\''+stop_id+'\')">journeys</a>';
 }
+
+function click_stop_journeys(stop_id)
+{
+    get_stop_journeys(stop_id);
+}
+
 // Draw the straight lines between stops on the selected journey
 // Updates drawn_routes[sensor_id] data structure:
 // drawn_routes[sensor_id]
@@ -3299,7 +3394,7 @@ function draw_route_profile(sensor)
                               })
                 }
             ));
-        drawn_routes[sensor_id].arrows[i-1].addTo(map);
+            drawn_routes[sensor_id].arrows[i-1].addTo(map);
         }
     }
 }
