@@ -178,7 +178,9 @@ var stops_drawn; // boolean whether stops are drawn on map or not
 var journeys = {};
 var journey_start_times = {}; // holds lists of journeys by start time
 
-var drawn_routes = {}; // dictionary (by sensor_id) of drawn routes, so they can be removed from map
+var drawn_journeys = {}; // dictionary (by drawn_journey_id_id) of drawn routes, so they can be removed from map
+
+var drawn_stops = {}; // dictionary (by stop_id) of drawn stops so they can be updated/removed from map
 
 // Trip data (from rtroutes_trip.js)
 //  { "Delay": "PT0S",
@@ -1044,9 +1046,6 @@ function update_old_status(sensor, clock_time)
 {
     var data_timestamp = get_msg_date(sensor.msg); // will hold Date from sensor
 
-    // get current value of sensor.state.old flag (default false)
-    var current_old_flag = !(sensor.state.old == null) || sensor.state.old;
-
     // calculate age of sensor (in seconds)
     var age = (clock_time - data_timestamp) / 1000;
 
@@ -1064,7 +1063,11 @@ function update_old_status(sensor, clock_time)
     }
     else
     {
-        // data record is NOT OLD
+        //console.log('update_old_status NOT OLD '+sensor.sensor_id);
+        //var clock_time_str = hh_mm_ss(clock_time);
+        //var msg_time_str = hh_mm_ss(data_timestamp);
+        //console.log(clock_time_str+' vs '+msg_time_str+' data record is NOT OLD '+sensor.sensor_id);
+
         // skip if this data record is already NOT OLD
         if (sensor.state.old != null && !sensor.state.old)
         {
@@ -2534,6 +2537,8 @@ function get_xml_digits(xml, units)
 // return a Leaflet Icon based on a real-time msg
 function create_sensor_icon(msg)
 {
+    console.log('create_sensor_icon '+msg['VehicleRef']);
+
     var line = '';
 
     if (msg.LineRef != null)
@@ -3077,6 +3082,12 @@ function check_old_records(clock_time)
 {
     //console.log('checking for old data records..,');
 
+    var check_time = new Date();
+    if (clock_time != null)
+    {
+        check_time = clock_time;
+    }
+
     // do nothing if timestamp format not recognised
     switch (RECORD_TS_FORMAT)
     {
@@ -3089,7 +3100,8 @@ function check_old_records(clock_time)
 
     for (var sensor_id in sensors)
     {
-        update_old_status(sensors[sensor_id], clock_time);
+        //console.log('check_old_records '+sensor_id);
+        update_old_status(sensors[sensor_id], check_time);
     }
 }
 
@@ -3284,30 +3296,42 @@ function draw_stops(stops)
     {
         if (stops.hasOwnProperty(stop_id))
         {
-            stops[stop_id].marker.addTo(map);
+            draw_stop(stops[stop_id]);
         }
     }
     stops_drawn = true;
 }
 
-function hide_stops(stops)
+function draw_stop(stop)
 {
-    for (var stop_id in stops)
+    drawn_stops[stop.stop_id] = true;
+    stop.marker.addTo(map);
+}
+
+function hide_stops()
+{
+    for (var stop_id in drawn_stops)
     {
-        if (stops.hasOwnProperty(stop_id))
+        if (drawn_stops.hasOwnProperty(stop_id) && drawn_stops[stop_id])
         {
-            map.removeLayer(stops[stop_id].marker);
+            hide_stop(stops_cache[stop_id]);
         }
     }
     stops_drawn = false;
 }
 
+function hide_stop(stop)
+{
+    drawn_stops[stop.stop_id] = false;
+    map.removeLayer(stop.marker);
+}
+
 // return a string with the stop popup content, sensor can be null
-function stop_content(stop, sensor)
+function stop_content(stop, msg)
 {
     var name = stop.common_name;
     var time = stop.time;
-    var line = sensor ? sensor.msg['LineRef'] : '';
+    var line = msg ? msg['LineRef'] : '';
     var stop_id = stop.stop_id;
     var lat = Math.floor(stop.lat*100000)/100000;
     var lng = Math.floor(stop.lng*100000)/100000;
@@ -3326,8 +3350,8 @@ function click_stop_journeys(stop_id)
 }
 
 // Draw the straight lines between stops on the selected journey
-// Updates drawn_routes[sensor_id] data structure:
-// drawn_routes[sensor_id]
+// Updates drawn_journeys[sensor_id] data structure:
+// drawn_journeys[sensor_id]
 //   .poly_line
 //   .arrows
 function draw_route_profile(sensor)
@@ -3346,44 +3370,52 @@ function draw_route_profile(sensor)
         return;
     }
 
-    // if it's already drawn, remove it and redraw
-    remove_drawn_route(sensor_id);
+    // if ANY already drawn, remove them
+    hide_journeys();
 
-    var route_profile = sensor.state.route_profile;
+    hide_stops();
 
+    draw_journey('s-'+sensor_id, sensor.state.route_profile, sensor.msg);
+
+    draw_journey_stops(sensor.state.route_profile);
+}
+
+// Here we draw a journey, either from a timetable lookup for a stop, or from the route_profile of an active bus
+function draw_journey(drawn_journey_id, journey, msg)
+{
     // And simply draw the polyline between the stops
     var poly_line = L.polyline([], {color: 'red'}).addTo(map);
 
-    drawn_routes[sensor_id] = {}; // create object to hold this routes drawn elements
+    drawn_journeys[drawn_journey_id] = {}; // create object to hold this routes drawn elements
 
-    drawn_routes[sensor_id].poly_line = poly_line; // polyline of route drawn on map
+    drawn_journeys[drawn_journey_id].poly_line = poly_line; // polyline of route drawn on map
 
-    drawn_routes[sensor_id].arrows = []; // arrows for each segment of the route
+    drawn_journeys[drawn_journey_id].arrows = []; // arrows for each segment of the route
 
-    log('Drawing route_profile '+sensor.sensor_id+', length '+route_profile.length);
+    log('Drawing journey '+drawn_journey_id+', length '+journey.length);
 
-    for (var i=0; i<route_profile.length; i++)
+    for (var i=0; i<journey.length; i++)
     {
-        var stop = stops_cache[route_profile[i].stop_id];
+        var stop = stops_cache[journey[i].stop_id];
 
-        stop.time = route_profile[i].time;
+        stop.time = journey[i].time;
 
         // update stop popup with time for this journey
-        stop.marker.setPopupContent(stop_content(stop, sensor));
+        stop.marker.setPopupContent(stop_content(stop, msg));
 
         // add journey segment to map
         var p = new L.LatLng(stop.lat, stop.lng);
-        drawn_routes[sensor_id].poly_line.addLatLng(p);
+        drawn_journeys[drawn_journey_id].poly_line.addLatLng(p);
 
         // Add an arrow from previous stop to this stop
         if (i > 0)
         {
-            var prev_stop = stops_cache[route_profile[i - 1].stop_id];
+            var prev_stop = stops_cache[journey[i - 1].stop_id];
             var diffLat = stop.lat - prev_stop.lat;
             var diffLng = stop.lng - prev_stop.lng;
             var center = [prev_stop.lat + diffLat/2, prev_stop.lng + diffLng/2];
             var angle = (get_bearing(prev_stop, stop)- 90 + 360) % 360;
-            drawn_routes[sensor_id].arrows.push( new L.marker(
+            drawn_journeys[drawn_journey_id].arrows.push( new L.marker(
                 center,
                 { icon: new L.divIcon({
                               className : 'arrow_icon',
@@ -3394,38 +3426,47 @@ function draw_route_profile(sensor)
                               })
                 }
             ));
-            drawn_routes[sensor_id].arrows[i-1].addTo(map);
+            drawn_journeys[drawn_journey_id].arrows[i-1].addTo(map);
         }
     }
 }
 
 // User has un-checked 'Show Journey'
-function remove_drawn_route(sensor_id)
+function hide_journey(drawn_journey_id)
 {
-    if (!sensor_id || !drawn_routes[sensor_id])
+    if (!drawn_journey_id || !drawn_journeys[drawn_journey_id])
     {
         return;
     }
 
-    if (drawn_routes[sensor_id].poly_line)
+    if (drawn_journeys[drawn_journey_id].poly_line)
     {
-        map.removeLayer(drawn_routes[sensor_id].poly_line);
-        for (var i=0; i < drawn_routes[sensor_id].arrows.length; i++)
+        map.removeLayer(drawn_journeys[drawn_journey_id].poly_line);
+        for (var i=0; i < drawn_journeys[drawn_journey_id].arrows.length; i++)
         {
-            map.removeLayer(drawn_routes[sensor_id].arrows[i]);
+            map.removeLayer(drawn_journeys[drawn_journey_id].arrows[i]);
         }
     }
 }
 
 // Remove ALL drawn routes
-function remove_drawn_routes()
+function hide_journeys()
 {
-    for (var sensor_id in drawn_routes)
+    for (var drawn_journey_id in drawn_journeys)
     {
-        if (drawn_routes.hasOwnProperty(sensor_id))
+        if (drawn_journeys.hasOwnProperty(drawn_journey_id))
         {
-            remove_drawn_route(sensor_id);
+            hide_journey(drawn_journey_id);
         }
+    }
+}
+
+// Draw the stops along a journey
+function draw_journey_stops(journey)
+{
+    for (var i=0; i<journey.length; i++)
+    {
+        draw_stop(stops_cache[journey[i].stop_id]);
     }
 }
 
@@ -3459,7 +3500,7 @@ function click_stops()
     }
     else
     {
-        hide_stops(stops_cache);
+        hide_stops();
     }
 }
 
@@ -3796,7 +3837,7 @@ function click_show_journey()
     else
     {
         analyze = false;
-        remove_drawn_routes();
+        hide_journeys();
     }
     // set analyze checkbox appropriately
     document.getElementById('analyze').checked = analyze;
@@ -3853,7 +3894,7 @@ function load_test_data(test_name)
     // show the test journey
     //
     // Remove the current displayed routes
-    remove_drawn_routes();
+    hide_journeys();
 
     document.getElementById("show_journey").checked = true;
 
