@@ -380,8 +380,6 @@ function load_stops()
     for (var i=0; i<rtroute_stops.length; i++)
     {
         load_stop(rtroute_stops[i]);
-<<<<<<< HEAD
-=======
     }
 }
 
@@ -390,7 +388,6 @@ function load_stop(stop)
     if (!stop.stop_id)
     {
         stop.stop_id = stop['atco_code'];
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
     }
 
     stop.lat = stop['latitude'];
@@ -656,10 +653,7 @@ function load_tests()
 // ************************    TRANSPORT API         **********************************
 // ************************************************************************************
 
-<<<<<<< HEAD
 // Call the API to get the journeys through a given stop
-=======
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 function get_stop_journeys(stop_id)
 {
     var datetime_from = hh_mm_ss(new Date());
@@ -667,12 +661,7 @@ function get_stop_journeys(stop_id)
     var qs = '?stop_id='+encodeURIComponent(stop_id);
     qs += '&datetime_from='+encodeURIComponent(datetime_from);
     qs += '&expand_journey=true';
-<<<<<<< HEAD
     qs += '&nresults='+STOP_MAX_JOURNEYS;
-
-    // can also have "&nresults=XX" for max # of journeys to return
-=======
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 
     var uri = TIMETABLE_URI+'/journeys_by_time_and_stop/'+qs;
 
@@ -715,11 +704,7 @@ function add_api_stop_journeys(stop_id, datetime_from, api_response)
 
     if (!stop)
     {
-<<<<<<< HEAD
         console.log('add_api_stop_journeys: '+stop_id+' not in cache');
-=======
-        console.log('add_api_stop_journeys: '+stop+' not in cache');
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
         return;
     }
 
@@ -736,17 +721,12 @@ function add_api_stop_journeys(stop_id, datetime_from, api_response)
     {
         console.log('add_api_stop_journeys: empty results for '+
                     stop_id+' @ '+datetime_from);
-<<<<<<< HEAD
         stop.journeys = [];
-=======
-        stop.journeys = null;
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 
         return;
     }
 
     console.log('add_api_stop_journeys: processing '+api_data.results.length+' journeys');
-<<<<<<< HEAD
 
     stop.journeys = [];
 
@@ -775,16 +755,12 @@ function add_api_stop_journeys(stop_id, datetime_from, api_response)
         }
         stop.journeys.push(journey);
     }
-=======
-    stop.journeys = null;
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 }
 
 // Deal with a stop that now has an updated 'journeys' property
 //
 function handle_stop_journeys(stop_id)
 {
-<<<<<<< HEAD
     console.log('handle_stop_journeys: '+stop_id+' '+stops_cache[stop_id].journeys.length);
 
     var stop = stops_cache[stop_id];
@@ -798,9 +774,6 @@ function handle_stop_journeys(stop_id)
         // using a drawn_journey_id of stop-STOP_ID-N where N is arbitrary index
         draw_journey('stop-'+stop_id+'-'+i,journeys[i]);
     }
-=======
-    console.log('handle_stop_journeys: '+stop_id);
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 }
 
 // Query (GET) the timetable API
@@ -3434,25 +3407,19 @@ function stop_content(stop, msg)
     var lat = Math.floor(stop.lat*100000)/100000;
     var lng = Math.floor(stop.lng*100000)/100000;
 
-<<<<<<< HEAD
     var journey_count = '';
 
     if (stop.journeys)
     {
         journey_count = ' ('+stop.journeys.length+')';
     }
-=======
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
+
     return name+'<br/>'+
            (time ? '"'+line+'": '+ time +'<br/>' : '')+
            stop_id+'<br/>'+
            lat+'<br/>'+
            lng+'<br/>'+
-<<<<<<< HEAD
            '<a href="#" onclick="click_stop_journeys(\''+stop_id+'\')">journeys</a>' + journey_count;
-=======
-           '<a href="#" onclick="click_stop_journeys(\''+stop_id+'\')">journeys</a>';
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 }
 
 function click_stop_journeys(stop_id)
@@ -3487,17 +3454,10 @@ function draw_route_profile(sensor)
     hide_stops();
 
     draw_journey('s-'+sensor_id, sensor.state.route_profile, sensor.msg);
-<<<<<<< HEAD
 
     draw_journey_stops(sensor.state.route_profile);
 }
 
-=======
-
-    draw_journey_stops(sensor.state.route_profile);
-}
-
->>>>>>> 1d37fa261ec18a50ede680aceb6f4f32bb2eda3f
 // Here we draw a journey, either from a timetable lookup for a stop, or from the route_profile of an active bus
 function draw_journey(drawn_journey_id, journey, msg)
 {
