@@ -17,5 +17,7 @@
         "TSP"
     ],
     "StationID": "S-1136",
-    "Latitude": 52.192
+    "Latitude": 52.192,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-25"
 }

@@ -18,5 +18,7 @@
     "Name": "NWC-Huntingdon Rd",
     "StationID": "S-1135",
     "Longitude": 0.0913,
-    "Description": "North West Cambridge near new school"
+    "Description": "North West Cambridge near new school",
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-19"
 }

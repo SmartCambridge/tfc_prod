@@ -1,5 +1,4 @@
-{ "aq_list":
-  [
+{ "aq_list": [
 {
     "FeedID": "cam_aq",
     "Name": "NWC-M11",
@@ -20,7 +19,9 @@
     ],
     "Longitude": 0.0821,
     "Latitude": 52.22,
-    "Description": "North West Cambridge near Motorway"
+    "Description": "North West Cambridge near Motorway",
+    "date_from": "2016-06-26",
+    "date_to": "2017-02-15"
 },
 {
     "Latitude": 52.221,
@@ -42,7 +43,9 @@
     "Name": "NWC-Huntingdon Rd",
     "StationID": "S-1135",
     "Longitude": 0.0913,
-    "Description": "North West Cambridge near new school"
+    "Description": "North West Cambridge near new school",
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-19"
 },
 {
     "FeedID": "cam_aq",
@@ -63,7 +66,9 @@
         "TSP"
     ],
     "StationID": "S-1136",
-    "Latitude": 52.192
+    "Latitude": 52.192,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-25"
 },
 {
     "Name": "Hills-CherryH",
@@ -84,7 +89,9 @@
     ],
     "StationID": "S-1137",
     "Latitude": 52.189,
-    "Longitude": 0.136
+    "Longitude": 0.136,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-25"
 },
 {
     "SensorTypes": [
@@ -105,7 +112,9 @@
     "FeedID": "cam_aq",
     "Name": "Gonville Place (roadside)",
     "StationID": "S-1138",
-    "Longitude": 0.1275
+    "Longitude": 0.1275,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-25"
 },
 {
     "StationID": "S-1139",
@@ -126,7 +135,9 @@
         "PM10",
         "TSP"
     ],
-    "Latitude": 52.203
+    "Latitude": 52.203,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-25"
 },
 {
     "SensorTypes": [
@@ -147,7 +158,9 @@
     "FeedID": "cam_aq",
     "Name": "Adden_Puddicombe",
     "StationID": "S-1140",
-    "Longitude": 0.1387
+    "Longitude": 0.1387,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "Latitude": 52.179,
@@ -168,7 +181,9 @@
         "PM2_5",
         "PM10",
         "TSP"
-    ]
+    ],
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "SensorTypes": [
@@ -189,7 +204,9 @@
     "FeedID": "cam_aq",
     "Name": "Flying Pig",
     "Latitude": 52.194,
-    "StationID": "S-1142"
+    "StationID": "S-1142",
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "FeedID": "cam_aq",
@@ -210,7 +227,9 @@
         "PM2_5",
         "PM10",
         "TSP"
-    ]
+    ],
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "FeedID": "cam_aq",
@@ -231,7 +250,9 @@
     ],
     "Longitude": 0.1351,
     "Latitude": 52.176,
-    "StationID": "S-1144"
+    "StationID": "S-1144",
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "StationID": "S-1145",
@@ -252,7 +273,9 @@
         "PM2_5",
         "PM10",
         "TSP"
-    ]
+    ],
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "Longitude": 0.1435,
@@ -273,7 +296,9 @@
         "PM2_5",
         "PM10",
         "TSP"
-    ]
+    ],
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 },
 {
     "Longitude": 0.1484,
@@ -294,7 +319,9 @@
         "PM10",
         "TSP"
     ],
-    "Latitude": 52.174
+    "Latitude": 52.174,
+    "date_from": "2016-06-26",
+    "date_to": "2016-11-18"
 },
 {
     "Latitude": 52.176,
@@ -315,7 +342,9 @@
         "PM2_5",
         "PM10",
         "TSP"
-    ]
+    ],
+    "date_from": "2016-06-22",
+    "date_to": "2016-10-08"
 },
 {
     "SensorTypes": [
@@ -336,7 +365,9 @@
     "Latitude": 52.176,
     "Name": "Adden Bus Stn",
     "Longitude": 0.145,
-    "StationID": "S-1149"
+    "StationID": "S-1149",
+    "date_from": "2016-06-26",
+    "date_to": "2016-10-18"
 },
 {
     "Latitude": 52.199,
@@ -357,7 +388,9 @@
     ],
     "StationID": "S-1150",
     "Name": "Gonville Place",
-    "Longitude": 0.1276
+    "Longitude": 0.1276,
+    "date_from": "2016-06-23",
+    "date_to": "2017-01-25"
 },
 {
     "FeedID": "cam_aq",
@@ -378,7 +411,9 @@
         "PM10",
         "TSP"
     ],
-    "Latitude": 52.174
+    "Latitude": 52.174,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-14"
 },
 {
     "Longitude": 0.1221,
@@ -399,7 +434,9 @@
         "PM10",
         "TSP"
     ],
-    "StationID": "S-1152"
+    "StationID": "S-1152",
+    "date_from": "2016-06-22",
+    "date_to": "2017-01-14"
 },
 {
     "Longitude": 0.1396,
@@ -420,7 +457,9 @@
         "PM10",
         "TSP"
     ],
-    "Latitude": 52.176
+    "Latitude": 52.176,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-14"
 }
-  ]
-}
+]}
+

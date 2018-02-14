@@ -17,5 +17,7 @@
     "FeedID": "cam_aq",
     "Name": "Adden_Puddicombe",
     "StationID": "S-1140",
-    "Longitude": 0.1387
+    "Longitude": 0.1387,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 }

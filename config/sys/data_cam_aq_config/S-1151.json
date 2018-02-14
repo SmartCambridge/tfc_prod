@@ -17,5 +17,7 @@
         "PM10",
         "TSP"
     ],
-    "Latitude": 52.174
+    "Latitude": 52.174,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-14"
 }

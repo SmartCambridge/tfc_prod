@@ -17,5 +17,7 @@
     ],
     "Longitude": 0.1351,
     "Latitude": 52.176,
-    "StationID": "S-1144"
+    "StationID": "S-1144",
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
 }

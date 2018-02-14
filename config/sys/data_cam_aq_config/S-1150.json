@@ -17,5 +17,7 @@
     ],
     "StationID": "S-1150",
     "Name": "Gonville Place",
-    "Longitude": 0.1276
+    "Longitude": 0.1276,
+    "date_from": "2016-06-23",
+    "date_to": "2017-01-25"
 }

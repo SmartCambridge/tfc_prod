@@ -17,5 +17,7 @@
     "Latitude": 52.176,
     "Name": "Adden Bus Stn",
     "Longitude": 0.145,
-    "StationID": "S-1149"
+    "StationID": "S-1149",
+    "date_from": "2016-06-26",
+    "date_to": "2016-10-18"
 }

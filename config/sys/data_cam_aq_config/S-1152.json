@@ -17,5 +17,7 @@
         "PM10",
         "TSP"
     ],
-    "StationID": "S-1152"
+    "StationID": "S-1152",
+    "date_from": "2016-06-22",
+    "date_to": "2017-01-14"
 }
