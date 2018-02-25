@@ -1,1 +1,3 @@
-0 1 * * * /usr/bin/pg_dumpall --clean | /bin/bzip2 > /backups/database.`date +"%Y.%m.%d"`.pgdumpall.bz2
+# Once a day, at 1AM
+SHELL=/bin/bash
+0 1 * * * /usr/bin/pg_dumpall --clean | /bin/bzip2 > "/backups/database.$(date +\%Y.\%m.\%d).pgdumpall.bz2"
