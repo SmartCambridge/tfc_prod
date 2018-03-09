@@ -18,10 +18,26 @@ function get_distance(p1, p2)
     return d; // returns the distance in meter
 };
 
+// return {north: .., south: .., east: .., west: .. } as bounds of array of position
+function get_box(position_array)
+{
+    var box = { north: -90, south: 90, east: -180, west: 180 };
+    for (var i=0; i<position_array.length; i++)
+    {
+        if (position_array[i].lat > box.north) box.north = position_array[i].lat;
+        else if (position_array[i].lat < box.south) box.south = position_array[i].lat;
+        if (position_array[i].lng > box.east) box.east = position_array[i].lng;
+        else if (position_array[i].lng < box.west) box.west = position_array[i].lng;
+    }
+    return box;
+}
+
 // Return true is position is inside bounding polygon
 // http://stackoverflow.com/questions/13950062/checking-if-a-longitude-latitude-coordinate-resides-inside-a-complex-polygon-in
-function inside(position, bounds_path, box)
+function is_inside(position, bounds_path, box)
 {
+    //console.log('is_inside '+JSON.stringify(position)+', '+JSON.stringify(bounds_path)+', '+JSON.stringify(box));
+
     // easy optimization - return false if position is outside bounding rectangle (box)
     if ( position.lat > box.north ||
          position.lat < box.south ||
@@ -214,7 +230,7 @@ function get_distance_from_line(P, line)
 //*********************************************************************************************
 
 // degrees to radians
-var rad = function(x) {
+function rad(x) {
       return x * Math.PI / 180;
 };
 
