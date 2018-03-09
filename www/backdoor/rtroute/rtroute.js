@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.03';
+var VERSION = '4.04';
+            // 4.04 geo.js get_box() and is_inside() testing
             // 4.03 using stop -> journeys API
             // 4.02 restructure to use sensor.state.route_profile and not .route
             // 4.01 adding timetable API call to lookup sirivm->route

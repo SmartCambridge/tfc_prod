@@ -25,9 +25,9 @@ function get_box(position_array)
     for (var i=0; i<position_array.length; i++)
     {
         if (position_array[i].lat > box.north) box.north = position_array[i].lat;
-        else if (position_array[i].lat < box.south) box.south = position_array[i].lat;
+        if (position_array[i].lat < box.south) box.south = position_array[i].lat;
         if (position_array[i].lng > box.east) box.east = position_array[i].lng;
-        else if (position_array[i].lng < box.west) box.west = position_array[i].lng;
+        if (position_array[i].lng < box.west) box.west = position_array[i].lng;
     }
     return box;
 }
