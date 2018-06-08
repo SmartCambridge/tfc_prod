@@ -321,7 +321,8 @@ function init()
 
     map.on('click',click_map);
 
-    map_tiles = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    map_tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            {
             attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
@@ -1050,7 +1051,7 @@ function init_state(sensor, clock_time)
     init_old_status(sensor, clock_time);
 
     // ASYNC GET of route_profile
-    get_route_profile(sensor);
+    //get_route_profile(sensor);
 }
 
 // Write messages to in-page log when segment-probability errors occur
