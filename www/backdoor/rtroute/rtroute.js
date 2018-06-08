@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.04';
+var VERSION = '4.05';
+            // 4.05 will now get_route_profile() and draw_route_profile() on bus popup -> journey
             // 4.04 geo.js get_box() and is_inside() testing
             // 4.03 using stop -> journeys API
             // 4.02 restructure to use sensor.state.route_profile and not .route
@@ -294,6 +295,10 @@ var poly_close; // line between poly last point and start, closing polygon
 function init()
 {
     document.title = document.title + ' ' + VERSION;
+
+    //initialise page_title
+    var page_title_text = document.createTextNode('RTRoute '+VERSION);
+    document.getElementById('page_title').appendChild(page_title_text);
 
     // initialize log 'console'
     log_div = document.getElementById('log_div');
@@ -778,8 +783,9 @@ function handle_stop_journeys(stop_id)
     }
 }
 
-// Query (GET) the timetable API
-function get_route_profile(sensor)
+// Query (GET) the departure_to_journey timetable API using data in sensor.msg
+// if draw=true then draw journey on map
+function get_route_profile(sensor, draw)
 {
     //console.log('get_route_profile '+sensor.sensor_id);
 
@@ -793,6 +799,11 @@ function get_route_profile(sensor)
         console.log('Found cached route_profile');
         sensor.state.route_profile = route_profile;
         handle_route_profile(sensor);
+        // if draw=true to original call of get_route_profile, then draw this journey
+        if (draw)
+        {
+            draw_route_profile(sensor);
+        }
         return;
     }
 
@@ -822,6 +833,11 @@ function get_route_profile(sensor)
             //console.log('got route profile for '+sensor_id);
             add_api_route_profile(sensor_id, stop_id, departure_time, xhr.responseText);
             handle_route_profile(sensor);
+            // if draw=true to original call of get_route_profile, then draw this journey
+            if (draw)
+            {
+                draw_route_profile(sensor);
+            }
         }
     }
 }
@@ -1051,7 +1067,7 @@ function init_state(sensor, clock_time)
     init_old_status(sensor, clock_time);
 
     // ASYNC GET of route_profile
-    //get_route_profile(sensor);
+    //get_route_profile(sensor, false);
 }
 
 // Write messages to in-page log when segment-probability errors occur
@@ -3738,7 +3754,8 @@ function draw_poly()
 // user clicked on 'journey' in sensor popup
 function click_journey(sensor_id)
 {
-    draw_route_profile(sensors[sensor_id]);
+    // get the route profile via the transport API, with draw=true
+    get_route_profile(sensors[sensor_id], true);
 }
 
 // user clicked on 'more' in sensor popup
@@ -3982,7 +3999,25 @@ function load_test_data(test_name)
     replay_stop(); // stop replay if it is already running
 
     // replay only the first record
-    replay_next_record();
+    //replay_next_record();
+    var msg = recorded_records[0];
+    replay_time = get_msg_date(msg);
+    update_clock(replay_time);
+    init_sensor(msg, replay_time);
+    var sensor_id = msg[RECORD_INDEX];
+    var sensor = sensors[sensor_id];
+    var route_profile = cached_route_profile(sensor);
+    if (route_profile)
+    {
+        console.log('Found cached route_profile for '+sensor_id);
+        sensor.state.route_profile = route_profile;
+        handle_route_profile(sensor);
+        draw_route_profile(sensor);
+    }
+    else
+    {
+        console.log('Test records '+test_name+' failed to find cached route profile for '+sensor_id);
+    }
 }
 
 // User has clicked on the 'hide map' checkbox.

@@ -44,11 +44,13 @@ RELEASE INFO:
 <style type="text/css">
 html {
     height: 100%;
+    margin-right: 15px;
 }
 
 body {
     font-family: sans-serif;
     height: 100%;
+    width: 100%;
 }
 
 #rt_scratchpad {
@@ -57,10 +59,18 @@ body {
     height: 30%;
 }
 
-#map {
-	display: inline-block;
-	width: 61%;
+.map_container {
+    width: auto;
     height: 80%;
+    overflow: hidden;
+    vertical-align: top;
+}
+
+#map {
+	/*display: inline-block; */
+	width: 100%;
+    height: 100%;
+    /* overflow: hidden;*/
 }
 
 #log_div {
@@ -85,16 +95,22 @@ body {
 }
 
 .control_div {
-    display: inline-block;
+    /* display: inline-block;*/
     width: 30%;
+    min-width: 250px;
+    max-width: 400px;
     height: 80%;
+    float: left;
+
 }
 
 .progress_div {
     display: inline-block;
     background-color: lightblue;
     height: 80%;
-    width: 7%;
+    width: 100px;
+    vertical-align: top;
+    float: left;
 }
 
 .progress_canvas {
@@ -201,7 +217,7 @@ var test_data = {};
 <body onload='init()'>
 
 <div id="control_div" class="top-aligned control_div">
-<h1>RTMonitor <span id='clock'></span></h1>
+    <h1><span id="page_title"></span> <span id='clock'></span></h1>
 <div><a href="#" onclick="hide_control()">hide</a>
 </div>
 <div class="control_heading">Real-time requests and subscriptions</div>
@@ -321,7 +337,9 @@ var test_data = {};
 </div>
 
 <!-- MAP -->
-<div class="top-aligned" id="map"></div>
+<div class="map_container">
+<div id="map"></div>
+</div>
 
 <!-- console log -->
 <div id="log_div"></div>
