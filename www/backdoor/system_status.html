@@ -2,12 +2,12 @@
 <meta charset="UTF-8">
 <html>
 <head>
-<title>System Status::smartCAMBRIDGE</title>
+<title>System Status</title>
 
 <style>
 body {
    font-family: Tahoma, Verdana, Segoe, sans-serif;
-   background-image: url("images/background_blur.png");
+/*   background-image: url("images/background_blur.png"); */
 
 }  
 
@@ -56,7 +56,9 @@ p {
 // Note these threshold values can also be sent in the EB_SYSTEM_STATUS message
 // i.e. if the console hasn't received an 'UP' status message in 35 seconds, it will treat the
 // local status of that module as 'amber'
-      
+
+var SECONDS = 1000; // for timer in ms
+var STATUS_POLLING_SECONDS = 30;
 var STATUS_AMBER_SECONDS_DEFAULT = 35;
 var STATUS_RED_SECONDS_DEFAULT = 65;
 
@@ -72,8 +74,10 @@ function init()
 
   clock = document.getElementById('clock');
 
-  // get status from /api/console/status
+  // request and write status to page
   get_status_then_display();
+  // and then poll for status
+  setInterval(get_status_then_display, STATUS_POLLING_SECONDS * SECONDS);
 
 } // end init()
 
@@ -88,13 +92,27 @@ function format_time(t)
       return hours + ':' + mins + ':' + secs;
 }
 
-function format_status(module_name, module_id, t)
+function format_date(d) {
+    var month = '' + (d.getMonth() + 1),
+        day = '' + d.getDate(),
+        year = d.getFullYear();
+
+    if (month.length < 2) month = '0' + month;
+    if (day.length < 2) day = '0' + day;
+
+    return [year, month, day].join('-');
+}
+
+function format_status(status)
 {
-    return module_name+"<br/>"+module_id+"<br/>"+format_time(t);
+    var d = new Date(status.ts*1000);
+
+    return status.module_name+'<br/>'+
+           status.module_id+'<br/>'+
+           format_time(d)+'<br/>'+
+           format_date(d);
 }
                     
-// We have just received a message on the EB_SYSTEM_STATUS address
-// so update the appropriate 'status_area' on the page
 function display_status(status)
 {
     var module_area = document.getElementById('module_area_'+status.module_name);
@@ -106,12 +124,19 @@ function display_status(status)
         module_area_others.appendChild(module_area);
     }
 		    
-      // create a new 'status_el' page element
-      var status_el = document.createElement('DIV');
-      status_el.setAttribute('class','status_area');
+    // use existing or create a new 'status_el' page element
+    var status_id = 'module_'+status.module_name+'_'+status.module_id;
+
+    var status_el = document.getElementById(status_id);
+    if (status_el == null)
+    {
+        status_el = document.createElement('DIV');
+        status_el.setAttribute('id', status_id);
+        status_el.setAttribute('class','status_area');
   
-      // add this status area to 'module_area_<name>' document element
-      module_area.appendChild(status_el);
+        // add this status area to 'module_area_<name>' document element
+        module_area.appendChild(status_el);
+    }
     
     // Set the "status_amber_seconds" and "status_red_seconds" properties for current module
     // either obtaining these values from the status message, or using the defaults on this page
@@ -126,9 +151,7 @@ function display_status(status)
         status_red_seconds = status.status_red_seconds;
       }
 
-    status_el.innerHTML = status.module_name+'<br/>'+
-                status.module_id+'<br/>'+
-                (new Date(status.ts*1000)).toLocaleTimeString();
+    status_el.innerHTML = format_status(status); 
 
     var seconds_since_ts = (new Date()).getTime()/1000 - status.ts;
     //console.log('seconds_since_ts '+seconds_since_ts);
@@ -199,27 +222,32 @@ function get_status_then_display()
                       }
                 });
   }
+
 </script>
 
 </head>
   <body onload="init()">
 <h1 class="header_title">
 <a href="/"><img src="images/smart_cambridge_logo_rounded.png"/></a>
-<a href=".">backdoor</a>::Rita System Status
+SmartCambridge Platform Status
 </h1>
-<p>This page shows the 'current status' of the various technical modules that make up the smartCAMBRIDGE real-time data platform known as
-  "Rita". Green means the module is performing happily, Red indicates that module is currently offline.  Note that experimental modules will be
+<p>This page shows the 'current status' of the various technical modules that make up the smartCAMBRIDGE real-time data platform.
+  Green means the module is performing happily, Red indicates that module is currently offline.  Note that experimental modules will be
   launched and stopped from time to time and these may well appear on this page in red...
   </p>
 <div id="status_areas">
-  <div id="module_area_feedhandler">
-    <div class="status_area_heading">FeedHandler - Rita is receiving real-time data from these sources</div>
+  <div class="module_area_section">
+    <div class="status_area_heading">Feeds - the platform is receiving real-time data from these sources</div>
+    <div class="module_area" id="module_area_feedhandler"></div>
+    <div class="module_area" id="module_area_feedmaker"></div>
   </div>
-  <div id="module_area_zone">
-    <div class="status_area_heading">Zone - Rita is monitoring these zones</div>
+  <div class="module_area_section">
+    <div class="status_area_heading">Traffic Zones - the platform is monitoring the traffic moving through these zones</div>
+    <div class="module_area" id="module_area_zone"></div>
   </div>
-  <div id="module_area_others">
-    <div class="status_area_heading">Additional Modules - Rita is using these other system components</div>
+  <div id="module_area_section">
+    <div class="status_area_heading">Additional Modules - other system components</div>
+    <div class="module_area" id="module_area_others"></div>
   </div>
 </div>
 </body>
