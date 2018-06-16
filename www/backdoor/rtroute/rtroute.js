@@ -4,7 +4,7 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.05';
+var VERSION = '4.05b';
             // 4.05 will now get_route_profile() and draw_route_profile() on bus popup -> journey
             // 4.04 geo.js get_box() and is_inside() testing
             // 4.03 using stop -> journeys API
@@ -22,9 +22,10 @@ var VERSION = '4.05';
             // 2.00 initial development of 'progress vector'
             // 1.00 initial development of 'segment distance vector'
 
-var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
+//var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
+var RTMONITOR_URI = 'http://smartcambridge.org/rtmonitor/sirivm';
 
-var TIMETABLE_URI = 'http://tfc-app3.cl.cam.ac.uk/transport/api';
+var TIMETABLE_URI = 'https://smartcambridge.org/transport/api';
 
 var STOP_MAX_JOURNEYS = 20; // max # of journeys to request from transport api (i.e. nresults)
 
@@ -42,6 +43,13 @@ var DRAW_PROGRESS_LEFT_MARGIN = 5;
 var DRAW_PROGRESS_RIGHT_MARGIN = 5;
 var DRAW_PROGRESS_TOP_MARGIN = 20;
 var DRAW_PROGRESS_BOTTOM_MARGIN = 10;
+
+// RTMonitor rt_connect client_data
+var CLIENT_DATA = { rt_client_name: 'RTRoute V'+VERSION,
+                    rt_client_id: 'rtroute',
+                    rt_client_url: location.href,
+                    rt_token: '888'
+                  };
 
 // ******************
 // ANALYSIS CONSTANTS
@@ -3303,7 +3311,10 @@ function sock_connect(method)
 
     sock.onopen = function() {
                 log('** socket open');
-                sock_send_str('{ "msg_type": "rt_connect" }');
+                var msg_obj = { msg_type: 'rt_connect',
+                                client_data: CLIENT_DATA
+                              };
+                sock_send_str(JSON.stringify(msg_obj));
                 };
 
     sock.onmessage = function(e) {
