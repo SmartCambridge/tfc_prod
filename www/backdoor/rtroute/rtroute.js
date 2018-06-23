@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.05b';
+var VERSION = '4.06';
+            // 4.06 display/update RTMONITOR_URI on page
             // 4.05 will now get_route_profile() and draw_route_profile() on bus popup -> journey
             // 4.04 geo.js get_box() and is_inside() testing
             // 4.03 using stop -> journeys API
@@ -310,6 +311,33 @@ function init()
 
     // initialize log 'console'
     log_div = document.getElementById('log_div');
+
+    // display RTMONITOR_URI on control div
+    var rtmonitor_uri_input = document.getElementById('rtmonitor_uri');
+
+    rtmonitor_uri_input.value = RTMONITOR_URI;
+
+    rtmonitor_uri_input.addEventListener('focus', function (e) {
+        rtmonitor_uri_input.style['background-color'] = '#ddffdd'; //lightgreen
+        return false;
+    });
+
+    rtmonitor_uri_input.addEventListener('blur', function (e) {
+        rtmonitor_uri_input.style['background-color'] = '#ffffff'; //white
+        return false;
+    });
+
+    rtmonitor_uri_input.addEventListener('keydown', function (e) {
+        if (e.key === "Enter" || e.keyCode == 13 || e.which == 13)
+        {
+            RTMONITOR_URI = rtmonitor_uri_input.value;
+            log('RTMONITOR_URI changed to '+RTMONITOR_URI);
+            rtmonitor_uri_input.blur();
+            e.preventDefault();
+            return false;
+        }
+        return false;
+    });
 
     // initialize progress div
     page_progress.div = document.getElementById('progress_div');

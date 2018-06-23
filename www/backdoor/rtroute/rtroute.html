@@ -184,6 +184,12 @@ body {
     border-radius: 3px;
 }
 
+#rtmonitor_uri {
+    width: 100%;
+    border: none;
+    margin: 0 0 5px 0;
+}
+
 </style>
 
 <!-- Create object to store test data from following files -->
@@ -222,6 +228,9 @@ var test_data = {};
 </div>
 <div class="control_heading">Real-time requests and subscriptions</div>
 <div class="control_box">
+    <form>
+        <input type="text" id="rtmonitor_uri"></input>
+    </form>
     <button onclick="sock_connect('nginx')"
         title="Connect socket to server and send rt_connect msg"
         >Connect</button>
