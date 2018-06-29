@@ -86,6 +86,12 @@ from the machine responding to smartcambridge.org/www.smartcambridge.org onto an
 other machines that might run these sites in future. Requires infrastructure for securely
 transferring root-owned secrets between our servers.
 
+**TODO:** alternatively, we could use certbot manual mode and arrange to transfer the CERTBOT_VALIDATION
+and CERTBOT_TOKEN values to whichever machine *is* responding to smartcambridge.org/www.smartcambridge.org
+using `--manual-auth-hook` (and cleaning up with `--manual-cleanup-hook`). This still requires infrastructure
+for transferring files but a) they would only be short-term secrets, and b) the destination doesn't need to be run as root.
+
+
 ## Configure nginx supporting carrier.csi.cam.ac.uk
 
 ```
