@@ -3766,112 +3766,126 @@ function click_map(e)
 {
     if (poly_draw)
     {
-        var marker = new L.marker( e.latlng,
-                                   { icon: L.icon({ iconUrl: 'circle_15px.png',
-                                                    iconAnchor: [7,7]
-                                                  })
-                                   }
-                                 );
-        poly_line.addLatLng(marker.getLatLng());
-        poly_markers.push(marker);
-        // if this is the first point of the polyline, highlight it
-        if (poly_markers.length == 1)
+        add_poly_marker(e.latlng);
+        if (poly_markers.length > 2)
         {
-            marker.addTo(map);
-            poly_start = marker;
-        }
-        // when we click the second point, we can remove the highlight of first point
-        if (poly_markers.length == 2)
-        {
-            map.removeLayer(poly_start);
-            poly_line_start = L.polyline([poly_markers[0].getLatLng(), poly_markers[1].getLatLng()],
-                                         { color: 'green' }
-                                        ).addTo(map);
-        }
-
-        if ( poly_markers.length > 2)
-        {
-            // add mid marker for most recent edge
-            var prev_latlng = poly_markers[poly_markers.length-2].getLatLng();
-            var lat_mid = (e.latlng.lat + prev_latlng.lat) / 2;
-            var lng_mid = (e.latlng.lng + prev_latlng.lng) / 2;
-
-            var mid_marker = new L.marker( L.latLng(lat_mid, lng_mid),
-                                   { icon: L.icon({ iconUrl: 'circle_15px.png',
-                                                    iconAnchor: [7,7]
-                                                  })
-                                   }
-                                 );
-
-            // when a mid-marker is clicked on, set that line as the finish line
-            mid_marker.on('click', function (n)
-                                   { return function (e)
-                                            { set_poly_line_finish(n);
-                                            };
-                                   }(poly_mid_markers.length));
-
-            mid_marker.addTo(map);
-
-            poly_mid_markers.push(mid_marker);
-
-            // add polygon closing line (and remove previous closing line)
-            if (poly_line_close != null)
-            {
-                map.removeLayer(poly_line_close);
-                map.removeLayer(poly_mid_marker_close);
-            }
-            prev_latlng = poly_markers[0].getLatLng();
-            poly_line_close = L.polyline([], {dashArray: '10,5', color: 'blue'}).addTo(map);
-            poly_line_close.addLatLng(e.latlng);
-            poly_line_close.addLatLng(prev_latlng);
-            // add mid marker for closing edge
-            lat_mid = (e.latlng.lat + prev_latlng.lat) / 2;
-            lng_mid = (e.latlng.lng + prev_latlng.lng) / 2;
-
-            poly_mid_marker_close = new L.marker( L.latLng(lat_mid, lng_mid),
-                                   { icon: L.icon({ iconUrl: 'circle_15px.png',
-                                                    iconAnchor: [7,7]
-                                                  })
-                                   }
-                                 );
-            // when a mid-marker is clicked on, set that line as the finish line
-            poly_mid_marker_close.on('click', function (n)
-                                              { return function (e)
-                                                       { set_poly_line_finish(n);
-                                                       };
-                                              }(poly_mid_markers.length));
-
-            poly_mid_marker_close.addTo(map);
-
-            // update user scratchpad with filter text
-
-            var rt_string = '';
-            rt_string += '{ "msg_type": "rt_request",\n';
-            rt_string += '  "request_id": "A",\n';
-            rt_string += '  "options": [ "latest_records" ],\n';
-            rt_string += '  "filters": [\n';
-            rt_string += '     { "test": "inside",\n';
-            rt_string += '       "lat_key": "Latitude",\n';
-            rt_string += '       "lng_key": "Longitude",\n';
-            rt_string += '       "points": [\n';
-            for (var i=0; i<poly_markers.length; i++)
-            {
-                rt_string += marker_to_pos(poly_markers[i]);
-                if (i < poly_markers.length - 1)
-                    rt_string += ',\n';
-            }
-            rt_string += '                 ]\n';
-            rt_string += '             } ]\n';
-            rt_string += '}';
-
-            // write this msg to scratchpad
-            document.getElementById('rt_scratchpad').value = rt_string;
+            poly_to_scratchpad();
         }
     }
 }
 
+function add_poly_marker(pos)
+{
+    var marker = new L.marker( pos,
+                               { icon: L.icon({ iconUrl: 'circle_15px.png',
+                                                iconAnchor: [7,7]
+                                              })
+                               }
+                             );
+    poly_line.addLatLng(marker.getLatLng());
+    poly_markers.push(marker);
+    // if this is the first point of the polyline, highlight it
+    if (poly_markers.length == 1)
+    {
+        marker.addTo(map);
+        poly_start = marker;
+    }
+    // when we click the second point, we can remove the highlight of first point
+    if (poly_markers.length == 2)
+    {
+        map.removeLayer(poly_start);
+        poly_line_start = L.polyline([poly_markers[0].getLatLng(), poly_markers[1].getLatLng()],
+                                     { color: 'green' }
+                                    ).addTo(map);
+    }
+
+    if ( poly_markers.length > 2)
+    {
+        // add mid marker for most recent edge
+        var prev_latlng = poly_markers[poly_markers.length-2].getLatLng();
+        var lat_mid = (pos.lat + prev_latlng.lat) / 2;
+        var lng_mid = (pos.lng + prev_latlng.lng) / 2;
+
+        var mid_marker = new L.marker( L.latLng(lat_mid, lng_mid),
+                               { icon: L.icon({ iconUrl: 'circle_15px.png',
+                                                iconAnchor: [7,7]
+                                              })
+                               }
+                             );
+
+        // when a mid-marker is clicked on, set that line as the finish line
+        mid_marker.on('click', function (n)
+                               { return function (e)
+                                        { set_poly_line_finish(n);
+                                        };
+                               }(poly_mid_markers.length));
+
+        mid_marker.addTo(map);
+
+        poly_mid_markers.push(mid_marker);
+
+        // add polygon closing line (and remove previous closing line)
+        if (poly_line_close != null)
+        {
+            map.removeLayer(poly_line_close);
+            map.removeLayer(poly_mid_marker_close);
+        }
+        prev_latlng = poly_markers[0].getLatLng();
+        poly_line_close = L.polyline([], {dashArray: '10,5', color: 'blue'}).addTo(map);
+        poly_line_close.addLatLng(pos);
+        poly_line_close.addLatLng(prev_latlng);
+        // add mid marker for closing edge
+        lat_mid = (pos.lat + prev_latlng.lat) / 2;
+        lng_mid = (pos.lng + prev_latlng.lng) / 2;
+
+        poly_mid_marker_close = new L.marker( L.latLng(lat_mid, lng_mid),
+                               { icon: L.icon({ iconUrl: 'circle_15px.png',
+                                                iconAnchor: [7,7]
+                                              })
+                               }
+                             );
+        // when a mid-marker is clicked on, set that line as the finish line
+        poly_mid_marker_close.on('click', function (n)
+                                          { return function (e)
+                                                   { set_poly_line_finish(n);
+                                                   };
+                                          }(poly_mid_markers.length));
+
+        poly_mid_marker_close.addTo(map);
+    }
+}
+
+function poly_to_scratchpad()
+{
+    // update user scratchpad with filter text
+
+    var rt_string = '';
+    rt_string += '{ "msg_type": "rt_request",\n';
+    rt_string += '  "request_id": "A",\n';
+    rt_string += '  "options": [ "latest_records" ],\n';
+    rt_string += '  "filters": [\n';
+    rt_string += '     { "test": "inside",\n';
+    rt_string += '       "lat_key": "Latitude",\n';
+    rt_string += '       "lng_key": "Longitude",\n';
+    rt_string += '       "points": [\n';
+    for (var i=0; i<poly_markers.length; i++)
+    {
+        rt_string += marker_to_pos(poly_markers[i]);
+        if (i < poly_markers.length - 1)
+            rt_string += ',\n';
+    }
+    rt_string += '                 ]\n';
+    rt_string += '             } ]\n';
+    rt_string += '}';
+
+    // write this msg to scratchpad
+    document.getElementById('rt_scratchpad').value = rt_string;
+}
+
 // User has clicked on a mid-marker on the edge of a drawn polygon.
 // This is assumed to select that edge as the 'finish' of a zone.
+// The edge will be highlighted in red, and the 'poly_finish_index' set.
+// Selecting the finish line will write the zone config to the scratchpad textarea.
 function set_poly_line_finish(mid_index)
 {
     poly_finish_index = mid_index + 1;
@@ -3893,10 +3907,71 @@ function set_poly_line_finish(mid_index)
     {
         next_index = poly_finish_index + 1;
     }
+    // draw a red line on the map over the selected 'finish' edge
     poly_line_finish = L.polyline([ poly_markers[poly_finish_index].getLatLng(),
                                     poly_markers[next_index].getLatLng()],
                                   { color: 'red' }
                                  ).addTo(map);
+
+    var map_center = map.getCenter();
+
+    // here we construct the zone content of a tfc_server Zone config
+    var z =  '{ "zone.center": {\n';
+    z += '  "lat":'+map_center.lat+',\n';
+    z += '  "lng":'+map_center.lng+'},\n';
+    z += '"zone.zoom":'+map.getZoom()+',\n';
+    z += '"zone.finish_index":'+poly_finish_index+',\n';
+    z += '"zone.path":[\n';
+    for (var i=0; i<poly_markers.length; i++)
+    {
+        z += marker_to_pos(poly_markers[i]);
+        if (i < poly_markers.length - 1)
+            z += ',\n';
+    }
+    z += '] }';
+    // write this info to scratchpad
+    document.getElementById('rt_scratchpad').value = z;
+}
+
+// Draw a polygon using JSON data from rt_scratchpad
+function load_poly()
+{
+    var z_str = document.getElementById('rt_scratchpad').value;
+    var z;
+    try {
+        z = JSON.parse(z_str);
+    }
+    catch(e) {
+        alert('Could not parse scratchpad data');
+        return;
+    }
+
+    if (z['zone.zoom'] && z['zone.center'])
+    {
+        var center = L.latLng(z['zone.center'].lat, z['zone.center'].lng);
+
+        console.log('map.setView to ' + center + ',' + z['zone.zoom']);
+        map.setView(center, z['zone.zoom']);
+    }
+
+    if (z['zone.finish_index'] && z['zone.path'] && z['zone.path'].length > 2)
+    {
+        // toggle poly_draw mode, clear existing poly if necessary
+        draw_poly();
+        if (!poly_draw)
+        {
+            draw_poly();
+        }
+        for (var i=0; i<z['zone.path'].length; i++)
+        {
+            var pos = L.latLng(z['zone.path'][i].lat, z['zone.path'][i].lng);
+            console.log('adding pos '+pos);
+            add_poly_marker(pos);
+        }
+
+        // highlight finish line
+        set_poly_line_finish(z['zone.finish_index']-1);
+    }
 }
 
 // Draw a polygon for the 'inside' filter test
