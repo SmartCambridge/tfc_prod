@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.06';
+var VERSION = '4.07';
+            // 4.07 forward/back scroll through sock send messages, subscribe link on bus popup
             // 4.06 display/update RTMONITOR_URI on page
             // 4.05 will now get_route_profile() and draw_route_profile() on bus popup -> journey
             // 4.04 geo.js get_box() and is_inside() testing
@@ -222,6 +223,11 @@ var drawn_stops = {}; // dictionary (by stop_id) of drawn stops so they can be u
 //    "DatedVehicleJourneyRef": "2",
 //    "OriginAimedDepartureTime": "2017-11-20T06:02:00+00:00"
 //    },
+
+// Message history for socket messages SENT
+var sock_send_history =  [];
+
+var sock_history_cursor = 0; // index to allow user scrolling through history
 
 // Data recording
 var recorded_records = [];
@@ -2726,6 +2732,7 @@ function sensor_popup_content(msg)
 		'<br/>Line "' + msg['PublishedLineName'] +'"'+
         '<br/>Delay: ' + xml_duration_to_string(msg['Delay'])+
         '<br/><a href="#" onclick="click_journey('+"'"+sensor_id+"'"+')">journey</a>'+
+        '<br/><a href="#" onclick="subscribe_to_sensor('+"'"+sensor_id+"'"+')">subscribe</a>'+
         '<br/><a href="#" onclick="click_more('+"'"+sensor_id+"'"+')">more</a>';
 }
 
@@ -3407,6 +3414,11 @@ function sock_send_str(msg)
 
     log('sending: '+msg);
 
+    // push msg onto history and update cursor to point to end
+    sock_send_history.push(msg);
+
+    sock_history_cursor = sock_send_history.length;
+
     // write msg into scratchpad textarea
     document.getElementById('rt_scratchpad').value = msg;
 
@@ -3685,6 +3697,34 @@ function clear_textarea(element_id)
     document.getElementById(element_id).value='';
 }
 
+// scroll BACK through socket messages sent to server and update scratchpad
+function sock_prev_msg(element_id)
+{
+    // don't try and scroll backwards before start
+    if (sock_history_cursor <= 1)
+    {
+        return;
+    }
+
+    sock_history_cursor--;
+
+    document.getElementById(element_id).value = sock_send_history[sock_history_cursor-1];
+}
+
+// scroll FORWARDS through socket messages sent to server
+function sock_next_msg(element_id)
+{
+    // don't scroll forwards after last msg
+    if (sock_history_cursor >= sock_send_history.length)
+    {
+        return;
+    }
+
+    sock_history_cursor++;
+
+    document.getElementById(element_id).value = sock_send_history[sock_history_cursor-1];
+}
+
 function marker_to_pos(marker)
 {
     var lat_lng = marker.getLatLng();
@@ -3795,6 +3835,16 @@ function click_journey(sensor_id)
 {
     // get the route profile via the transport API, with draw=true
     get_route_profile(sensors[sensor_id], true);
+}
+
+//user clicked on 'subscribe' for a bus
+function subscribe_to_sensor(sensor_id)
+{
+    var msg_obj = { msg_type: 'rt_subscribe',
+                    request_id: sensor_id,
+                    filters: [ { test: "=", key: "VehicleRef", value: sensor_id } ]
+                  };
+    sock_send_str(JSON.stringify(msg_obj));
 }
 
 // user clicked on 'more' in sensor popup
