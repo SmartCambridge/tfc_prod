@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Script run on the secure side of userv AS ROOT to setup or cleanup an
+# ACME HTTP-01 challenge.
+#
+# Receives the parameters of the request stdin:
+#    Line 1: action - auth or cleanup
+#    Line 2: CERTBOT_DOMAIN
+#    Line 3: CERTBOT_TOKEN (aka file name)
+#    Line 4: CERTBOT_VALIDATION (aka file content)
+
+read -r action
+read -r certbot_domain
+read -r certbot_token
+read -r certbot_validation
+
+set -e
+
+logger -p daemon.notice -t acme-challenge "${certbot_domain} ${action}"
+
+if [[ "${action}" == "auth" ]]; then
+    echo "${certbot_validation}" > "/var/www/acme-challenge/${certbot_token}"
+    rc=$?
+elif [[ "${action}" == "cleanup" ]]; then
+    rm -f "/var/www/acme-challenge/${certbot_token}"
+    rc=$?
+else
+    logger -p daemon.error -t acme-challenge "Unrecognised action ${action}"
+    rc=100
+fi
+
+logger -p daemon.notice -t acme-challenge "rc=${rc}"
+
+exit ${rc}

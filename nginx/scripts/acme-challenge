@@ -1,0 +1,6 @@
+if ( glob service-user root
+   & glob calling-user acme-challenge
+   )
+        reset
+        execute /usr/local/lib/userv/acme-challenge.target
+fi

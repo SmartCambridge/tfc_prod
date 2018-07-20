@@ -1,10 +1,16 @@
 Nginx and certificate management
 ================================
 
-## Install Nginx
+## Install Software
 
 ```
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:certbot/certbot
+sudo apt update
 sudo apt install nginx
+sudo apt install python-certbot-nginx
+sudo apt install userv
+
 ```
 test with
 
@@ -12,23 +18,29 @@ test with
 wget -O- "http://localhost"
 ```
 
-## Install certbot:
+## Setup support for forwarding certificate challenges
+
+We use a special account (`certbot-challenge`) to transfer the challenges created by `certbot` so that we can apply for certificates on one machine while the domain is being services by another one.
+
+First collect the `certbot-challenge` ssh keypair from a machine that already has them
 
 ```
-sudo apt-get update
-sudo apt-get install software-properties-common
-sudo add-apt-repository ppa:certbot/certbot
-sudo apt-get update
-sudo apt-get install python-certbot-nginx
+sudo scp root@<other-server>:/root/acme-challenge-keys /root/acme-challenge-keys
 ```
 
-Add the following line to root's crontab (`crontab -e`):
+then
 
 ```
-15 3 * * * /usr/bin/certbot renew --quiet
+sudo mkdir /usr/local/lib/userv/
+sudo cp ~tfc_prod/tfc_prod/nginx/scripts/acme-challenge.target /usr/local/lib/userv/
+sudo cp ~tfc_prod/tfc_prod/nginx/scripts/acme-challenge /etc/userv/services.d/
+sudo mkdir /var/www/acme-challenge
+sudo useradd --create-home acme-challenge
+sudo mkdir ~acme-challenge/.ssh
+sudo cp /root/acme-challenge-keys/authorized_keys ~acme-challenge/.ssh/
 ```
 
-## Configure generic Nginx
+## Setup initial Nginx, get certifictes
 
 ```
 sudo mkdir /etc/nginx/includes_tfc
@@ -39,70 +51,41 @@ sudo ln -s /etc/nginx/sites-available/tls-bootstrap.conf /etc/nginx/sites-enable
 sudo service nginx restart
 ```
 
-Make a certificate for this server's hostname (e.g. `tfc-app1.cl.cam.ac.uk`), replacing \<hostname\> appropriately.
-DO NOT omit the `--cert-name` option.
+Get certificates for this server, and for smartcambridge.org
 
 ```
-sudo certbot certonly --nginx --cert-name tfc_prod -d <hostname>
+sudo ~tfc_prod/tfc_prod/nginx/scripts/request-certificate.sh
+sudo ~tfc_prod/tfc_prod/nginx/scripts/request-smartcambridge-certificate.sh
 ```
 
-Restart nginx with a new configuration:
+Collect certificates for carrier.csi.cam.ac.uk from another machine that already has them
+
+```
+sudo mkdir /etc/nginx/ssl
+sudo scp root@<other-server>:/etc/nginx/ssl/carrier.pem /etc/nginx/ssl
+sudo scp root@<other-server>:/etc/nginx/ssl/carrier.key /etc/nginx/ssl
+sudo chmod 600 /etc/nginx/ssl/*
+sudo chmod 700 /etc/nginx/ssl
+```
+
+## Restart nginx with production configuration:
 
 ```
 sudo rm /etc/nginx/sites-enabled/tls-bootstrap.conf
 sudo ln -s /etc/nginx/sites-available/tfc_prod2.conf /etc/nginx/sites-enabled/
-sudo service nginx restart
-```
-
-## Configure nginx supporting smartcambridge.org
-
-There are two different strategies:
-
-### For a machine currently responding to requests to smartcambridge.org/www.smartcambridge.org
-
-```
-sudo certbot certonly --nginx --cert-name smartcambridge -d smartcambridge.org -d www.smartcambridge.org
 sudo ln -s /etc/nginx/sites-available/smartcambridge.conf /etc/nginx/sites-enabled/
-sudo service nginx restart
-```
-
-### For a machine NOT currently responding to requests to smartcambridge.org/www.smartcambridge.org
-
-Create `/etc/letsencrypt/live/fullchain.pem` and `/etc/letsencrypt/live/privkey.pem`,
-by copying them from the machine that is currently running smartcambridge.org/www.smartcambridge.org,
-or from a backup. If this isn't possible then you'll need to update the DNS so the machine does respond to
-smartcambridge.org/www.smartcambridge.org and folow the instructions above.
-
-```
-sudo ln -s /etc/nginx/sites-available/smartcambridge.conf /etc/nginx/sites-enabled/
-sudo service nginx restart
-```
-
-**TODO:** enable renewal if this machine will be running this for long. Will copying
-actual files to /etc/letsencrypt/live/ mess this up?
-
-**TODO:** automatically transfer keys and certificates as they are regenerated
-from the machine responding to smartcambridge.org/www.smartcambridge.org onto any
-other machines that might run these sites in future. Requires infrastructure for securely
-transferring root-owned secrets between our servers.
-
-**TODO:** alternatively, we could use certbot manual mode and arrange to transfer the CERTBOT_VALIDATION
-and CERTBOT_TOKEN values to whichever machine *is* responding to smartcambridge.org/www.smartcambridge.org
-using `--manual-auth-hook` (and cleaning up with `--manual-cleanup-hook`). This still requires infrastructure
-for transferring files but a) they would only be short-term secrets, and b) the destination doesn't need to be run as root.
-
-
-## Configure nginx supporting carrier.csi.cam.ac.uk
-
-```
-sudo mkdir /etc/nginx/ssl
-sudo cp carrier.pem /etc/nginx/ssl
-sudo cp carrier.key /etc/nginx/ssl
-sudo chmod 600 /etc/nginx/ssl/*
-sudo chmod 700 /etc/nginx/ssl
 sudo ln -s /etc/nginx/sites-available/carrier.csi.cam.ac.uk.conf /etc/nginx/sites-enabled/
 sudo service nginx restart
 ```
 
-**TODO:** store backup copies of carrier.pem/carrier.key somewhere so they don't get lost.
-Needs infrastructure for securely storing and transfering root-owned secrets between our servers.
+Note this enables `smartcambridge.org`/`www.smartcambridge.org`/`carrier.csi.cam.ac.uk` on every
+machine, but only the machine coresponding to those names in the DNS will actually recieve traffic for
+those hosts.
+
+## Setup certificate renewals:
+
+Add the following line to root's crontab (`sudo crontab -e`):
+
+```
+15 3 * * * /usr/bin/certbot renew --quiet
+```
