@@ -43,9 +43,9 @@ sudo cp /root/acme-challenge-keys/authorized_keys ~acme-challenge/.ssh/
 ## Setup initial Nginx, get certifictes
 
 ```
-sudo mkdir /etc/nginx/includes_tfc
+sudo mkdir /etc/nginx/includes2
 sudo cp /home/tfc_prod/tfc_prod/nginx/sites-available/* /etc/nginx/sites-available
-sudo cp /home/tfc_prod/tfc_prod/nginx/includes_tfc/* /etc/nginx/includes_tfc
+sudo cp /home/tfc_prod/tfc_prod/nginx/includes2/* /etc/nginx/includes2
 sudo rm /etc/nginx/sites-enabled/*
 sudo ln -s /etc/nginx/sites-available/tls-bootstrap.conf /etc/nginx/sites-enabled/
 sudo service nginx restart
