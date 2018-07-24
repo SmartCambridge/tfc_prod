@@ -7,9 +7,7 @@ Nginx and certificate management
 sudo apt install software-properties-common
 sudo add-apt-repository ppa:certbot/certbot
 sudo apt update
-sudo apt install nginx
-sudo apt install python-certbot-nginx
-sudo apt install userv
+sudo apt install nginx python-certbot-nginx userv
 
 ```
 test with
@@ -47,13 +45,14 @@ sudo mkdir /etc/nginx/includes2
 sudo cp /home/tfc_prod/tfc_prod/nginx/sites-available/* /etc/nginx/sites-available
 sudo cp /home/tfc_prod/tfc_prod/nginx/includes2/* /etc/nginx/includes2
 sudo rm /etc/nginx/sites-enabled/*
+```
+
+Install a temporary, non-TLS nginx configuration and use this to get certificates
+for this server, and for smartcambridge.org
+
+```
 sudo ln -s /etc/nginx/sites-available/tls-bootstrap.conf /etc/nginx/sites-enabled/
 sudo service nginx restart
-```
-
-Get certificates for this server, and for smartcambridge.org
-
-```
 sudo ~tfc_prod/tfc_prod/nginx/scripts/request-certificate.sh
 sudo ~tfc_prod/tfc_prod/nginx/scripts/request-smartcambridge-certificate.sh
 ```
@@ -73,13 +72,27 @@ sudo chmod 700 /etc/nginx/ssl
 ```
 sudo rm /etc/nginx/sites-enabled/tls-bootstrap.conf
 sudo ln -s /etc/nginx/sites-available/tfc_prod2.conf /etc/nginx/sites-enabled/
+```
+
+For any machine that will or could run `smartcambridge.org`:
+
+```
 sudo ln -s /etc/nginx/sites-available/smartcambridge.conf /etc/nginx/sites-enabled/
+```
+
+For any machine that will or could run `carrier.csi.cam.ac.uk`:
+
+```
 sudo ln -s /etc/nginx/sites-available/carrier.csi.cam.ac.uk.conf /etc/nginx/sites-enabled/
+```
+
+and then restart nginx:
+
+```
 sudo service nginx restart
 ```
 
-Note this enables `smartcambridge.org`/`www.smartcambridge.org`/`carrier.csi.cam.ac.uk` on every
-machine, but only the machine coresponding to those names in the DNS will actually recieve traffic for
+There are no problems, and some advantages, in enabling `smartcambridge.org`/`www.smartcambridge.org`/`carrier.csi.cam.ac.uk` on many or all machines. Only the machines coresponding to those names in the DNS will actually recieve traffic for
 those hosts.
 
 ## Setup certificate renewals:
