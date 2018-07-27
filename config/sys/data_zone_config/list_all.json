@@ -6,7 +6,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "babraham_road_in",
       "zone.id": "babraham_road_in",
-      "zone.reverse_id": "babraham_road_out",
+      "zone.reverse.id": "babraham_road_out",
       "zone.name": "Babraham Road IN",
       "zone.map": true,
       "zone.center": {
@@ -40,7 +40,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "babraham_road_out",
       "zone.id": "babraham_road_out",
-      "zone.reverse_id": "babraham_road_in",
+      "zone.reverse.id": "babraham_road_in",
       "zone.name": "Babraham Road OUT",
       "zone.map": false,
       "zone.center": {
@@ -74,7 +74,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "barton_fen_east",
       "zone.id": "barton_fen_east",
-      "zone.reverse_id": "barton_fen_west",
+      "zone.reverse.id": "barton_fen_west",
       "zone.name": "Barton Road/Fen Causeway EAST",
       "zone.map": true,
       "zone.center": {
@@ -112,7 +112,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "barton_fen_west",
       "zone.id": "barton_fen_west",
-      "zone.reverse_id": "barton_fen_east",
+      "zone.reverse.id": "barton_fen_east",
       "zone.name": "Barton Road/Fen Causeway WEST",
       "zone.map": false,
       "zone.center": {
@@ -150,7 +150,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "barton_road_outer_in",
       "zone.id": "barton_road_outer_in",
-      "zone.reverse_id": "barton_road_outer_out",
+      "zone.reverse.id": "barton_road_outer_out",
       "zone.name": "Barton Road outer IN",
       "zone.map": true,
       "zone.center": {
@@ -184,7 +184,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "barton_road_outer_out",
       "zone.id": "barton_road_outer_out",
-      "zone.reverse_id": "barton_road_outer_in",
+      "zone.reverse.id": "barton_road_outer_in",
       "zone.name": "Barton Road outer OUT",
       "zone.map": false,
       "zone.center": {
@@ -218,7 +218,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "cherry_hinton_road_in",
       "zone.id": "cherry_hinton_road_in",
-      "zone.reverse_id": "cherry_hinton_road_out",
+      "zone.reverse.id": "cherry_hinton_road_out",
       "zone.name": "Cherry Hinton Road IN",
       "zone.map": true,
       "zone.center": {
@@ -252,7 +252,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "cherry_hinton_road_out",
       "zone.id": "cherry_hinton_road_out",
-      "zone.reverse_id": "cherry_hinton_road_in",
+      "zone.reverse.id": "cherry_hinton_road_in",
       "zone.name": "Cherry Hinton Road OUT",
       "zone.map": false,
       "zone.center": {
@@ -286,7 +286,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "east_road_in",
-      "zone.reverse_id": "east_road_out",
+      "zone.reverse.id": "east_road_out",
       "zone.center": {
         "lat": 52.2031306184964,
         "lng": 0.12281446378325622
@@ -320,7 +320,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "east_road_out",
-      "zone.reverse_id": "east_road_in",
+      "zone.reverse.id": "east_road_in",
       "zone.center": {
         "lat": 52.20298135849034,
         "lng": 0.10277728982033718
@@ -354,7 +354,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "grange_road_north",
       "zone.id": "grange_road_north",
-      "zone.reverse_id": "grange_road_south",
+      "zone.reverse.id": "grange_road_south",
       "zone.name": "Grange Road NORTH",
       "zone.map": true,
       "zone.center": {
@@ -388,7 +388,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "grange_road_south",
       "zone.id": "grange_road_south",
-      "zone.reverse_id": "grange_road_north",
+      "zone.reverse.id": "grange_road_north",
       "zone.name": "Grange Road SOUTH",
       "zone.map": false,
       "zone.center": {
@@ -422,7 +422,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "harston_in",
       "zone.id": "harston_in",
-      "zone.reverse_id": "harston_out",
+      "zone.reverse.id": "harston_out",
       "zone.name": "Harston (A10) IN",
       "zone.map": true,
       "zone.center": {
@@ -464,7 +464,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "harston_out",
       "zone.id": "harston_out",
-      "zone.reverse_id": "harston_in",
+      "zone.reverse.id": "harston_in",
       "zone.name": "Harston (A10) OUT",
       "zone.map": false,
       "zone.center": {
@@ -506,7 +506,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "hills_road_in",
-      "zone.reverse_id": "hills_road_out",
+      "zone.reverse.id": "hills_road_out",
       "zone.path": [
         {
           "lat": 52.17929377243817,
@@ -549,7 +549,7 @@
       "eb.zone": "tfc.zone",
       "zone.name": "Hills Road OUT",
       "zone.id": "hills_road_out",
-      "zone.reverse_id": "hills_road_in",
+      "zone.reverse.id": "hills_road_in",
       "zone.path": [
         {
           "lat": 52.19797376106204,
@@ -611,7 +611,7 @@
       ],
       "zone.finish_index": 2,
       "zone.name": "Histon Road v2 IN",
-      "zone.reverse_id": "histon_road_2_out",
+      "zone.reverse.id": "histon_road_2_out",
       "zone.map": true
     },
     {
@@ -645,7 +645,7 @@
       ],
       "zone.finish_index": 2,
       "zone.name": "Histon Road v2 OUT",
-      "zone.reverse_id": "histon_road_2_in",
+      "zone.reverse.id": "histon_road_2_in",
       "zone.map": false
     },
     {
@@ -654,7 +654,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "histon_road_in",
-      "zone.reverse_id": "histon_road_out",
+      "zone.reverse.id": "histon_road_out",
       "zone.center": {
         "lat": 52.20825841138823,
         "lng": 0.13840560913082722
@@ -688,7 +688,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "histon_road_out",
-      "zone.reverse_id": "histon_road_in",
+      "zone.reverse.id": "histon_road_in",
       "zone.center": {
         "lat": 52.20825841138823,
         "lng": 0.13840560913082722
@@ -722,7 +722,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "huntingdon_road_in",
-      "zone.reverse_id": "huntingdon_road_out",
+      "zone.reverse.id": "huntingdon_road_out",
       "zone.center": {
         "lat": 52.21839850870647,
         "lng": 0.1003611564635909
@@ -756,7 +756,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "huntingdon_road_out",
-      "zone.reverse_id": "huntington_road_in",
+      "zone.reverse.id": "huntington_road_in",
       "zone.center": {
         "lat": 52.21966380410292,
         "lng": 0.08257274627682332
@@ -815,7 +815,7 @@
       "zone.finish_index": 2,
       "zone.name": "Madingley Road IN",
       "zone.id": "madingley_road_in",
-      "zone.reverse_id": "madingley_road_out",
+      "zone.reverse.id": "madingley_road_out",
       "zone.map": true
     },
     {
@@ -849,7 +849,7 @@
       "zone.finish_index": 2,
       "zone.name": "Madingley Road OUT",
       "zone.id": "madingley_road_out",
-      "zone.reverse_id": "madingley_road_in",
+      "zone.reverse.id": "madingley_road_in",
       "zone.map": false
     },
     {
@@ -858,7 +858,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "madingley_road_outer_in",
       "zone.id": "madingley_road_outer_in",
-      "zone.reverse_id": "madingley_road_outer_out",
+      "zone.reverse.id": "madingley_road_outer_out",
       "zone.name": "Madingley Road outer IN",
       "zone.map": true,
       "zone.center": {
@@ -892,7 +892,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "madingley_road_outer_out",
       "zone.id": "madingley_road_outer_out",
-      "zone.reverse_id": "madingley_road_outer_in",
+      "zone.reverse.id": "madingley_road_outer_in",
       "zone.name": "Madingley Road outer OUT",
       "zone.map": false,
       "zone.center": {
@@ -926,7 +926,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "mill_road_in",
       "zone.id": "mill_road_in",
-      "zone.reverse_id": "mill_road_out",
+      "zone.reverse.id": "mill_road_out",
       "zone.name": "Mill Road IN",
       "zone.map": true,
       "zone.center": {
@@ -968,7 +968,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "mill_road_out",
       "zone.id": "mill_road_out",
-      "zone.reverse_id": "mill_road_in",
+      "zone.reverse.id": "mill_road_in",
       "zone.name": "Mill Road OUT",
       "zone.map": false,
       "zone.center": {
@@ -1010,7 +1010,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "milton_road_2_in",
-      "zone.reverse_id": "milton_road_2_out",
+      "zone.reverse.id": "milton_road_2_out",
       "zone.center": {
         "lat": 52.224208710767265,
         "lng": 0.13572340011593464
@@ -1044,7 +1044,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "milton_road_2_out",
-      "zone.reverse_id": "milton_road_2_in",
+      "zone.reverse.id": "milton_road_2_in",
       "zone.center": {
         "lat": 52.224208710767265,
         "lng": 0.13572340011593464
@@ -1078,7 +1078,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "milton_road_in",
-      "zone.reverse_id": "milton_road_out",
+      "zone.reverse.id": "milton_road_out",
       "zone.center": {
         "lat": 52.224208710767265,
         "lng": 0.13572340011593464
@@ -1116,7 +1116,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "milton_road_out",
-      "zone.reverse_id": "milton_road_in",
+      "zone.reverse.id": "milton_road_in",
       "zone.center": {
         "lat": 52.22411669991708,
         "lng": 0.14427428245541218
@@ -1150,7 +1150,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "newmarket_road_in",
-      "zone.reverse_id": "newmarket_road_out",
+      "zone.reverse.id": "newmarket_road_out",
       "zone.center": {
         "lat": 52.20786459390002,
         "lng": 0.15028028409575622
@@ -1192,7 +1192,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "newmarket_road_out",
-      "zone.reverse_id": "newmarket_road_in",
+      "zone.reverse.id": "newmarket_road_in",
       "zone.center": {
         "lat": 52.20445420983166,
         "lng": 0.14191608376564968
@@ -1230,7 +1230,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "perne_road_north",
       "zone.id": "perne_road_north",
-      "zone.reverse_id": "perne_road_south",
+      "zone.reverse.id": "perne_road_south",
       "zone.name": "Perne Road NORTH",
       "zone.map": false,
       "zone.center": {
@@ -1264,7 +1264,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "perne_road_south",
       "zone.id": "perne_road_south",
-      "zone.reverse_id": "perne_road_north",
+      "zone.reverse.id": "perne_road_north",
       "zone.name": "Perne Road SOUTH",
       "zone.map": true,
       "zone.center": {
@@ -1298,7 +1298,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "shelford_road_in",
       "zone.id": "shelford_road_in",
-      "zone.reverse_id": "shelford_road_out",
+      "zone.reverse.id": "shelford_road_out",
       "zone.name": "Shelford Road IN",
       "zone.map": true,
       "zone.center": {
@@ -1332,7 +1332,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "shelford_road_out",
       "zone.id": "shelford_road_out",
-      "zone.reverse_id": "shelford_road_in",
+      "zone.reverse.id": "shelford_road_in",
       "zone.name": "Shelford Road OUT",
       "zone.map": false,
       "zone.center": {
@@ -1366,7 +1366,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "the_backs_north",
-      "zone.reverse_id": "the_backs_south",
+      "zone.reverse.id": "the_backs_south",
       "zone.center": {
         "lat": 52.199790232386256,
         "lng": 0.10869531552886169
@@ -1412,7 +1412,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "the_backs_south",
-      "zone.reverse_id": "the_backs_north",
+      "zone.reverse.id": "the_backs_north",
       "zone.center": {
         "lat": 52.20289390648686,
         "lng": 0.11839418332671325
@@ -1462,7 +1462,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "trumpington_road_in",
-      "zone.reverse_id": "trumpington_road_out",
+      "zone.reverse.id": "trumpington_road_out",
       "zone.center": {
         "lat": 52.18307729908614,
         "lng": 0.11913661956783894
@@ -1512,7 +1512,7 @@
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
       "zone.id": "trumpington_road_out",
-      "zone.reverse_id": "trumpington_road_in",
+      "zone.reverse.id": "trumpington_road_in",
       "zone.center": {
         "lat": 52.181419540901615,
         "lng": 0.11896495819088582
