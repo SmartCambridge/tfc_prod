@@ -142,7 +142,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "barton_east",
       "zone.id": "barton_east",
-      "zone.reverse.id": "barton_fwest",
+      "zone.reverse.id": "barton_west",
       "zone.name": "Barton Road EAST",
       "zone.map": true,
       "zone.center": {
@@ -2066,7 +2066,7 @@
       "eb.zone": "tfc.zone",
       "module.id": "newmarket_road_outer_in",
       "zone.id": "newmarket_road_outer_in",
-      "zone.reverse.id": "nwemarket_road_outer_out",
+      "zone.reverse.id": "newmarket_road_outer_out",
       "zone.name": "Newmarket Road outer IN",
       "zone.map": true,
       "zone.center": {
