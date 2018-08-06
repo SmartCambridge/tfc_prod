@@ -1,4 +1,9 @@
+# Temporary editor files
 *~
+*#
+*.swp
+
+# General
 *[#]*
 *[#]*[#]
 bin
@@ -36,7 +41,6 @@ tfc_monitor/send_to_*
 __pycache__/
 *.py[cod]
 *$py.class
-*~
 
 # C extensions
 *.so
