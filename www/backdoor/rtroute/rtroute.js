@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.07';
+var VERSION = '4.08';
+            // 4.08 rtmonitor websocket uri now https, added blur callback for change on page
             // 4.07 forward/back scroll through sock send messages, subscribe link on bus popup
             // 4.06 display/update RTMONITOR_URI on page
             // 4.05 will now get_route_profile() and draw_route_profile() on bus popup -> journey
@@ -25,7 +26,7 @@ var VERSION = '4.07';
             // 1.00 initial development of 'segment distance vector'
 
 //var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
-var RTMONITOR_URI = 'http://smartcambridge.org/rtmonitor/sirivm';
+var RTMONITOR_URI = 'https://smartcambridge.org/rtmonitor/sirivm';
 
 var TIMETABLE_URI = 'https://smartcambridge.org/transport/api';
 
