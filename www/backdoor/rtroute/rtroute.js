@@ -329,6 +329,8 @@ function init()
     });
 
     rtmonitor_uri_input.addEventListener('blur', function (e) {
+        RTMONITOR_URI = rtmonitor_uri_input.value;
+        log('RTMONITOR_URI changed to '+RTMONITOR_URI);
         rtmonitor_uri_input.style['background-color'] = '#ffffff'; //white
         return false;
     });
