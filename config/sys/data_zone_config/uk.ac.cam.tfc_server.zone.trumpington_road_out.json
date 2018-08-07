@@ -9,7 +9,7 @@
         "eb.zone":          "tfc.zone",
                      
         "zone.id":          "trumpington_road_out",
-        "zone.reverse.id":  "trumpington_road_in",
+        "zone.reverse.id": "trumpington_road_in",
         "zone.center":{"lat":52.181419540901615,"lng":0.11896495819088582},
         "zone.zoom":14,
         "zone.path":[{"lat":52.194974967836465,"lng":0.12033462524414062},
@@ -21,7 +21,8 @@
                      {"lat":52.16924016496907,"lng":0.10814666748046875},
                      {"lat":52.178872724522144,"lng":0.11175155639648438}],
         "zone.finish_index":5,
-        "zone.name":"Trumpington Road OUT"
+        "zone.name":"Trumpington Road OUT",
+        "zone.map": false
 
                  }
                }
