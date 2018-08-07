@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>SockJS client</title>
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha256-CutOzxCRucUsn6C6TcEYsauvvYilEniTXldPa6/wu0k=" crossorigin="anonymous"></script>
+
+<script type="text/javascript">
+
+/* jshint browser: true */
+/*global SockJS, moment*/
+
+'use strict';
+
+var VERSION = '1.0.0';
+
+var CONNECTING = 0;
+var OPEN = 1;
+var CLOSING = 2;
+var CLOSED = 3;
+
+var socket;
+
+function init() {
+
+    // Add UI event handlers
+
+    var heading_el = document.getElementById("heading");
+    heading_el.innerHTML += ' ' + VERSION;
+
+    var change_state_el = document.getElementById("change_state");
+    change_state_el.addEventListener("click", change_state);
+
+    var clear_log_el = document.getElementById("clear_log");
+    clear_log_el.addEventListener("click", clear_log);
+
+    var send_el = document.getElementById("send");
+    send_el.addEventListener("click", send_message);
+
+    update_ui();
+
+}
+
+// UI event handlers
+
+function change_state(event) {
+
+    if (event.target.value == "Connect") {
+        do_connect();
+    }
+    else if (event.target.value == "Disconnect") {
+        do_disconnect();
+    }
+
+    update_ui();
+
+}
+
+function clear_log() {
+
+    var log_area = document.getElementById("log");
+    log_area.value = '';
+
+}
+
+function send_message() {
+
+    var message_el = document.getElementById("message");
+    var message = message_el.value;
+    socket.send(message);
+    log("Sent message:\n" + maybe_prettyprint(message));
+
+}
+
+// Connection management
+
+function do_connect() {
+
+    var url = document.getElementById("url").value;
+    log("Connecting to " + url);
+
+    try {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            log("Trying SockJS connection");
+            socket = new SockJS(url);
+        }
+        else if (url.startsWith('ws://') || url.startsWith('wss://')) {
+            log("Trying raw websocket connection");
+            socket = new WebSocket(url);
+        }
+        else {
+            log("Unrecognised scheme - expecting one of 'http', 'https', 'ws' or 'wss'");
+            return;
+        }
+    }
+    catch (e) {
+        log("Error connecting: " + e.name + " " + e.message);
+    }
+
+    // binary messages in an arrayBuffer not a blob
+    socket.binaryType = "arraybuffer";
+
+    socket.onopen = on_open;
+    socket.onmessage = on_message;
+    socket.onerror = on_error;
+    socket.onclose = on_close;
+
+}
+
+function do_disconnect() {
+
+    log("Disconnecting");
+    socket.close();
+
+}
+
+// Socket event handlers
+
+function on_open() {
+
+    log("Socket opened OK");
+    update_ui();
+
+}
+
+function on_message(event) {
+
+    if (isString(event.data)) {
+        log("Received string message:\n" + maybe_prettyprint(event.data));
+    }
+
+    else if (isArrayBuffer(event.data)) {
+        var uint8 = new Uint8Array(event.data);
+        var decoder = new TextDecoder('utf8');
+        var message_text = decoder.decode(uint8);
+        var message_hex = '';
+        for (var i = 0, l = uint8.byteLength; i < l; ++i) {
+            message_hex += toHex(uint8[i]) + " ";
+        }
+        log("Received binary message:\n" +
+            message_hex + "\n" +
+            maybe_prettyprint(message_text));
+    }
+
+    else {
+        log("Received unrecognised message type:\n" + event.data);
+    }
+
+}
+
+function on_error(event) {
+
+    // The API doesn't expose error details here
+    log("Error occurred - see browser console for details");
+
+}
+
+function on_close(event) {
+
+    log("Socket closed, clean = " + event.wasClean +
+        ", code = " + event.code + " (" + closeCodeToString(event.code) + ")" +
+        ", reason = " + event.reason);
+    update_ui();
+
+}
+
+// Sync UI to socket state
+
+function update_ui() {
+
+    document.body.className = "";
+
+    var state_el = document.getElementById("state");
+    var state_change_el = document.getElementById("change_state");
+    var url_el = document.getElementById("url");
+    var message_el = document.getElementById("message");
+    var send_el = document.getElementById("send");
+
+    if (socket == null || socket.readyState == CLOSED) {
+        document.body.className = 'closed';
+        state_el.innerHTML = "Closed";
+        state_change_el.value = "Connect";
+        url_el.removeAttribute("disabled");
+        message_el.setAttribute("disabled", "disabled");
+        send_el.setAttribute("disabled", "disabled");
+    }
+    else if (socket.readyState == CONNECTING) {
+        document.body.className = 'connecting';
+        state_el.innerHTML = "Connecting";
+        url_el.setAttribute("disabled", "disabled");
+        message_el.setAttribute("disabled", "disabled");
+        send_el.setAttribute("disabled", "disabled");
+    }
+    else if (socket.readyState == CLOSING) {
+        document.body.className = 'closing';
+        state_el.innerHTML = "Closing";
+        url_el.setAttribute("disabled", "disabled");
+        message_el.setAttribute("disabled", "disabled");
+        send_el.setAttribute("disabled", "disabled");
+    }
+    else if (socket.readyState == OPEN) {
+        document.body.className = 'open';
+        state_el.innerHTML = "Open";
+        state_change_el.value = "Disconnect";
+        url_el.setAttribute("disabled", "disabled");
+        message_el.removeAttribute("disabled");
+        send_el.removeAttribute("disabled");
+    }
+    else {
+        log("Invalid socket ready state" + socket.readyState);
+        state_el.value = "????????";
+    }
+
+}
+
+// Utilities
+
+// Append a message to the log area
+function log(text) {
+
+    var time_now = moment().format("HH:mm:ss");
+    var log_area = document.getElementById("log");
+    log_area.value += "[" + time_now + "] " + text + "\r\n\r\n";
+    log_area.scrollTop = log_area.scrollHeight;
+
+}
+
+// Convert byte to hex
+// See https://github.com/dy/arraybuffer-to-string
+function toHex (n) {
+  if (n < 16) return '0' + n.toString(16);
+  return n.toString(16);
+}
+
+// Return message as pretty-printed JSON if possible, else message
+function maybe_prettyprint(message) {
+
+    try {
+        var data = JSON.parse(message);
+        return JSON.stringify(data, null, 4);
+    }
+    catch(e) {
+        return message;
+    }
+
+}
+
+// Convert WebSocket close code to text
+// See https://github.com/mschurr/chrome-web-socket-client
+function closeCodeToString(code) {
+    code = Number(code);
+
+    if (code >= 0 && code <= 999) {
+        return 'UNKNOWN_UNUSED_CODE';
+    }
+
+    if (code >= 1016 && code <= 1999) {
+        return 'UNKNOWN_WEBSOCKET_CODE';
+    }
+
+    if (code >= 2000 && code <= 2999) {
+        return 'UNKNOWN_EXTENSION_CODE';
+    }
+
+    if (code >= 3000 && code <= 3999) {
+        return 'UNKNOWN_FRAMEWORK_CODE';
+    }
+
+    if (code >= 4000 && code <= 4999) {
+        return 'UNKNOWN_APPLICATION_CODE';
+    }
+
+    switch (code) {
+        case 1000: return 'NORMAL';
+        case 1001: return 'GOING_AWAY';
+        case 1002: return 'PROTOCOL_ERROR';
+        case 1003: return 'UNSUPPORTED';
+        case 1014: // fall through
+        case 1004: return 'UNKNOWN_RESERVED_CODE';
+        case 1005: return 'NO_STATUS_RECVD';
+        case 1006: return 'ABNORMAL';
+        case 1007: return 'UNSUPPORTED_DATA';
+        case 1008: return 'POLICY_VIOLATION';
+        case 1009: return 'TOO_LARGE';
+        case 1010: return 'MISSING_EXTENSION';
+        case 1011: return 'INTERNAL_ERROR';
+        case 1012: return 'RESTARTING';
+        case 1013: return 'TRY_AGAIN_LATER';
+        case 1015: return 'TLS_HANDSHAKE';
+        default:
+          break;
+    }
+
+    return 'UNKNOWN';
+
+}
+
+// Test object types
+function isString(x) {
+    return Object.prototype.toString.call(x) === "[object String]";
+}
+
+function isArrayBuffer(x) {
+    return Object.prototype.toString.call(x) === "[object ArrayBuffer]";
+}
+
+</script>
+
+
+<style>
+
+body {
+    background-color: powderblue;
+    font-family: Arial, sans-serif;
+}
+
+td {
+    vertical-align: top;
+}
+
+
+input:disabled, textarea:disabled {
+    background-color: #eee;
+}
+
+.open .state {
+    color: green;
+}
+
+.closed .state {
+    color: red;
+}
+
+</style>
+
+
+</head>
+
+<body onload="init()">
+
+<h1 id="heading">Socket Client</h1>
+
+<p><i>Connects to SockJS clients (use 'http' or 'https' URLs) or raw
+WebSocket clients (use 'ws' or 'wss' URLs).</i></p>
+
+<table>
+
+    <tr>
+        <td>URL:</td>
+        <td><div><input type="text" name="url" id="url" size="60"
+            value="https://tfc-app4.cl.cam.ac.uk/rtmonitor/sirivm-zones"/>
+            <input type="submit" name="change_state" id="change_state"/></div></td>
+    </tr>
+
+    <tr>
+        <td>State:</td>
+        <td id="state" class="state"></td>
+    </tr>
+
+    <tr>
+        <td>Message:</td>
+        <td><textarea rows="15" cols="100" name="message" id="message"></textarea></td>
+        <td><input type="submit" name="send" id="send" value="Send"/></td>
+    </tr>
+
+    <tr>
+        <td></td>
+        <td><textarea rows="30" cols="100" name="log" id="log" disabled="disabled"></textarea></td>
+        <td><input type="submit" name="clear_log" id="clear_log" value="Clear"/></td>
+    </tr>
+
+</table>
+
+<pre>
+https://smartcambridge.org/rtmonitor/sirivm
+https://smartcambridge.org/rtmonitor/sirivm-zones
+wss://smartcambridge.org/rtmonitor/sirivm/websocket
+wss://echo.websocket.org
+</pre>
+
+<pre>
+{"msg_type":"rt_connect","client_data":{"rt_client_name":"Socket Client","rt_client_id":"socket_client","rt_client_url":"https://tfc-app4.cl.cam.ac.uk/backdoor/socket-client/index.html","rt_token":"888"}}
+{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_msg" ] }
+{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_records" ] }
+{ "msg_type": "rt_subscribe", "request_id": "A" }
+</pre>
+
+</body>
+
+</html>
