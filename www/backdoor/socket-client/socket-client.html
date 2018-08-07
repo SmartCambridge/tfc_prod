@@ -14,7 +14,7 @@
 
 'use strict';
 
-var VERSION = '1.0.0';
+var VERSION = '1.1.0';
 
 var CONNECTING = 0;
 var OPEN = 1;
@@ -22,6 +22,10 @@ var CLOSING = 2;
 var CLOSED = 3;
 
 var socket;
+
+var history_key = "socket_client_send_history";
+var send_history = [];
+var send_history_cursor = 0;
 
 function init() {
 
@@ -39,6 +43,19 @@ function init() {
     var send_el = document.getElementById("send");
     send_el.addEventListener("click", send_message);
 
+    var message_el = document.getElementById("message");
+    var previous_el = document.getElementById("previous");
+    previous_el.addEventListener("click", function () {
+        send_history_previous(message_el);
+    });
+    var next_el = document.getElementById("next");
+    next_el.addEventListener("click", function () {
+        send_history_next(message_el);
+    });
+    var history_clear_el = document.getElementById("clear_history");
+    history_clear_el.addEventListener("click", send_history_clear);
+
+    populate_send_history();
     update_ui();
 
 }
@@ -70,6 +87,7 @@ function send_message() {
     var message_el = document.getElementById("message");
     var message = message_el.value;
     socket.send(message);
+    send_history_push(message);
     log("Sent message:\n" + maybe_prettyprint(message));
 
 }
@@ -166,6 +184,65 @@ function on_close(event) {
 
 }
 
+// Send history
+
+// Populate send_history from localStorage if possible
+function populate_send_history() {
+
+    var history = localStorage.getItem(history_key);
+    if (history) {
+        try {
+            send_history = JSON.parse(history);
+            send_history_cursor = send_history.length + 1;
+        }
+        catch(e) {
+            // Noop
+        }
+    }
+
+}
+
+// Save current history
+function save_send_history() {
+    localStorage.setItem(history_key, JSON.stringify(send_history));
+}
+
+// Push a command onto history
+function send_history_push(command) {
+    send_history.push(command);
+    send_history_cursor = send_history.length;
+    save_send_history();
+}
+
+// Clear history
+function send_history_clear() {
+    send_history = [];
+    send_history_cursor = 0;
+    save_send_history();
+}
+
+// Put previous item into el
+function send_history_previous(el) {
+    if (send_history_cursor > 1) {
+        send_history_cursor--;
+        el.value = send_history[send_history_cursor-1];
+    }
+}
+
+// Put next item into el
+function send_history_next(el) {
+    if (send_history_cursor <= send_history.length) {
+        send_history_cursor++;
+        if (send_history_cursor <= send_history.length) {
+           el.value = send_history[send_history_cursor-1];
+        }
+        else {
+            el.value = '';
+        }
+   }
+}
+
+
 // Sync UI to socket state
 
 function update_ui() {
@@ -177,6 +254,9 @@ function update_ui() {
     var url_el = document.getElementById("url");
     var message_el = document.getElementById("message");
     var send_el = document.getElementById("send");
+    var previous_el = document.getElementById("previous");
+    var next_el = document.getElementById("next");
+    var history_clear_el = document.getElementById("clear_history");
 
     if (socket == null || socket.readyState == CLOSED) {
         document.body.className = 'closed';
@@ -185,6 +265,10 @@ function update_ui() {
         url_el.removeAttribute("disabled");
         message_el.setAttribute("disabled", "disabled");
         send_el.setAttribute("disabled", "disabled");
+        previous_el.setAttribute("disabled", "disabled");
+        next_el.setAttribute("disabled", "disabled");
+        history_clear_el.setAttribute("disabled", "disabled");
+
     }
     else if (socket.readyState == CONNECTING) {
         document.body.className = 'connecting';
@@ -192,6 +276,9 @@ function update_ui() {
         url_el.setAttribute("disabled", "disabled");
         message_el.setAttribute("disabled", "disabled");
         send_el.setAttribute("disabled", "disabled");
+        previous_el.setAttribute("disabled", "disabled");
+        next_el.setAttribute("disabled", "disabled");
+        history_clear_el.setAttribute("disabled", "disabled");
     }
     else if (socket.readyState == CLOSING) {
         document.body.className = 'closing';
@@ -199,6 +286,9 @@ function update_ui() {
         url_el.setAttribute("disabled", "disabled");
         message_el.setAttribute("disabled", "disabled");
         send_el.setAttribute("disabled", "disabled");
+        previous_el.setAttribute("disabled", "disabled");
+        next_el.setAttribute("disabled", "disabled");
+        history_clear_el.setAttribute("disabled", "disabled");
     }
     else if (socket.readyState == OPEN) {
         document.body.className = 'open';
@@ -207,6 +297,9 @@ function update_ui() {
         url_el.setAttribute("disabled", "disabled");
         message_el.removeAttribute("disabled");
         send_el.removeAttribute("disabled");
+        previous_el.removeAttribute("disabled");
+        next_el.removeAttribute("disabled");
+        history_clear_el.removeAttribute("disabled");
     }
     else {
         log("Invalid socket ready state" + socket.readyState);
@@ -362,13 +455,19 @@ WebSocket clients (use 'ws' or 'wss' URLs).</i></p>
     <tr>
         <td>Message:</td>
         <td><textarea rows="15" cols="100" name="message" id="message"></textarea></td>
-        <td><input type="submit" name="send" id="send" value="Send"/></td>
+        <td>
+            <input type="submit" name="send" id="send" value="Send"/><br/>
+            <input type="submit" name="previous" id="previous" value="&lt;"/>
+            <input type="submit" name="next" id="next" value="&gt;"/><br/>
+            <input type="submit" name="clear_history" id="clear_history" value="Clear"/>
+        </td>
     </tr>
 
     <tr>
         <td></td>
         <td><textarea rows="30" cols="100" name="log" id="log" disabled="disabled"></textarea></td>
-        <td><input type="submit" name="clear_log" id="clear_log" value="Clear"/></td>
+        <td><input type="submit" name="clear_log" id="clear_log" value="Clear"/>
+        </td>
     </tr>
 
 </table>
