@@ -1,7 +1,7 @@
 { "parking_list":
   [ 
 {
-    "feed_id" : "cam_park_local",
+    "feed_id" : "cam_park_rss",
     "parking_id": "grafton-east-car-park",
     "parking_name": "Grafton East",
     "parking_type": "car_park",
@@ -11,7 +11,7 @@
 },
 
 {
-    "feed_id" : "cam_park_local",
+    "feed_id" : "cam_park_rss",
     "parking_id": "grafton-west-car-park",
     "parking_name": "Grafton West",
     "parking_type": "car_park",
@@ -21,7 +21,7 @@
 },
 
 {
-    "feed_id" : "cam_park_local",
+    "feed_id" : "cam_park_rss",
     "parking_id": "grand-arcade-car-park",
     "parking_name": "Grand Arcade",
     "parking_type": "car_park",
@@ -31,7 +31,7 @@
 },
 
 {
-    "feed_id" : "cam_park_local",
+    "feed_id" : "cam_park_rss",
     "parking_id": "park-street-car-park",
     "parking_name": "Park Street",
     "parking_type": "car_park",
@@ -41,7 +41,7 @@
 },
 
 {
-    "feed_id" : "cam_park_local",
+    "feed_id" : "cam_park_rss",
     "parking_id": "queen-anne-terrace-car-park",
     "parking_name": "Queen Anne Terrace",
     "parking_type": "car_park",

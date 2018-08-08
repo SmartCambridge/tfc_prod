@@ -1,5 +1,5 @@
 {
-    "feed_id" : "cam_park_local",
+    "feed_id" : "cam_park_rss",
     "parking_id": "grafton-west-car-park",
     "parking_name": "Grafton West",
     "parking_type": "car_park",
