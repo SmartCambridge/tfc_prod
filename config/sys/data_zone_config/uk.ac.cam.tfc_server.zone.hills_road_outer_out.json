@@ -1,0 +1,39 @@
+{
+    "main": "uk.ac.cam.tfc_server.zone.Zone",
+    "options": {
+        "config": {
+            "module.name": "zone",
+            "module.id": "hills_road_outer_out",
+            "eb.system_status": "system_status",
+            "eb.zone": "tfc.zone",
+            "zone.id": "hills_road_outer_out",
+            "zone.reverse.id": "hills_road_outer_in",
+            "zone.center": {
+                "lat": 52.18318591264076,
+                "lng": 0.14104731380939486
+            },
+            "zone.zoom": 15,
+            "zone.finish_index": 2,
+            "zone.path": [
+                {
+                    "lat": 52.18847452465385,
+                    "lng": 0.13523228466510775
+                },
+                {
+                    "lat": 52.1883166647464,
+                    "lng": 0.13802178204059604
+                },
+                {
+                    "lat": 52.179449300115834,
+                    "lng": 0.14355786144733432
+                },
+                {
+                    "lat": 52.179449300115834,
+                    "lng": 0.14081127941608432
+                }
+            ],
+            "zone.name": "Hills Road outer OUT",
+            "zone.map": false
+        }
+    }
+}
