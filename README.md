@@ -202,13 +202,7 @@ You should see the SDK version 1.8.xxx or higher.
 
 ### Install Nginx
 
-```
-sudo apt install nginx
-```
-test with
-```
-wget -O- "http://localhost"
-```
+See nginx/README.md
 
 ### Install Monit (?)
 
@@ -332,24 +326,6 @@ ln -s /mnt/sdb1/tfc/cam_park_rss /media/tfc/cam_park_rss
 cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys
 ```
 
-### configure/test nginx
-
-```
-cd /home/tfc_prod
-su <your sudo-able account>
-sudo mkdir /etc/nginx/includes
-sudo cp /home/tfc_prod/tfc_prod/nginx/sites-available/* /etc/nginx/sites-available
-sudo cp /home/tfc_prod/tfc_prod/nginx/includes/* /etc/nginx/includes
-sudo ln -s /etc/nginx/sites-available/tfc_prod.conf /etc/nginx/sites-enabled/tfc_prod.conf
-sudo rm /etc/nginx/sites-enabled/default
-sudo service nginx restart
-```
-Test with wget (or use browser):
-```
-wget -O- "http://<hostname>/local_rule"
-```
-Also browse to ```http://localhost```
-
 ### Test run Rita Console
 
 ```
@@ -366,56 +342,6 @@ Test by browsing to ```http://localhost:8081/console``` and ```http://localhost/
 git clone https://github.com/ijl20/tfc_web.git
 ```
 ### See tfc_web/README.md
-
-### Configure https access
-
-Get the certificate bundle.crt and private.key files (e.g. ```tfc-app1_bundle.crt, tfc_app1_cl_cam_ac_uk.key```)
-
-Create the nginx directory to hold the certificates and copy the certificate files
-```
-sudo mkdir /etc/nginx/ssl
-sudo cp tfc-app1_bundle.crt /etc/nginx/ssl
-sudo cp tfc_app1_cl_cam_ac_uk.key /etc/nginx/ssl
-sudo chmod 600 /etc/nginx/ssl/*
-sudo chmod 700 /etc/nginx/ssl
-```
-Copy the tfc_prod_ssl.conf nginx config file to /etc/nginx/sites-available, and link
-```
-sudo cp tfc_prod/nginx/sites-available/tfc_prod_ssl.conf /etc/nginx/sites-available/
-cd /etc/nginx/sites-enabled/
-sudo ln -s ../sites-available/tfc_prod_ssl.conf tfc_prod_ssl.conf
-```
-Restart nginx
-```
-sudo service nginx restart
-```
-Test by browsing to a locally served nginx test page:
-```
-https://tfc-app3.cl.cam.ac.uk/test_proxy
-```
-
-### Configure https access for smartcambridge.org
-
-Install LetsEncrypt certbot:
-
-```
-sudo apt-get update
-sudo apt-get install software-properties-common
-sudo add-apt-repository ppa:certbot/certbot
-sudo apt-get update
-sudo apt-get install python-certbot-nginx 
-```
-
-Run certbot, generate a certificate for smartcambridge.org, www.smartcambridge.org,  carrier.csi.cam.ac.uk
-
-Disable stand-alone SSl configuration:
-
-```
-rm /etc/nginx/sites-available/tfc_prod_ssl.conf
-```
-
-Note that doing this will _prevent_ direct ssl access via the underlying 
-server name.
 
 ### Configure email (for Monit alerts)
 
