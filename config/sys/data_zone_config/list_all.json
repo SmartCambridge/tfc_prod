@@ -356,6 +356,74 @@
       "zone.id": "busway_north_in",
       "zone.reverse.id": "busway_north_out",
       "zone.center": {
+        "lat": 52.23153422669769,
+        "lng": 0.13287864625453952
+      },
+      "zone.zoom": 14,
+      "zone.finish_index": 2,
+      "zone.path": [
+        {
+          "lat": 52.23981305638554,
+          "lng": 0.11446796357631683
+        },
+        {
+          "lat": 52.241757700329934,
+          "lng": 0.11584125459194185
+        },
+        {
+          "lat": 52.23113995819567,
+          "lng": 0.14682613313198092
+        },
+        {
+          "lat": 52.22924742064292,
+          "lng": 0.14545284211635592
+        }
+      ],
+      "zone.name": "Guided Busway (north) IN",
+      "zone.map": true
+    },
+    {
+      "module.name": "zone",
+      "module.id": "busway_north_out",
+      "eb.system_status": "system_status",
+      "eb.zone": "tfc.zone",
+      "zone.id": "busway_north_out",
+      "zone.reverse.id": "busway_north_in",
+      "zone.center": {
+        "lat": 52.23153422669769,
+        "lng": 0.13287864625453952
+      },
+      "zone.zoom": 14,
+      "zone.finish_index": 2,
+      "zone.path": [
+        {
+          "lat": 52.23113995819567,
+          "lng": 0.14682613313198092
+        },
+        {
+          "lat": 52.22924742064292,
+          "lng": 0.14545284211635592
+        },
+        {
+          "lat": 52.23981305638554,
+          "lng": 0.11446796357631683
+        },
+        {
+          "lat": 52.241757700329934,
+          "lng": 0.11584125459194185
+        }
+      ],
+      "zone.name": "Guided Busway (north) OUT",
+      "zone.map": false
+    },
+    {
+      "module.name": "zone",
+      "module.id": "busway_north_outer_in",
+      "eb.system_status": "system_status",
+      "eb.zone": "tfc.zone",
+      "zone.id": "busway_north_outer_in",
+      "zone.reverse.id": "busway_north_outer_out",
+      "zone.center": {
         "lat": 52.24686937520481,
         "lng": 0.09952738881111146
       },
@@ -379,16 +447,16 @@
           "lng": 0.106780081987381
         }
       ],
-      "zone.name": "Guided Busway (northern) IN",
+      "zone.name": "Guided Busway (northern) outer IN",
       "zone.map": true
     },
     {
       "module.name": "zone",
-      "module.id": "busway_north_out",
+      "module.id": "busway_north_outer_out",
       "eb.system_status": "system_status",
       "eb.zone": "tfc.zone",
-      "zone.id": "busway_north_out",
-      "zone.reverse.id": "busway_north_in",
+      "zone.id": "busway_north_outer_out",
+      "zone.reverse.id": "busway_north_outer_in",
       "zone.center": {
         "lat": 52.24686937520481,
         "lng": 0.09952738881111146
@@ -413,7 +481,7 @@
           "lng": 0.08154585957527162
         }
       ],
-      "zone.name": "Guided Busway (northern) OUT",
+      "zone.name": "Guided Busway (northern) outer OUT",
       "zone.map": false
     },
     {
