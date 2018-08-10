@@ -56,16 +56,16 @@ nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_serve
 # #############################################################################################
 
 # FEEDHANDLER FOR VIX GTFS DATA
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedhandler.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/feedhandler.vix.err & disown
+#nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedhandler.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/feedhandler.vix.err & disown
 
 # MSGFILER TO STORE VIX ZONE TRANSIT MESSAGES
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.zone_cambridge" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.zone_cambridge.err & disown
+#nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.zone_cambridge" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.zone_cambridge.err & disown
 
 # MSGFILER TO STORE VIX JSON GTFS MESSAGES (i.e. from feedhandler.vix, parsed from Google Protobuf)
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.feed_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.feed_json.err & disown
+#nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.vix.feed_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.vix.feed_json.err & disown
 
 # ZONEMANAGER VIX (launches all the Cambridge zone verticles)
-nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.cambridge.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.cambridge.vix.err & disown
+#nohup java -cp tfc$1.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.cambridge.vix" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.cambridge.vix.err & disown
 
 # #############################################################################################
 # ################  EVERYNET FEED HANDLER  ####################################################
