@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.09';
+var VERSION = '4.10';
+            // 4.10 add rtmonitor-config.js and API key support
             // 4.09 rtmonitor websocket uri now https, added blur callback for change on page
             // 4.08 improving polygon draw support
             // 4.07 forward/back scroll through sock send messages, subscribe link on bus popup
@@ -26,10 +27,10 @@ var VERSION = '4.09';
             // 2.00 initial development of 'progress vector'
             // 1.00 initial development of 'segment distance vector'
 
-//var RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
-var RTMONITOR_URI = 'https://smartcambridge.org/rtmonitor/sirivm';
-
-var TIMETABLE_URI = 'https://smartcambridge.org/transport/api';
+// All supplied from rtmonitor_config.js
+// var RTMONITOR_URI = '';
+// var TIMETABLE_URI = '';
+// var API_KEY = '';
 
 var STOP_MAX_JOURNEYS = 20; // max # of journeys to request from transport api (i.e. nresults)
 
@@ -734,6 +735,10 @@ function get_stop_journeys(stop_id)
 
     xhr.open("GET", uri, true);
 
+    if (API_KEY) {
+        xhr.setRequestHeader('Authorization', 'Token ' + API_KEY);
+    }
+
     xhr.send();
 
     xhr.onreadystatechange = function() {//Call a function when the state changes.
@@ -879,6 +884,10 @@ function get_route_profile(sensor, draw)
     var xhr = new XMLHttpRequest();
 
     xhr.open("GET", uri, true);
+    
+    if (API_KEY) {
+        xhr.setRequestHeader('Authorization', 'Token ' + API_KEY);
+    }
 
     xhr.send();
 
