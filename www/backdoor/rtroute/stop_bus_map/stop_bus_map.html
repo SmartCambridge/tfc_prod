@@ -1,0 +1,130 @@
+<!doctype html>
+
+<html>
+
+  <head>
+    <title>Test Bus Stop Map</title>
+
+    <!-- Leaflet and associated script files-->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
+
+    <script src="MovingMarker.js" type="text/javascript"></script>
+
+    <script src="Semicircle.js" type="text/javascript"></script>
+
+    <script src="geo.js" type="text/javascript"></script>
+
+    <!-- RTMonitor scripts including sock.js -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+
+    <script src="rtmonitor_api.js" type="text/javascript"></script>
+
+    <script type="text/javascript">
+
+      var RTMONITOR_API; // will be instantiated RTMonitorAPI object for shared API access between widgets
+
+      // Widget instantiation
+
+      var widget = [];
+
+      // Generic framework - init and refresh handling
+
+      function reload_widgets () {
+        for (var i = 0; i < widget.length; i++) {
+          if ('reload' in widget[i]) {
+            //console.log("Reloading ", widget[i].container);
+            widget[i].reload();
+          }
+          else {
+            //console.log("Not reloading ", widget[i].container);
+          }
+        }
+      }
+
+      function page_load() {
+        // Note we must instatiate RTMonitorAPI before widgets
+        RTMONITOR_API = new RTMonitorAPI();
+
+        for (var i = 0; i < widget.length; i++) {
+          if ('init' in widget[i]) {
+            console.log("Initing ", widget[i].container);
+            widget[i].init();
+          }
+          else {
+            console.log("Not initing ", widget[i].container);
+          }
+        }
+
+        // Now we know widgets have run 'init', we can tell RTMonitorAPI to connect and tell those widgets
+        RTMONITOR_API.init();
+
+        setInterval(function() {
+          //console.log("Running page-level reloader");
+          reload_widgets();
+        }, 60000);
+
+        //setInterval(update_screen_clock, 1000);
+      }
+
+      function update_screen_clock() {
+        var datetime = new Date();
+        var hh = ('0'+datetime.getHours()).slice(-2);
+        var mm = ('0'+datetime.getMinutes()).slice(-2);
+        var ss = ('0'+datetime.getSeconds()).slice(-2);
+        document.getElementById('screen_clock').innerHTML = hh+':'+mm+':'+ss;
+      }
+
+    </script>
+
+    <link rel="stylesheet" href="stop_bus_map.css">
+    <!-- Widget Javascript -->
+    <script src="stop_bus_map.js" type="text/javascript"></script>
+
+    <script type="text/javascript">
+
+      var DEBUG = ''; // widget.log() code will check this global variable
+
+      widget.push(new StopBusMap(
+        { container: 'stop_bus_map_1',
+          static_url: ''
+        },
+        { id: 'stop_bus_map_1',
+          static_url: '',
+          title: 'Live Buses: U and Citi4',
+          stops: [
+            { stop_id: '0500CCITY424',
+              common_name: 'William Gates Building',
+              lat: 52.21129,
+              lng: 0.09107
+            },
+            { stop_id: '0500CCITY199',
+              common_name: 'Cam Uni Vet School',
+              lat: 52.21297,
+              lng: 0.09062
+            }
+          ],
+          breadcrumbs: true,
+          lat: 52.205,
+          lng: 0.125,
+          zoom: 15
+        }
+      ));
+
+    </script>
+
+  </head>
+
+  <body style="width: 100%; height: 100%" onLoad="page_load()">
+
+    <!-- Widget display area definition -->
+
+    <div style="width: 100%; height: 100%">
+
+        <div style="width: 600px; height: 600px" id="stop_bus_map_1">
+      </div>
+    </div>
+
+  </body>
+
+</html>

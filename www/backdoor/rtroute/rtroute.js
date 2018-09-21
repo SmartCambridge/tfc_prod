@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.09';
+var VERSION = '4.10';
+            // 4.10 added API_TOKEN for SmartCambridge API
             // 4.09 rtmonitor websocket uri now https, added blur callback for change on page
             // 4.08 improving polygon draw support
             // 4.07 forward/back scroll through sock send messages, subscribe link on bus popup
@@ -30,6 +31,9 @@ var VERSION = '4.09';
 var RTMONITOR_URI = 'https://smartcambridge.org/rtmonitor/sirivm';
 
 var TIMETABLE_URI = 'https://smartcambridge.org/transport/api';
+
+// SmartCambridge restricted-access token
+var API_TOKEN = '5d195fe6a80d8e68c00fbfbb0047eba33a6e497b';
 
 var STOP_MAX_JOURNEYS = 20; // max # of journeys to request from transport api (i.e. nresults)
 
@@ -715,6 +719,24 @@ function load_tests()
 // ************************    TRANSPORT API         **********************************
 // ************************************************************************************
 
+function call_api(uri, callback)
+{
+    var xhr = new XMLHttpRequest();
+
+    xhr.open("GET", uri, true);
+
+    xhr.setRequestHeader('Authorization','Token ' + API_TOKEN);
+
+    xhr.send();
+
+    xhr.onreadystatechange = function() {//Call a function when the state changes.
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
+        {
+            callback(xhr.responseText);
+        }
+    }
+}
+
 // Call the API to get the journeys through a given stop
 function get_stop_journeys(stop_id)
 {
@@ -730,20 +752,11 @@ function get_stop_journeys(stop_id)
     console.log('get_stop_journeys: getting '+stop_id+
                 ' @ '+datetime_from);
 
-    var xhr = new XMLHttpRequest();
-
-    xhr.open("GET", uri, true);
-
-    xhr.send();
-
-    xhr.onreadystatechange = function() {//Call a function when the state changes.
-        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
-        {
-            //console.log('got route profile for '+sensor_id);
-            add_api_stop_journeys(stop_id, datetime_from, xhr.responseText);
-            handle_stop_journeys(stop_id);
-        }
-    }
+    call_api(uri, function (responseText) {
+                     console.log('got journeys for ',stop_id);
+                     add_api_stop_journeys(stop_id, datetime_from, responseText);
+                     handle_stop_journeys(stop_id);
+                  });
 }
 
 // Update a stop.journeys property with the data from the transport API
