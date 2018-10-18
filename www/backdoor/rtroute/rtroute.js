@@ -4,8 +4,9 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '4.11';
-            // 4.11 move bus tracking code into ../rt_tracking, generalize API for tracking
+var VERSION = '5.02';
+            // 5.02 remove local rt socket code and use RTMonitorAPI from tfc_web
+            // 5.01 move bus tracking code into ../rt_tracking, generalize API for tracking
             // 4.10 add rtmonitor-config.js and API key support
             // 4.09 rtmonitor websocket uri now https, added blur callback for change on page
             // 4.08 improving polygon draw support
@@ -33,6 +34,8 @@ var VERSION = '4.11';
 // var TIMETABLE_URI = '';
 // var API_KEY = '';
 
+var DEBUG = 'rtmonitor_api_log';
+
 var STOP_MAX_JOURNEYS = 20; // max # of journeys to request from transport api (i.e. nresults)
 
 var LOG_TRUNCATE = 200; // we'll limit the log to this many messages
@@ -53,7 +56,6 @@ var DRAW_PROGRESS_BOTTOM_MARGIN = 10;
 // RTMonitor rt_connect client_data
 var CLIENT_DATA = { rt_client_name: 'RTRoute V'+VERSION,
                     rt_client_id: 'rtroute',
-                    rt_client_url: location.href,
                     rt_token: '888'
                   };
 
@@ -62,7 +64,7 @@ var CLIENT_DATA = { rt_client_name: 'RTRoute V'+VERSION,
 // Globals
 // *************************************************************
 // *************************************************************
-var map;       // Leaflet map
+var map = null;       // Leaflet map
 var map_tiles; // map tiles layer
 
 var urlparams = new URLSearchParams(window.location.search);
@@ -122,7 +124,7 @@ var stops_drawn; // boolean whether stops are drawn on map or not
 // {vehicle_journey_id:'20-4-_-y08-1-98-T2',order:1,time:'11:22:00',stop_id:'0500SCAMB011'},
 // becomes:
 // journeys['20-4-_-y08-1-98-T2'] = { route: [ ... {above record} ] }
-var journeys = {};
+var journey_cache = {};
 var journey_start_times = {}; // holds lists of journeys by start time
 
 var drawn_journeys = {}; // dictionary (by drawn_journey_id_id) of drawn routes, so they can be removed from map
@@ -158,9 +160,9 @@ var drawn_stops = {}; // dictionary (by stop_id) of drawn stops so they can be u
 //    },
 
 // Message history for socket messages SENT
-var sock_send_history =  [];
+var rt_send_history =  [];
 
-var sock_history_cursor = 0; // index to allow user scrolling through history
+var rt_history_cursor = 0; // index to allow user scrolling through history
 
 // Data recording
 var recorded_records = [];
@@ -245,16 +247,24 @@ var poly_mid_markers = []; // markers marking edge midpoints to select zone fini
 var poly_mid_marker_close; // edge midpoint for closing line to select zone finish
 
 // *********************************************************************************
+var RTMONITOR_API = null;
+
+// *********************************************************************************
 // *********************************************************************************
 // ********************  INIT RUN ON PAGE LOAD  ************************************
 // *********************************************************************************
 // *********************************************************************************
 function init()
 {
-    document.title = document.title + ' ' + VERSION;
+    document.title = 'RTRoute ' + VERSION;
 
     //initialise page_title
     var page_title_text = document.createTextNode('RTRoute '+VERSION);
+    var page_title = document.getElementById('page_title');
+    // remove existing title if there is one
+    while (page_title.firstChild) {
+            page_title.removeChild(page_title.firstChild);
+    }
     document.getElementById('page_title').appendChild(page_title_text);
 
     // initialize log 'console'
@@ -306,6 +316,10 @@ function init()
     // initialize map
 
     var map_options = { preferCanvas: true };
+
+    if (map) {
+        map.remove();
+    }
 
     map = L.map('map', map_options)
             .setView(MAP_CENTER, MAP_SCALE);
@@ -361,6 +375,14 @@ function init()
 
     load_tests();
 
+    RTMONITOR_API = new RTMonitorAPI(CLIENT_DATA);
+
+    RTMONITOR_API.onconnect(rtmonitor_connected);
+
+    RTMONITOR_API.ondisconnect(rtmonitor_disconnected);
+
+    RTMONITOR_API.init();
+
 } // end init()
 
 // *********************************************************************************
@@ -370,6 +392,8 @@ function init()
 // Load the rtroute_stops array (from rtroute_stops.js) into stops dictionary
 function load_stops()
 {
+    stops_cache = {};
+
     for (var i=0; i<rtroute_stops.length; i++)
     {
         load_stop(rtroute_stops[i]);
@@ -440,7 +464,7 @@ function stops_cache_miss(stop_id)
 //      ]
 function load_journeys()
 {
-    journeys = {};
+    journey_cache = {};
     journey_start_times = {};
 
     var journeys_count = 0;
@@ -454,9 +478,9 @@ function load_journeys()
         var stop = stops_cache[journey_stop.stop_id];
 
         // For a given row of that data, either create a new journey or add to existing
-        if (journeys.hasOwnProperty(vehicle_journey_id))
+        if (journey_cache.hasOwnProperty(vehicle_journey_id))
         {
-            var journey = journeys[vehicle_journey_id];
+            var journey = journey_cache[vehicle_journey_id];
 
             // Add this journey row to an existing journey in dictionary
             journey.route[stop_index] = journey_stop;
@@ -472,10 +496,10 @@ function load_journeys()
 
             var journey_id = journey_stop.vehicle_journey_id;
 
-            // Add this route to a new journeys entry
-            journeys[journey_id] = {route: new_route};
+            // Add this route to a new journey_cache entry
+            journey_cache[journey_id] = {route: new_route};
 
-            journeys_count++; // keep track of total number of journeys
+            journeys_count++; // keep track of total number of journey_cache
 
             // Add this journey to the journey_start_time dictionary
             //
@@ -579,8 +603,8 @@ function unique_journey(journey_ids, index)
 // return true if journey_id_a and journey_id_b represent the same route
 function same_journey(journey_id_a, journey_id_b)
 {
-    var route_a = journeys[journey_id_a].route;
-    var route_b = journeys[journey_id_b].route;
+    var route_a = journey_cache[journey_id_a].route;
+    var route_b = journey_cache[journey_id_b].route;
 
     if (route_a.length != route_b.length)
     {
@@ -608,7 +632,7 @@ function same_journey(journey_id_a, journey_id_b)
 
 function journey_to_string(journey_id)
 {
-    var route = journeys[journey_id].route;
+    var route = journey_cache[journey_id].route;
     var str = journey_id;
     for (var i=0; i<route.length; i++)
     {
@@ -623,9 +647,14 @@ function load_tests()
     // get DIV to add buttons to
     var test_buttons = document.getElementById('test_buttons');
 
-    for (var test_name in test_data)
+    // clear out existing test buttons
+    while (test_buttons.firstChild) {
+            test_buttons.removeChild(test_buttons.firstChild);
+    }
+
+    for (var test_name in test_sirivm_journey)
     {
-        if (test_data.hasOwnProperty(test_name))
+        if (test_sirivm_journey.hasOwnProperty(test_name))
         {
             var test_button = document.createElement('input');
             test_button.setAttribute('type', 'button');
@@ -633,7 +662,7 @@ function load_tests()
             test_button.setAttribute('value', test_name);
             test_button.onclick = (function (x)
                                    {
-                                       return function () { load_test_data(x); };
+                                       return function () { load_test_sirivm_journey(x); };
                                    }
                                   )(test_name);
 
@@ -782,16 +811,16 @@ function get_route(sensor, draw)
     var sensor_id = sensor.sensor_id;
 
     // We will see if we find a route in the 'journeys' cache
-    var route = cached_route_profile(sensor);
+    var journey = cached_journey(sensor);
 
-    if (route)
+    if (journey)
     {
-        console.log('Found cached route');
-        new_route(sensor, route);
+        console.log('get_route()','Found cached journey');
+        new_journey(sensor, journey);
         // if draw=true to original call of get_route, then draw this journey
         if (draw)
         {
-            draw_route_profile(sensor);
+            draw_journey_profile(sensor);
         }
         return;
     }
@@ -823,17 +852,17 @@ function get_route(sensor, draw)
     xhr.onreadystatechange = function() {//Call a function when the state changes.
         if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
         {
-            console.log('get_route()', 'got route profile for '+sensor_id);
-            var route = get_api_route(sensor_id, stop_id, departure_time, xhr.responseText);
-            console.log('get_route()','have route, length',route.length);
-            new_route(sensor, route);
-            console.log('get_route()','after new_route');
+            console.log('get_route()', 'got api journey for '+sensor_id);
+            var journey = get_api_route(sensor_id, stop_id, departure_time, xhr.responseText);
+            console.log('get_route()','have journey, length',journey.length);
+            new_journey(sensor, journey);
+            console.log('get_route()','after new_journey');
 
             // if draw=true to original call of get_route, then draw this journey
             if (draw)
             {
-                console.log('get_route()','drawing route',sensor.bus_tracker.get_route_profile());
-                draw_route_profile(sensor);
+                console.log('get_route()','drawing journey',sensor.bus_tracker.get_journey_profile());
+                draw_journey_profile(sensor);
             }
         }
     }
@@ -891,14 +920,14 @@ function get_api_route(sensor_id, stop_id, departure_time, api_response)
 
 // Now that (possibly asynchronously) we have new route, do
 // initial processing of the first message
-function new_route(sensor, route)
+function new_journey(sensor, journey)
 {
 
-    console.log('new_route()',sensor.sensor_id, route);
+    console.log('new_journey()',sensor.sensor_id, journey);
 
-    //draw_route_profile(sensor);
+    //draw_journey_profile(sensor);
 
-    sensor.bus_tracker.init_route(route);
+    sensor.bus_tracker.init_journey(journey);
 
     // We have a user checkbox to control bus<->segment tracking
     if (analyze)
@@ -921,8 +950,10 @@ function new_route(sensor, route)
 }
 
 //debug Given a sirivm msg, return the vehicle journey_id
-function cached_route_profile(sensor)
+function cached_journey(sensor)
 {
+    console.log('cached_journey()','seeking for ', sensor.sensor_id, sensor);
+
     if (sensor.msg['OriginRef'] != '0500SCAMB011')
     {
         return 0;
@@ -931,19 +962,19 @@ function cached_route_profile(sensor)
     switch (sensor.msg['OriginAimedDepartureTime'])
     {
         case '2017-11-20T06:02:00+00:00':
-            return create_route_profile(sensor, journeys['20-4-_-y08-1-51-T0'].route);
+            return journey_cache['20-4-_-y08-1-51-T0'].route;
 
         case '2017-11-20T06:22:00+00:00':
-            return create_route_profile(sensor, journeys['20-4-_-y08-1-1-T0'].route);
+            return journey_cache['20-4-_-y08-1-1-T0'].route;
 
         case '2017-11-20T06:42:00+00:00':
-            return create_route_profile(sensor, journeys['20-4-_-y08-1-2-T0'].route);
+            return journey_cache['20-4-_-y08-1-2-T0'].route;
 
         case '2017-11-20T07:22:00+00:00':
-            return create_route_profile(sensor, journeys['20-4-_-y08-1-4-T0'].route);
+            return journey_cache['20-4-_-y08-1-4-T0'].route;
 
         case '2017-11-20T07:42:00+00:00':
-            return create_route_profile(sensor, journeys['20-4-_-y08-1-5-T0'].route);
+            return journey_cache['20-4-_-y08-1-5-T0'].route;
 
         default:
             //log('<span style="color: red">Vehicle departure time not recognized</span>');
@@ -1069,7 +1100,7 @@ function draw_progress_init(sensor)
         return;
     }
 
-    var route_profile = sensor.bus_tracker.get_route_profile();
+    var route_profile = sensor.bus_tracker.get_journey_profile();
 
     if (!route_profile)
     {
@@ -1116,7 +1147,7 @@ function draw_progress_update(sensor)
 {
     // Get basic route info from route_profile
     //
-    var route_profile = sensor.bus_tracker.get_route_profile();
+    var route_profile = sensor.bus_tracker.get_journey_profile();
 
     var route_distance = route_profile[route_profile.length-1].distance;
 
@@ -1192,7 +1223,7 @@ function draw_progress_update(sensor)
 
     // Draw segment progress line
     //
-    var segment_progress_y = segment_top + sensor.bus_tracker.segment_progress * segment_height;
+    var segment_progress_y = segment_top + sensor.bus_tracker.get_segment_progress() * segment_height;
 
     var segment_progress_x = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)*0.65;
 
@@ -1244,7 +1275,7 @@ function draw_route_segment(sensor)
             map.removeLayer(sensor.route_highlight);
         }
 
-        var route_profile = sensor.bus_tracker.get_route_profile();
+        var route_profile = sensor.bus_tracker.get_journey_profile();
 
         if (!route_profile)
         {
@@ -1426,11 +1457,12 @@ function annotate_click(segment_index)
 // Process websocket data
 function handle_records(websock_data)
 {
-    var incoming_data = JSON.parse(websock_data);
+    //console.log(websock_data);
+    //var incoming_data = JSON.parse(websock_data);
     //console.log('handle_records'+json['request_data'].length);
-    for (var i = 0; i < incoming_data[RECORDS_ARRAY].length; i++)
+    for (var i = 0; i < websock_data[RECORDS_ARRAY].length; i++)
     {
-	    handle_msg(incoming_data[RECORDS_ARRAY][i], new Date());
+	    handle_msg(websock_data[RECORDS_ARRAY][i], new Date());
     }
 } // end function handle_records
 
@@ -1650,6 +1682,7 @@ function update_clock(time)
 //
 function init_old_status(sensor, clock_time)
 {
+    sensor.old = false; // start with the assumption msg is not old, update will correct if needed
     update_old_status(sensor, clock_time);
 }
 
@@ -1854,102 +1887,39 @@ function get_msg_date(msg)
 }
 
 // ***************************************************************************
-// *******************  WebSocket code    ************************************
+// *******************  RTmonitor calls/callbacks ****************************
 // ***************************************************************************
 
-var sock; // the page's WebSocket
-
-function sock_connect(method)
+function rtmonitor_disconnected()
 {
-    // for testing (e.g. on laptop) we can us local port directly
-    if (method=="port")
-    {
-        sock = new SockJS('http://localhost:8099/test/rtmonitor/sirivm');
-    }
-    else
-    {
-        sock = new SockJS(RTMONITOR_URI);
-    }
-
-    sock.onopen = function() {
-                log('** socket open');
-                var msg_obj = { msg_type: 'rt_connect',
-                                client_data: CLIENT_DATA
-                              };
-                sock_send_str(JSON.stringify(msg_obj));
-                };
-
-    sock.onmessage = function(e) {
-                var json_msg = JSON.parse(e.data);
-                if (json_msg.msg_type != null && json_msg.msg_type == "rt_nok")
-                {
-                    log('<span class="log_error">** '+e.data+'</span>');
-                    return;
-                }
-                if (json_msg.msg_type != null && json_msg.msg_type == "rt_connect_ok")
-                {
-                    log('Connected OK');
-                    return;
-                }
-                if (log_data)
-                {
-                    log(e.data);
-                }
-                handle_records(e.data);
-                };
-
-    sock.onclose = function() {
-                    log('** socket closed');
-                };
+    log('** rtmonitor connection closed **');
 }
 
-function sock_close()
+function rtmonitor_connected()
 {
-    log('** closing socket...');
-    sock.close();
+    log('** rtmonitor connected **');
 }
 
-function sock_send(input_name)
+function rt_send_input(input_name)
 {
-    var msg = document.getElementById(input_name).value;
+    var str_msg = document.getElementById(input_name).value;
 
-    sock_send_str(msg);
+    rt_send_raw(str_msg);
 }
 
-function sock_send_str(msg)
+function rt_send_raw(str_msg)
 {
-    if (sock == null)
-    {
-	    log('<span style="color: red;">Socket not yet connected</span>');
-	    return;
-    }
-    if (sock.readyState == SockJS.CONNECTING)
-    {
-	    log('<span style="color: red;">Socket connecting...</span>');
-  	    return;
-    }
-    if (sock.readyState == SockJS.CLOSING)
-    {
-	    log('<span style="color: red;">Socket closing...</span>');
-	    return;
-    }
-    if (sock.readyState == SockJS.CLOSED)
-    {
-	    log('<span style="color: red;">Socket closed</span>');
-	    return;
-    }
-
-    log('sending: '+msg);
+    log('sending: '+str_msg);
 
     // push msg onto history and update cursor to point to end
-    sock_send_history.push(msg);
+    rt_send_history.push(str_msg);
 
-    sock_history_cursor = sock_send_history.length;
+    rt_history_cursor = rt_send_history.length;
 
     // write msg into scratchpad textarea
-    document.getElementById('rt_scratchpad').value = msg;
+    document.getElementById('rt_scratchpad').value = str_msg;
 
-    sock.send(msg);
+    RTMONITOR_API.raw_request(JSON.parse(str_msg), handle_records);
 }
 
 // ****************************************************************************************
@@ -2028,15 +1998,15 @@ function click_stop_journeys(stop_id)
 // drawn_journeys[sensor_id]
 //   .poly_line
 //   .arrows
-function draw_route_profile(sensor)
+function draw_journey_profile(sensor)
 {
     var sensor_id = sensor.sensor_id;
 
-    var route_profile = sensor.bus_tracker.get_route_profile();
+    var route_profile = sensor.bus_tracker.get_journey_profile();
 
     if (!route_profile)
     {
-        console.log('draw_route_profile: No route_profile for '+sensor_id);
+        console.log('draw_journey_profile: No route_profile for '+sensor_id);
         return;
     }
 
@@ -2292,31 +2262,31 @@ function clear_textarea(element_id)
 }
 
 // scroll BACK through socket messages sent to server and update scratchpad
-function sock_prev_msg(element_id)
+function rt_prev_msg(element_id)
 {
     // don't try and scroll backwards before start
-    if (sock_history_cursor <= 1)
+    if (rt_history_cursor <= 1)
     {
         return;
     }
 
-    sock_history_cursor--;
+    rt_history_cursor--;
 
-    document.getElementById(element_id).value = sock_send_history[sock_history_cursor-1];
+    document.getElementById(element_id).value = rt_send_history[rt_history_cursor-1];
 }
 
 // scroll FORWARDS through socket messages sent to server
-function sock_next_msg(element_id)
+function rt_next_msg(element_id)
 {
     // don't scroll forwards after last msg
-    if (sock_history_cursor >= sock_send_history.length)
+    if (rt_history_cursor >= rt_send_history.length)
     {
         return;
     }
 
-    sock_history_cursor++;
+    rt_history_cursor++;
 
-    document.getElementById(element_id).value = sock_send_history[sock_history_cursor-1];
+    document.getElementById(element_id).value = rt_send_history[rt_history_cursor-1];
 }
 
 function marker_to_pos(marker)
@@ -2326,21 +2296,27 @@ function marker_to_pos(marker)
 }
 
 // issue a request to server for the latest message
-function request_latest_msg()
-{
-    sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_msg" ] }');
-}
+// Note this function DISABLED while RTMonitor doesn't send request_id in its reply
+//function request_latest_msg()
+//{
+//    //sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_msg" ] }');
+//    var msg = {  options: [ 'latest_msg' ] };
+//    RTMONITOR_API.request(CLIENT_DATA.rt_client_id,'A',msg,handle_records);
+//}
 
 // issue a request to server for the latest records
 function request_latest_records()
 {
-    sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_records" ] }');
+    //sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_records" ] }');
+    var msg = {  options: [ 'latest_records' ] };
+    RTMONITOR_API.request(CLIENT_DATA.rt_client_id,'A',msg,handle_records);
 }
 
 // issue a subscription to server for all records
 function subscribe_all()
 {
-    sock_send_str('{ "msg_type": "rt_subscribe", "request_id": "A" }');
+    RTMONITOR_API.subscribe(CLIENT_DATA.rt_client_id,'A',{},handle_records);
+    //sock_send_str('{ "msg_type": "rt_subscribe", "request_id": "A" }');
 }
 
 // User has clicked on map.
@@ -2634,7 +2610,8 @@ function subscribe_to_sensor(sensor_id)
                     request_id: sensor_id,
                     filters: [ { test: "=", key: "VehicleRef", value: sensor_id } ]
                   };
-    sock_send_str(JSON.stringify(msg_obj));
+    //sock_send_str(JSON.stringify(msg_obj));
+    RTMONITOR_API.subscribe(CLIENT_DATA.rt_client_id, sensor_id, msg_obj, handle_records);
 }
 
 // user clicked on 'more' in sensor popup
@@ -2649,6 +2626,12 @@ function click_less(sensor_id)
 {
     var sensor = sensors[sensor_id];
     sensor.marker.setPopupContent(sensor_popup_content(sensor.msg));
+}
+
+// user has clicked the 'Reset' button
+function page_reset()
+{
+    init();
 }
 
 // user has clicked to only show the map
@@ -2808,7 +2791,7 @@ function click_show_journey()
     if (show_journey)
     {
         analyze = true;
-        //draw_route_profile(drawn_route_sensor_id);
+        //draw_journey_profile(drawn_route_sensor_id);
     }
     else
     {
@@ -2820,10 +2803,9 @@ function click_show_journey()
 }
 
 // Load the test data
-function load_test_data(test_name)
+function load_test_sirivm_journey(test_name)
 {
-
-    console.log('load_test_data '+test_name);
+    console.log('load_test_sirivm_journey()',test_name);
 
     // kill the real-time clock in case it is running
     clearInterval(clock_timer);
@@ -2834,20 +2816,9 @@ function load_test_data(test_name)
     // Scrub all the sensor data
     sensors = {};
 
-    var debug_str = 'rtroute '+VERSION+' test: '+test_name+' '+(new Date())+'\n';
-    debug_str += 'SEGMENT_DISTANCE_WEIGHT='+SEGMENT_DISTANCE_WEIGHT;
-    debug_str += ' SEGMENT_PROGRESS_WEIGHT='+SEGMENT_PROGRESS_WEIGHT;
-    debug_str += ' SEGMENT_TIMETABLE_WEIGHT='+SEGMENT_TIMETABLE_WEIGHT;
-    debug_str += ' SEGMENT_BEYOND_ADJUST='+SEGMENT_BEYOND_ADJUST;
-    debug_str += ' SEGMENT_DISTANCE_ADJUST='+SEGMENT_DISTANCE_ADJUST;
-    // 3.07 debug_str += ' PROGRESS_BACKWARD_ADJUST='+PROGRESS_BACKWARD_ADJUST;
-    // 3.07 debug_str += ' PROGRESS_SLOW_ADJUST='+PROGRESS_SLOW_ADJUST;
-    debug_str += ' PROGRESS_MIN_SEGMENT_LENGTH='+PROGRESS_MIN_SEGMENT_LENGTH;
-    console.log(debug_str);
-
     // Load the relevant data records into the 'recorded_records' array for playback
     //debug we can replace this with a GET from the server, particularly when we have API
-    var source_records = test_data[test_name];
+    var source_records = test_sirivm_journey[test_name];
 
     // transfer test records into 'recorded_records' store for replay
     recorded_records = [];
@@ -2861,7 +2832,8 @@ function load_test_data(test_name)
     replay_errors = 0;
     replay_on = true;
 
-    log('Loaded test records '+test_name);
+    console.log('load_test_sirivm_journey()','Loaded test records '+test_name);
+    log('load_test_sirivm_journey()','Loaded test records '+test_name);
 
     // turn analyze on
     analyze = true;
@@ -2885,16 +2857,16 @@ function load_test_data(test_name)
     init_sensor(msg, replay_time);
     var sensor_id = msg[RECORD_INDEX];
     var sensor = sensors[sensor_id];
-    var route = cached_route_profile(sensor);
-    if (route)
+    var journey = cached_journey(sensor);
+    if (journey)
     {
-        console.log('Found cached route for '+sensor_id);
-        new_route(sensor, route);
-        draw_route_profile(sensor.bus_tracker.get_route_profile());
+        console.log('Found cached journey for '+sensor_id);
+        new_journey(sensor, journey);
+        draw_journey_profile(sensor);
     }
     else
     {
-        console.log('Test records '+test_name+' failed to find cached route profile for '+sensor_id);
+        console.log('Test records '+test_name+' failed to find cached journey for '+sensor_id);
     }
 }
 

@@ -9,7 +9,9 @@
 
 function BusTracker() {
 
-    // ******************
+    // ********************************************************************************************
+    // ********************************************************************************************
+    // ********************************************************************************************
     // ANALYSIS CONSTANTS
     //
     // Currently we have seperate weights for the 'initial' phase (when we first hear from the bus)
@@ -17,22 +19,16 @@ function BusTracker() {
     //
     // The weights are applied to the probability vectors provided by each analysis algorithm.
     //
-    // Weight applied to the SEGMENT DISTANCE segment probabilities
-    var SEGMENT_DISTANCE_WEIGHT = 0.25;
-    var INIT_SEGMENT_DISTANCE_WEIGHT = 0.4;
-
-    // Weight applied to the PATH PROGRESS segment probabilities
-    // Note this version of rtroute does NOT use path progress
-    var PATH_PROGRESS_WEIGHT = 0.0;
-    var INIT_PATH_PROGRESS_WEIGTH = 0.0;
-
-    // Weight applied to SEGMENT PROGRESS probabilities
-    var SEGMENT_PROGRESS_WEIGHT = 0.5;
-    var INIT_SEGMENT_PROGRESS_WEIGHT = 0.0;
-
-    // Weight applied to the TIMETABLE segment probabilities
-    var SEGMENT_TIMETABLE_WEIGHT = 0.25;
-    var INIT_SEGMENT_TIMETABLE_WEIGHT = 0.6;
+    // We currently have 3 separate algorithms giving a probability vector for the likelihood the
+    // bus is on each 'route segment' of its journey. I.e. [ 0.0, 0.1, 0.05, 0.4, 0.1, ...] would
+    // suggest the bus is most likely on the fourth route segment, between the 3rd and 4th stops.
+    //
+    // 1. DISTANCE: uses the distance and angle of the current bus position relative to each
+    //              segment to arrive at a probability the bus is currently on that segment.
+    // 2. PROGRESS: uses the previous estimated position of the bus plus the time between the last
+    //              position record and the current position record to estimate the new position.
+    // 3. TIMETABLE: uses the timetable (i.e. the stop/time data in the journey) to estimate the
+    //              probability the bus is currently on each segment
 
     // PATTERN_WEIGHTS, i.e. the probability vector weights to apply given a macro pattern
     //
@@ -80,11 +76,15 @@ function BusTracker() {
     var RECORD_LAT = 'Latitude';      // name of property containing latitude
     var RECORD_LNG = 'Longitude';     // name of property containing longitude
 
+    // ********************************************************************************************
+    // **********  GLOBALS  ***********************************************************************
+    // ********************************************************************************************
+
     var msg = null; // most recent bus position message
 
     var vehicle_id = null; // vehicle_id of bus
 
-    var route_profile = null; // enhanced version of the route, i.e. sequence of stop/times
+    var journey_profile = null; // enhanced version of the route, i.e. sequence of stop/times
 
     var segment_index; // current best guess of index of route segment bus is currently on
 
@@ -108,12 +108,31 @@ function BusTracker() {
     // position of bus along current segment 0..1
     var segment_progress = null;
 
+    // ********************************************************************************************
+    // ********* BusTracker methods ***************************************************************
+    //
+    // .init(msg, clock_time) - initialize the tracker with a bus position message and current time
+    //
+    // .init_journey(journey) - update this BusTracker with a new journey
+    //
+    // .update(msg, clock_time)
+    //
+    // .get_segment_index()
+    //
+    // .get_journey_profile()
+    //
+    // .print_status() - dump the analysis parameters to console
+    //
+    // ********************************************************************************************
+
     // .init called when we have the first bus position message
     this.init = function (init_msg, clock_time) {
 
         //log('Initializing '+vehicle_id);
 
-        segment_index = 0;
+        segment_index = 0; // index of current calculated journey segment for this bus (0 = before start)
+
+        segment_progress = 0; // progress of bus along current segment 0..1
 
         if (!init_msg['OriginRef'])
         {
@@ -128,13 +147,13 @@ function BusTracker() {
 
     // Initial route analysis (e.g. when first position data record from bus)
     // called when we have the route from the transport API or JS cache
-    this.init_route = function (route) {
+    this.init_journey = function (journey) {
 
-        route_profile = create_route_profile(JSON.parse(JSON.stringify(route))); // Copy route into route_profile
+        journey_profile = create_journey_profile(JSON.parse(JSON.stringify(journey))); // Copy journey into journey_profile
 
-        console.log('rt_tracker init_route()', route_profile);
+        console.log('rt_tracker init_route()', journey_profile);
 
-        var segments = route.length + 1;
+        var segments = journey.length + 1;
 
         set_weights();
 
@@ -187,14 +206,14 @@ function BusTracker() {
     //
     this.update = function (update_msg) {
 
-        // If bus doesn't have a route_profile then
+        // If bus doesn't have a journey_profile then
         // there's nothing we can do, so return
-        if (!route_profile)
+        if (!journey_profile)
         {
             return;
         }
 
-        var segments = route_profile.length + 1; // number of segments is stops+1
+        var segments = journey_profile.length + 1; // number of segments is stops+1
                                                         // to include start/finish
         set_weights();
 
@@ -244,9 +263,19 @@ function BusTracker() {
         return segment_index;
     }
 
-    this.get_route_profile = function () {
-        return route_profile;
+    this.get_journey_profile = function () {
+        return journey_profile;
     }
+
+    this.get_segment_progress = function () {
+        return segment_progress;
+    }
+
+    // ******************************************************************************
+    // ******************************************************************************
+    // ********* Internal Functions  ************************************************
+    // ******************************************************************************
+    // ******************************************************************************
 
     // Return index of vector element containing highest value
     function max_index(vector) {
@@ -294,8 +323,8 @@ function BusTracker() {
         //debug this needs fixing for routes that span midnight
         var STARTING_PERIOD = 600; // Treat first 10 mins from start time as 'starting period'
 
-        var route_start_seconds = route_profile[0].time_secs;
-        var route_finish_seconds = route_profile[route_profile.length-1].time_secs;
+        var route_start_seconds = journey_profile[0].time_secs;
+        var route_finish_seconds = journey_profile[journey_profile.length-1].time_secs;
         var seconds = get_msg_day_seconds(msg);
 
         if (seconds < route_start_seconds)
@@ -348,25 +377,25 @@ function BusTracker() {
 
         var P = get_msg_point(update_msg);
 
-        console.log('update_segment_distance_vector '+JSON.stringify(P)+' vs route length '+route_profile.length);
+        console.log('update_segment_distance_vector '+JSON.stringify(P)+' vs route length '+journey_profile.length);
 
-        var segment_count = route_profile.length + 1;
+        var segment_count = journey_profile.length + 1;
 
         // Create segment_distance_vector array of { segment_index:, distance: }
         var segment_distance_vector = [];
 
         // Add distance to first stop as segment_distance_vector[0]
 
-        console.log('update_segment_distance_vector route_profile[0]='+JSON.stringify(route_profile[0]));
+        console.log('update_segment_distance_vector journey_profile[0]='+JSON.stringify(journey_profile[0]));
 
-        segment_distance_vector.push( { segment_index: 0, distance: get_distance(P, stops_cache[route_profile[0].stop_id]) } );
+        segment_distance_vector.push( { segment_index: 0, distance: get_distance(P, stops_cache[journey_profile[0].stop_id]) } );
 
         // Now add the distances for route segments
         for (var seg_index=1; seg_index<segment_count-1; seg_index++)
         {
-            //debug use route_profile
-            var prev_stop = stops_cache[route_profile[seg_index-1].stop_id];
-            var next_stop = stops_cache[route_profile[seg_index].stop_id];
+            //debug use journey_profile
+            var prev_stop = stops_cache[journey_profile[seg_index-1].stop_id];
+            var next_stop = stops_cache[journey_profile[seg_index].stop_id];
             var dist = get_distance_from_line(P, [prev_stop,next_stop]);
 
             segment_distance_vector.push({ segment_index: seg_index, distance: dist });
@@ -374,10 +403,10 @@ function BusTracker() {
 
         // And for the 'finished' segment[segment_count-1] add distance from last stop
 
-        //debug use route_profile
+        //debug use journey_profile
         // Add distance to last stop (for 'finished' segment)
         segment_distance_vector.push({ segment_index: segment_count - 1,
-                               distance: get_distance(P, stops_cache[route_profile[route_profile.length-1].stop_id]) });
+                               distance: get_distance(P, stops_cache[journey_profile[journey_profile.length-1].stop_id]) });
 
         // Create sorted nearest_segments array of NEAREST_COUNT
         // { segment_index:, distance: } elements
@@ -393,7 +422,7 @@ function BusTracker() {
         //                        nearest_segments.map( x =>
         //                                              SEGMENT_DISTANCE_ADJUST /
         //                                              ( x.distance/2 + SEGMENT_DISTANCE_ADJUST)));
-        var nearest_probs = segment_distances_to_probs(P, route_profile, nearest_segments);
+        var nearest_probs = segment_distances_to_probs(P, journey_profile, nearest_segments);
 
         // Initialize final result segment_vector with zeros
         // and then insert the weights of the nearest segments
@@ -414,7 +443,7 @@ function BusTracker() {
     }
 
     // Convert Point, [ {segment_index, distance},... ] to probabilties in same order
-    function segment_distances_to_probs(P, route_profile, nearest_segments) {
+    function segment_distances_to_probs(P, journey_profile, nearest_segments) {
         var probs = new Array(nearest_segments.length);
 
         // for development print the 'nearest segments' array to console
@@ -432,16 +461,16 @@ function BusTracker() {
             var segment_distance = nearest_segments[i].distance;
 
             //var prob; // probability bus is on this segment
-            probs[i] = segment_distance_to_prob(P, route_profile, seg_index, segment_distance);
+            probs[i] = segment_distance_to_prob(P, journey_profile, seg_index, segment_distance);
         }
         return linear_adjust(probs);
     }
 
     // Convert a segment_index + segment_distance to probability
-    function segment_distance_to_prob(P, route_profile, segment_index, segment_distance) {
+    function segment_distance_to_prob(P, journey_profile, segment_index, segment_distance) {
         var prob;
 
-        if (segment_index < route_profile.length)
+        if (segment_index < journey_profile.length)
         {
 
             // First of all we'll see if the bus is BEYOND the end stop of the segment
@@ -449,20 +478,20 @@ function BusTracker() {
             // bearing_out is the bearing of the next route segment
             var bearing_out;
 
-            if (segment_index < route_profile.length - 1)
+            if (segment_index < journey_profile.length - 1)
             {
-                bearing_out = route_profile[segment_index+1].bearing_in;
+                bearing_out = journey_profile[segment_index+1].bearing_in;
             }
             else
             {
-                bearing_out = route_profile[segment_index].bearing_in;
+                bearing_out = journey_profile[segment_index].bearing_in;
             }
             // bisector_out is the outer angle bisector of this segment and the next
-            var bisector_out = route_profile[segment_index].bisector;
+            var bisector_out = journey_profile[segment_index].bisector;
             // turn_out is the degrees turned from this segment to the next (clockwise)
-            var turn_out = route_profile[segment_index].turn;
+            var turn_out = journey_profile[segment_index].turn;
             // end_bearing_to_bus is the bearing of the bus from the end bus-stop
-            var end_bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index], P));
+            var end_bearing_to_bus = Math.floor(get_bearing(journey_profile[segment_index], P));
 
             var beyond = test_beyond_segment(end_bearing_to_bus, turn_out, bearing_out, bisector_out);
 
@@ -481,13 +510,13 @@ function BusTracker() {
                     else
                     {
                         // route bearing on the run-up towards the segment start bus-stop
-                        var bearing_before = route_profile[segment_index-1].bearing_in;
+                        var bearing_before = journey_profile[segment_index-1].bearing_in;
                         // outer angle bisector bearing at the segment start bus-stop
-                        var bisector_before = route_profile[segment_index-1].bisector;
+                        var bisector_before = journey_profile[segment_index-1].bisector;
                         // turn at start bus-stop (degrees clockwise, i.e. turn left 10 degrees is 350)
-                        var turn_before = route_profile[segment_index-1].turn;
+                        var turn_before = journey_profile[segment_index-1].turn;
                         // bearing of bus from start bus-stop
-                        var start_bearing_to_bus = Math.floor(get_bearing(route_profile[segment_index-1],P));
+                        var start_bearing_to_bus = Math.floor(get_bearing(journey_profile[segment_index-1],P));
 
                         var before = test_before_segment(start_bearing_to_bus,
                                                          turn_before,
@@ -663,13 +692,13 @@ function BusTracker() {
 
         var MIN_SEGMENT_DISTANCE = 150; // (m), if route segment seems shorter then this, then use this.
 
-        var segments = route_profile.length + 1;
+        var segments = journey_profile.length + 1;
 
         //debug maybe only do this in segment_timetable_vector
         // Exit early with segment=0 if time < route start
         var msg_date = get_msg_date(update_msg);
         if ((msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours()) <
-            route_profile[0].time_secs)
+            journey_profile[0].time_secs)
         {
             console.log('Segment progress PRE-START');
             var start_vector = new Array(segments);
@@ -693,9 +722,9 @@ function BusTracker() {
         hop_distance = Math.floor(hop_distance);
 
         // Here's how far the bus is along its route
-        var segment_start_distance = segment_index > 0 ? route_profile[segment_index-1].distance : 0;
+        var segment_start_distance = segment_index > 0 ? journey_profile[segment_index-1].distance : 0;
 
-        var segment_end_distance = route_profile[segment_index].distance;
+        var segment_end_distance = journey_profile[segment_index].distance;
 
         var progress_distance = segment_start_distance +
                                 segment_progress *
@@ -718,7 +747,7 @@ function BusTracker() {
 
         var hop_max_progress = SEGMENT_PROGRESS_MAX;
 
-        var bus_speed = progress_speed(segment_index, route_profile);
+        var bus_speed = progress_speed(segment_index, journey_profile);
 
         // If bus appears to have moved very little, we will use hop distance as the estimated progress_delta
         if (hop_distance < SEGMENT_MIN_HOP_DISTANCE)
@@ -769,7 +798,7 @@ function BusTracker() {
         }
 
         while (update_segment < segments &&
-               route_profile[update_segment-1].distance < progress_distance + progress_delta * hop_max_progress)
+               journey_profile[update_segment-1].distance < progress_distance + progress_delta * hop_max_progress)
         {
             vector[update_segment++] = 1;
         }
@@ -811,13 +840,13 @@ function BusTracker() {
         var PROGRESS_STOPPED_TIME = 15; // How long we assume bus is stopped at each stop (s)
 
         // Note for 'n' stops we have 'n+1' segments, including before start and after finish
-        var segments = route_profile.length + 1;
+        var segments = journey_profile.length + 1;
 
         //debug maybe only do this in segment_timetable_vector
         // Exit early with segment=0 if time < route start
         var msg_date = get_msg_date(update_msg);
         if ((msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours()) <
-            route_profile[0].time_secs)
+            journey_profile[0].time_secs)
         {
             var start_vector = new Array(segments);
             start_vector[0] = 0.9;
@@ -838,9 +867,9 @@ function BusTracker() {
         hop_distance = Math.floor(hop_distance);
 
         // Here's how far the bus is along its route
-        var segment_start_distance = segment_index > 0 ? route_profile[segment_index-1].distance : 0;
+        var segment_start_distance = segment_index > 0 ? journey_profile[segment_index-1].distance : 0;
 
-        var segment_end_distance = route_profile[segment_index].distance;
+        var segment_end_distance = journey_profile[segment_index].distance;
 
         var progress_distance = segment_start_distance +
                                 segment_progress *
@@ -873,7 +902,7 @@ function BusTracker() {
         }
         else
         {
-            var bus_speed = progress_speed(segment_index, route_profile);
+            var bus_speed = progress_speed(segment_index, journey_profile);
 
             // Estimate progress distance based on speed and time since last point
             // with upward adjustment to (hop_distance+5%) if that is larger. I.e.
@@ -964,8 +993,8 @@ function BusTracker() {
         while (update_factor < factors.length && update_segment < segments - 1)
         {
             // segment_start and segment_end are the route distance boundaries of current segment
-            var segment_start = route_profile[update_segment-1].distance;
-            var segment_end = route_profile[update_segment].distance;
+            var segment_start = journey_profile[update_segment-1].distance;
+            var segment_end = journey_profile[update_segment].distance;
 
             // factor_start and factor_end are the boundaries of the current probability factor
             var factor_end = factor_start + step_distance;
@@ -1016,7 +1045,7 @@ function BusTracker() {
                         factor_remaining_time = step_time;
                     }
                     // adjust factor_start (distance) so factor stopped ratio is converted to distance
-                    factor_start = route_profile[update_segment].distance - step_distance * factor_stopped_ratio;
+                    factor_start = journey_profile[update_segment].distance - step_distance * factor_stopped_ratio;
                 }
                 // We have accumulated the stop time, so now can move on to next segment (with partial current factor remaining)
                 update_segment++;
@@ -1036,10 +1065,10 @@ function BusTracker() {
         return segment_probability_vector;
     }
 
-    // Return estimated forward speed (m/s) for bus on segment segment_index given a route_profile.
+    // Return estimated forward speed (m/s) for bus on segment segment_index given a journey_profile.
     // We use the length of the nearby route segments to estimate probable speed, i.e. a section
     // of the route with short segments will give a lower speed than if the segments were long.
-    function progress_speed(segment_index, route_profile) {
+    function progress_speed(segment_index, journey_profile) {
         var MIN_EST_SPEED = 6.1; // (m/s) Minimum speed to use for estimated bus speed
         var MAX_EST_SPEED = 15;  // (m/s)
 
@@ -1051,22 +1080,22 @@ function BusTracker() {
         {
             avg_segment_distance = 100;
         }
-        else if (segment_index <= route_profile.length - 3)
+        else if (segment_index <= journey_profile.length - 3)
         {
-            avg_segment_distance = (route_profile[segment_index+2].distance -
-                                    route_profile[segment_index-1].distance
+            avg_segment_distance = (journey_profile[segment_index+2].distance -
+                                    journey_profile[segment_index-1].distance
                                    ) / 3;
         }
-        else if (segment_index <= route_profile.length - 2)
+        else if (segment_index <= journey_profile.length - 2)
         {
-            avg_segment_distance = (route_profile[segment_index+1].distance -
-                                    route_profile[segment_index-1].distance
+            avg_segment_distance = (journey_profile[segment_index+1].distance -
+                                    journey_profile[segment_index-1].distance
                                    ) / 2;
         }
         else
         {
-            avg_segment_distance = route_profile[segment_index].distance -
-                                   route_profile[segment_index-1].distance;
+            avg_segment_distance = journey_profile[segment_index].distance -
+                                   journey_profile[segment_index-1].distance;
         }
 
         avg_segment_distance = Math.floor(avg_segment_distance);
@@ -1093,15 +1122,15 @@ function BusTracker() {
 
         var TIME_BEHIND_SECONDS = 600; // How far behind schedule can the bus be
 
-        var segments = route_profile.length + 1;
+        var segments = journey_profile.length + 1;
 
         // get JS date() of data record
         var msg_date = get_msg_date(update_msg);
 
-        // convert to time-of-day in seconds since midnight (as in route_profile)
+        // convert to time-of-day in seconds since midnight (as in journey_profile)
         var msg_secs = msg_date.getSeconds() + 60 * msg_date.getMinutes() + 3600 * msg_date.getHours();
 
-        var before_start = msg_secs < route_profile[0].time_secs;
+        var before_start = msg_secs < journey_profile[0].time_secs;
 
         var vector = new Array(segments);
 
@@ -1134,7 +1163,7 @@ function BusTracker() {
             }
             else
             {
-                segment_finish_time = route_profile[seg_index].time_secs;
+                segment_finish_time = journey_profile[seg_index].time_secs;
                 //console.log('segment_finish_time='+segment_finish_time);
                 if ((msg_secs > segment_start_time - TIME_AHEAD_SECONDS) &&
                     (msg_secs < segment_finish_time + TIME_BEHIND_SECONDS))
@@ -1160,19 +1189,19 @@ function BusTracker() {
 
 
     // Return progress 0..1 along a route segment for a bus.
-    // The current route for this bus is in route_profile
+    // The current route for this bus is in journey_profile
     // and the current segment is between stops route[segment_index-1]..route[segment_index]
     function get_segment_progress() {
-        if ((segment_index == 0) || (segment_index == route_profile.length))
+        if ((segment_index == 0) || (segment_index == journey_profile.length))
         {
             return 0;
         }
 
         var pos = get_msg_point(msg);
 
-        var prev_stop = stops_cache[route_profile[segment_index - 1].stop_id];
+        var prev_stop = stops_cache[journey_profile[segment_index - 1].stop_id];
 
-        var next_stop = stops_cache[route_profile[segment_index].stop_id];
+        var next_stop = stops_cache[journey_profile[segment_index].stop_id];
 
         var distance_to_prev_stop = get_distance(pos, prev_stop);
 
@@ -1186,7 +1215,7 @@ function BusTracker() {
     // starting at {starttime,0,0}
     // where route is array of:
     //   {vehicle_journey_id:'20-4-_-y08-1-98-T2',order:1,time:'06:02:00',stop_id:'0500SCAMB011'},...
-    // and returned route_profile is SAME SIZE array:
+    // and returned journey_profile is SAME SIZE array:
     //    {"time_secs":21840, // timetabled time-of-day in seconds since midnight at this stop
     //     "lat": 52.123,     // latitiude of stop
     //     "lng": -0.1234,    // longitude of stop
@@ -1194,99 +1223,99 @@ function BusTracker() {
     //     "bisector": 68,    // bearing at mid-point of OUTER angle of turn
     //     "distance":178,    // length (m) of route segment approaching this stop
     //     "turn":39},...     // angle of turn in route from this stop to next (0..360) clockwise
-    function create_route_profile(route) {
+    function create_journey_profile(journey) {
 
-        var route_profile = [];
+        var journey_profile = [];
 
-        // iterate along route, creating a time/distance/turn value for each stop
-        for (var i=0; i<route.length; i++)
+        // iterate along journey, creating a time/distance/turn value for each stop
+        for (var i=0; i<journey.length; i++)
         {
-            var stop_id = route[i].stop_id ? route[i].stop_id : route[i].stop['atco_code'];
+            var stop_id = journey[i].stop_id ? journey[i].stop_id : journey[i].stop['atco_code'];
 
             //debug skip stops not in cache
             // i(this will be an error when we have stop data included in timetable API)
             if (stops_cache_miss(stop_id))
             {
-                load_stop(route[i].stop);
-                //console.log('stops cache miss for '+route[i].stop_id);
+                load_stop(journey[i].stop);
+                //console.log('stops cache miss for '+journey[i].stop_id);
                 //continue;
             }
 
             var route_element = {};
 
-            route_element.time_secs = get_seconds(route[i].time);
+            route_element.time_secs = get_seconds(journey[i].time);
 
             route_element.stop_id = stop_id;
 
-            route_element.time = route[i].time;
+            route_element.time = journey[i].time;
 
             route_element.lat = stops_cache[stop_id].lat;
             route_element.lng = stops_cache[stop_id].lng;
 
-            // note we are using this route_profile (not route) for the previous stop
+            // note we are using this journey_profile (not journey) for the previous stop
             // in case we are ignoring stops not in stops_cache
-            if (route_profile.length == 0)
+            if (journey_profile.length == 0)
             {
                 // add first element for start stop at time=timetabled, distance=zero
                 route_element.distance = 0;
             }
             else
             {
-                var prev_stop = stops_cache[route_profile[route_profile.length-1].stop_id];
+                var prev_stop = stops_cache[journey_profile[journey_profile.length-1].stop_id];
 
                 var this_stop = stops_cache[stop_id];
 
                 route_element.distance =
-                    Math.floor( route_profile[route_profile.length-1].distance +
+                    Math.floor( journey_profile[journey_profile.length-1].distance +
                                 get_distance(prev_stop, this_stop));
 
                 route_element.bearing_in = Math.floor(get_bearing(prev_stop, this_stop));
             }
 
-            route_profile.push(route_element);
+            journey_profile.push(route_element);
         }
 
-        if (route_profile.length < 2)
+        if (journey_profile.length < 2)
         {
-            console.log('create_route_profile: '+vehicle_id+' stops_cache total miss?');
+            console.log('create_journey_profile: '+vehicle_id+' stops_cache total miss?');
             return null;
         }
 
-        // Now provide correct values at route_profile[0]
-        route_profile[0].bearing_in = route_profile[1].bearing_in;
-        route_profile[0].bisector = angle360(route_profile[0].bearing_in+90);
+        // Now provide correct values at journey_profile[0]
+        journey_profile[0].bearing_in = journey_profile[1].bearing_in;
+        journey_profile[0].bisector = angle360(journey_profile[0].bearing_in+90);
 
-        // Add .turn and .bisector to each element of route_profile
-        for (var i=1; i < route_profile.length; i++)
+        // Add .turn and .bisector to each element of journey_profile
+        for (var i=1; i < journey_profile.length; i++)
         {
-            if (i==route_profile.length-1)
+            if (i==journey_profile.length-1)
             {
-                route_profile[i].turn = 0;
-                route_profile[i].bisector = angle360(route_profile[i].bearing_in + 90);
+                journey_profile[i].turn = 0;
+                journey_profile[i].bisector = angle360(journey_profile[i].bearing_in + 90);
             }
             else
             {
-                var prev_stop = stops_cache[route_profile[i-1].stop_id];
-                var this_stop = stops_cache[route_profile[i].stop_id];
-                var next_stop = stops_cache[route_profile[i+1].stop_id];
+                var prev_stop = stops_cache[journey_profile[i-1].stop_id];
+                var this_stop = stops_cache[journey_profile[i].stop_id];
+                var next_stop = stops_cache[journey_profile[i+1].stop_id];
                 var bearing_out = get_bearing(this_stop, next_stop);
-                route_profile[i].turn = Math.floor(angle360(bearing_out - route_profile[i].bearing_in));
-                route_profile[i].bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
+                journey_profile[i].turn = Math.floor(angle360(bearing_out - journey_profile[i].bearing_in));
+                journey_profile[i].bisector = Math.floor(get_bisector(prev_stop, this_stop, next_stop));
             }
         }
 
-        // debug print route profile to console
-        //for (var i=0; i<route_profile.length; i++)
+        // debug print journey profile to console
+        //for (var i=0; i<journey_profile.length; i++)
         //{
-        //    console.log(i+' '+JSON.stringify(route_profile[i]));
+        //    console.log(i+' '+JSON.stringify(journey_profile[i]));
         //}
-        console.log('create_route_profile: '+vehicle_id+' '+
-                    route_profile[0].stop_id+' @ '+route_profile[0].time+' to '+
-                    route_profile[route_profile.length-1].stop_id+' @ '+
-                    route_profile[route_profile.length-1].time+
-                    (route.length == route_profile.length ? ' OK' : ' truncated'));
+        console.log('create_journey_profile: '+vehicle_id+' '+
+                    journey_profile[0].stop_id+' @ '+journey_profile[0].time+' to '+
+                    journey_profile[journey_profile.length-1].stop_id+' @ '+
+                    journey_profile[journey_profile.length-1].time+
+                    (journey.length == journey_profile.length ? ' OK' : ' truncated'));
 
-        return route_profile;
+        return journey_profile;
     }
 
 

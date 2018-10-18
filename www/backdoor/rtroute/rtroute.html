@@ -45,7 +45,7 @@ RELEASE INFO:
 
 <!-- Create object to store test data from following files -->
 <script type="text/javascript">
-var test_data = {};
+var test_sirivm_journey = {};
 </script>
 
 <!-- create array of sirivm js objects rtroute_trip (one sample journey) -->
@@ -55,8 +55,10 @@ var test_data = {};
 <script type="text/javascript" src="../rt_tracker/sample_data/bus4_2017-11-20-07-22_annotated.js"></script>
 <script type="text/javascript" src="../rt_tracker/sample_data/bus4_2017-11-20-07-42_annotated.js"></script>
 
-<!-- WebSockets library to connect to RTMonitor -->
+<!-- RTMonitor and WebSockets library -->
 <script src="sockjs.min.js"></script>
+
+<script src="../rtmonitor_api.js"></script>
 
 <!-- ijl20 library of useful geo functions -->
 <script src="geo.js"></script>
@@ -88,15 +90,18 @@ var test_data = {};
     <form>
         <input type="text" id="rtmonitor_uri"></input>
     </form>
+    <button onclick="page_reset()"
+        title="Reset this page"
+        >Reset</button>
     <button onclick="sock_connect('nginx')"
         title="Connect socket to server and send rt_connect msg"
         >Connect</button>
     <button onclick="sock_close()"
         title="Close socket connection to server"
         >Close</button>
-    <button onclick="request_latest_msg()"
+    <!--<button onclick="request_latest_msg()"
         title="Get the latest eventbus message from the server"
-        >Request msg</button>
+        >Request msg</button> -->
     <button onclick="request_latest_records()"
         title="Get all the latest data records accumulated on the server"
         >Request records</button>
@@ -182,10 +187,10 @@ var test_data = {};
 
 <div class="scratchpad_box">
 <div class="button_box">
-  <button class="verticle_button" onclick="sock_send('rt_scratchpad')">Send:</button>
+  <button class="verticle_button" onclick="rt_send_input('rt_scratchpad')">Send:</button>
   <button class="verticle_button" onclick="clear_textarea('rt_scratchpad')">Clear</button>
-  <button class="verticle_button" onclick="sock_prev_msg('rt_scratchpad')">&lt;</button>
-  <button class="verticle_button" onclick="sock_next_msg('rt_scratchpad')">&gt;</button>
+  <button class="verticle_button" onclick="rt_prev_msg('rt_scratchpad')">&lt;</button>
+  <button class="verticle_button" onclick="rt_next_msg('rt_scratchpad')">&gt;</button>
 </div>
 
 <textarea rows="25" cols="50" id="rt_scratchpad">
