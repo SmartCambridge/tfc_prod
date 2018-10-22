@@ -24,6 +24,8 @@ function RTMonitorAPI(client_data) {
 
     var sock_timer = {}; // intervalTimer we use for retries if socket has failed
 
+    var sock_keepalive = true; // boolean whether we want to auto-reconnect on close
+
     var connect_callbacks = []; // client callback functions for 'connect' method
 
     var disconnect_callbacks = []; // client callback functions for 'disconnect' method
@@ -78,6 +80,7 @@ this.connect = function()
     sock.onopen = function() {
                 log('** socket open');
                 clearInterval(sock_timer); // delete reconnect timer if it's running
+                sock_keepalive = true;
 
                 var msg_obj = { msg_type: 'rt_connect',
                                 client_data: self.client_data
@@ -121,7 +124,7 @@ this.connect = function()
     };
 
     sock.onclose = function() {
-                log('socket closed, starting reconnect timer');
+                log('socket closed');
 
                 request_callbacks = {};
 
@@ -129,9 +132,15 @@ this.connect = function()
                 {
                     disconnect_callbacks[i].callback.call(disconnect_callbacks[i].caller)
                 }
-                // start interval timer trying to reconnect
+
                 clearInterval(sock_timer);
-                sock_timer = setInterval(function (rt) { return function () { rt.reconnect(); } }(self), 10000);
+
+                if (sock_keepalive)
+                {
+                    // start interval timer trying to reconnect
+                    log('starting reconnect timer');
+                    sock_timer = setInterval(function (rt) { return function () { rt.reconnect(); } }(self), 10000);
+                }
     };
 };
 
@@ -161,6 +170,7 @@ this.connected = function()
 this.disconnect = function()
 {
     log('disconnect() ** closing socket...');
+    sock_keepalive = false;
     sock.close();
 };
 

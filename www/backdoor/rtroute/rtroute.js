@@ -853,16 +853,22 @@ function get_route(sensor, draw)
         if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
         {
             console.log('get_route()', 'got api journey for '+sensor_id);
-            var journey = get_api_route(sensor_id, stop_id, departure_time, xhr.responseText);
-            console.log('get_route()','have journey, length',journey.length);
-            new_journey(sensor, journey);
-            console.log('get_route()','after new_journey');
-
-            // if draw=true to original call of get_route, then draw this journey
-            if (draw)
+            var journey = get_api_journey(sensor_id, stop_id, departure_time, xhr.responseText);
+            if (journey)
             {
-                console.log('get_route()','drawing journey',sensor.bus_tracker.get_journey_profile());
-                draw_journey_profile(sensor);
+                console.log('get_route()','have journey, length',journey.length);
+                new_journey(sensor, journey);
+                console.log('get_route()','after new_journey');
+                // if draw=true to original call of get_route, then draw this journey
+                if (draw)
+                {
+                    console.log('get_route()','drawing journey',sensor.bus_tracker.get_journey_profile());
+                    draw_journey_profile(sensor);
+                }
+            }
+            else
+            {
+                log('** no journey found for '+sensor_id);
             }
         }
     }
@@ -870,7 +876,7 @@ function get_route(sensor, draw)
 
 // Convert the data returned by the API into a route_profile
 //
-function get_api_route(sensor_id, stop_id, departure_time, api_response)
+function get_api_journey(sensor_id, stop_id, departure_time, api_response)
 {
     var api_data;
     try
@@ -879,41 +885,41 @@ function get_api_route(sensor_id, stop_id, departure_time, api_response)
     }
     catch (e)
     {
-        console.log('add_api_route_profile: failed to parse API response for '+
+        console.log('get_api_journey(): failed to parse API response for '+
                     sensor_id+' origin '+stop_id+' @ '+departure_time);
         console.log(api_response);
-        return;
+        return null;
     }
 
     var sensor = sensors[sensor_id];
 
     if (!api_data.results)
     {
-        console.log('add_api_route_profile: null results for '+
+        console.log('get_api_journey(): null results for '+
                     sensor_id+' origin '+stop_id+' @ '+departure_time);
         console.log(api_response);
-        return;
+        return null;
     }
     if (!api_data.results[0])
     {
-        console.log('add_api_route_profile: empty results for '+
+        console.log('get_api_journey(): empty results for '+
                     sensor_id+' "'+sensor.msg['LineRef']+'" origin '+stop_id+' @ '+departure_time);
 
         console.log(api_response);
-        return;
+        return null;
     }
     if (api_data.results.length > 1)
     {
-        console.log('add_api_route_profile: '+
+        console.log('get_api_journey(): '+
                     api_data.results.length+' results for '+
                     sensor_id+' "'+sensor.msg['LineRef']+'" origin '+stop_id+' @ '+departure_time);
-        return;
+        return null;
     }
     if (!api_data.results[0].timetable)
     {
-        console.log('add_api_route_profile: no timetable for '+sensor_id);
+        console.log('get_api_journey(): no timetable for '+sensor_id);
         console.log(api_response);
-        return;
+        return null;
     }
     return api_data.results[0].timetable;
 }
@@ -1149,6 +1155,11 @@ function draw_progress_update(sensor)
     //
     var route_profile = sensor.bus_tracker.get_journey_profile();
 
+    if (!route_profile)
+    {
+        return;
+    }
+
     var route_distance = route_profile[route_profile.length-1].distance;
 
     var x1 = PROGRESS_X_START + (PROGRESS_X_FINISH - PROGRESS_X_START)*0.8;
@@ -1264,6 +1275,11 @@ function draw_route_segment(sensor)
     // highlight line on map of next route segment
     //
     var segment_index = sensor.bus_tracker.get_segment_index();
+
+    if (segment_index == null)
+    {
+        return;
+    }
 
     if (segment_index != sensor.prev_segment_index)
     {
@@ -1890,6 +1906,20 @@ function get_msg_date(msg)
 // *******************  RTmonitor calls/callbacks ****************************
 // ***************************************************************************
 
+// user has clicked the 'connect' button
+function rt_connect()
+{
+    log('** connecting rtmonitor **');
+    RTMONITOR_API.connect();
+}
+
+// user has clicked the 'close' button
+function rt_disconnect()
+{
+    log('** disconnecting rtmonitor **');
+    RTMONITOR_API.disconnect();
+}
+
 function rtmonitor_disconnected()
 {
     log('** rtmonitor connection closed **');
@@ -1951,7 +1981,10 @@ function hide_stops()
     {
         if (drawn_stops.hasOwnProperty(stop_id) && drawn_stops[stop_id])
         {
-            hide_stop(stops_cache[stop_id]);
+            if (stops_cache[stop_id])
+            {
+                hide_stop(stops_cache[stop_id]);
+            }
         }
     }
     stops_drawn = false;

@@ -130,9 +130,9 @@ function BusTracker() {
 
         //log('Initializing '+vehicle_id);
 
-        segment_index = 0; // index of current calculated journey segment for this bus (0 = before start)
+        segment_index = null; // index of current calculated journey segment for this bus (0 = before start)
 
-        segment_progress = 0; // progress of bus along current segment 0..1
+        segment_progress = null; // progress of bus along current segment 0..1
 
         if (!init_msg['OriginRef'])
         {
