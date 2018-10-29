@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '5.02';
+var VERSION = '5.03';
+            // 5.03 added transport/stops API to retrieve stops within bounding box
             // 5.02 remove local rt socket code and use RTMonitorAPI from tfc_web
             // 5.01 move bus tracking code into ../rt_tracking, generalize API for tracking
             // 4.10 add rtmonitor-config.js and API key support
@@ -31,7 +32,9 @@ var VERSION = '5.02';
 
 // All supplied from rtmonitor_config.js
 // var RTMONITOR_URI = '';
-// var TIMETABLE_URI = '';
+// var TIMETABLE_API = '';
+// var STOP_API
+// var STOPS_API
 // var API_KEY = '';
 
 var DEBUG = 'rtmonitor_api_log';
@@ -366,6 +369,8 @@ function init()
     // build stops dictionary keyed on stop_id
     load_stops();
 
+    get_api_stops({ lng: 0.027311, lat: 52.179541 }, { lng: 0.154821, lat: 52.243031}, handle_api_stops);
+
     // build journeys dictionary keyed on vehicle_journey_id
     load_journeys();
 
@@ -388,6 +393,43 @@ function init()
 // *********************************************************************************
 // ************* RTRoute code      ***************************************************
 // *********************************************************************************
+
+function handle_api_stops(api_response)
+{
+    var api_data;
+    try
+    {
+        api_data = JSON.parse(api_response);
+    }
+    catch (e)
+    {
+        console.log('handle_api_stops: failed to parse API response');
+        console.log(api_response);
+        return;
+    }
+
+    if (!api_data.results)
+    {
+        console.log('handle_api_stops: null results');
+        console.log(api_response);
+        return;
+    }
+
+    if (!api_data.results[0])
+    {
+        console.log('handle_api_stops: empty results');
+
+        alert('No stops found');
+
+        return;
+    }
+
+    console.log('handle_api_stops: processing '+api_data.results.length+' stops');
+
+    for (var i=0; i<api_data.results.length; i++)
+    {
+    }
+}
 
 // Load the rtroute_stops array (from rtroute_stops.js) into stops dictionary
 function load_stops()
@@ -675,8 +717,90 @@ function load_tests()
 // ************************    TRANSPORT API         **********************************
 // ************************************************************************************
 
+// Call the API to get the atco_code -> stop info
+function get_api_stop_info(stop_id)
+{
+    var datetime_from = hh_mm_ss(new Date());
+
+    var uri = STOP_API+encodeURIComponent(stop_id)+'/';
+
+    console.log('get_api_stop_info: getting '+stop_id);
+
+    var xhr = new XMLHttpRequest();
+
+    xhr.open("GET", uri, true);
+
+    if (API_KEY) {
+        xhr.setRequestHeader('Authorization', 'Token ' + API_KEY);
+    }
+
+    xhr.send();
+
+    xhr.onreadystatechange = function() {//Call a function when the state changes.
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
+        {
+            //console.log('got route profile for '+sensor_id);
+            add_api_stop_info(stop_id, xhr.responseText);
+        }
+    }
+}
+
+// Update a stop.info property with the data from the transport API
+function add_api_stop_info(stop_id, api_response)
+{
+    var api_data;
+    try
+    {
+        api_data = JSON.parse(api_response);
+    }
+    catch (e)
+    {
+        console.log('add_api_stop_info: failed to parse API response for '+stop_id);
+        console.log(api_response);
+        return;
+    }
+
+    var stop = stops_cache[stop_id];
+
+    if (!stop)
+    {
+        console.log('add_api_stop_info: '+stop_id+' not in cache');
+        return;
+    }
+
+    alert(api_response);
+}
+
+// Call the API to get the bounding_box -> stops list
+function get_api_stops(sw,ne,callback)
+{
+    var qs='?bounding_box='+sw.lng+','+sw.lat+','+ne.lng+','+ne.lat;
+
+    var uri = STOPS_API+qs;
+
+    console.log('get_api_stops: getting ',sw,ne);
+
+    var xhr = new XMLHttpRequest();
+
+    xhr.open("GET", uri, true);
+
+    if (API_KEY) {
+        xhr.setRequestHeader('Authorization', 'Token ' + API_KEY);
+    }
+
+    xhr.send();
+
+    xhr.onreadystatechange = function() {//Call a function when the state changes.
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200)
+        {
+            //console.log('got route profile for '+sensor_id);
+            callback(xhr.responseText);
+        }
+    }
+}
+
 // Call the API to get the journeys through a given stop
-function get_stop_journeys(stop_id)
+function get_api_stop_journeys(stop_id)
 {
     var datetime_from = hh_mm_ss(new Date());
 
@@ -685,9 +809,9 @@ function get_stop_journeys(stop_id)
     qs += '&expand_journey=true';
     qs += '&nresults='+STOP_MAX_JOURNEYS;
 
-    var uri = TIMETABLE_URI+'/journeys_by_time_and_stop/'+qs;
+    var uri = TIMETABLE_API+'/journeys_by_time_and_stop/'+qs;
 
-    console.log('get_stop_journeys: getting '+stop_id+
+    console.log('get_api_stop_journeys: getting '+stop_id+
                 ' @ '+datetime_from);
 
     var xhr = new XMLHttpRequest();
@@ -748,6 +872,8 @@ function add_api_stop_journeys(stop_id, datetime_from, api_response)
         console.log('add_api_stop_journeys: empty results for '+
                     stop_id+' @ '+datetime_from);
         stop.journeys = [];
+
+        alert('No journey found for '+stop_id + ' @ '+datetime_from);
 
         return;
     }
@@ -834,7 +960,7 @@ function get_route(sensor, draw)
     qs += '&departure_time='+encodeURIComponent(departure_time);
     qs += '&expand_journey=true';
 
-    var uri = TIMETABLE_URI+'/departure_to_journey/'+qs;
+    var uri = TIMETABLE_API+'/departure_to_journey/'+qs;
 
     console.log('get_route: getting '+sensor.sensor_id+
                 ' route_profile '+stop_id+' @ '+hh_mm_ss(new Date(departure_time)));
@@ -903,6 +1029,8 @@ function get_api_journey(sensor_id, stop_id, departure_time, api_response)
     if (!api_data.results[0])
     {
         console.log('get_api_journey(): empty results for '+
+                    sensor_id+' "'+sensor.msg['LineRef']+'" origin '+stop_id+' @ '+departure_time);
+        alert('No journey found for '+
                     sensor_id+' "'+sensor.msg['LineRef']+'" origin '+stop_id+' @ '+departure_time);
 
         console.log(api_response);
@@ -1042,6 +1170,7 @@ function tooltip_content(msg)
     return time_str +
             '<br/>' + msg[RECORD_INDEX] +
 			'<br/>Line "' + msg['PublishedLineName'] +'"'+
+            '<br/>'+msg['DirectionRef']+
             '<br/>Delay: ' + xml_duration_to_string(msg['Delay']);
 }
 
@@ -1055,6 +1184,7 @@ function sensor_popup_content(msg)
     return time_str +
         '<br/>' + sensor_id +
 		'<br/>Line "' + msg['PublishedLineName'] +'"'+
+        '<br/>'+msg['DirectionRef']+
         '<br/>Delay: ' + xml_duration_to_string(msg['Delay'])+
         '<br/><a href="#" onclick="click_journey('+"'"+sensor_id+"'"+')">journey</a>'+
         '<br/><a href="#" onclick="subscribe_to_sensor('+"'"+sensor_id+"'"+')">subscribe</a>'+
@@ -2018,12 +2148,18 @@ function stop_content(stop, msg)
            stop_id+'<br/>'+
            lat+'<br/>'+
            lng+'<br/>'+
-           '<a href="#" onclick="click_stop_journeys(\''+stop_id+'\')">journeys</a>' + journey_count;
+           '<a href="#" onclick="click_stop_journeys(\''+stop_id+'\')">journeys</a>' + journey_count+'<br/>'+
+           '<a href="#" onclick="click_stop_more(\''+stop_id+'\')">more</a>';
 }
 
 function click_stop_journeys(stop_id)
 {
-    get_stop_journeys(stop_id);
+    get_api_stop_journeys(stop_id);
+}
+
+function click_stop_more(stop_id)
+{
+    get_api_stop_info(stop_id);
 }
 
 // Draw the straight lines between stops on the selected journey
