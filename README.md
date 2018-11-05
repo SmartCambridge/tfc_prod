@@ -206,7 +206,7 @@ See nginx/README.md
 
 ### Install Monit (?)
 
-PENDING
+See (monit/INSTALLATION.md)[monit/INSTALLATION.md]
 
 ### Create (non-sudo) tfc_prod user
 

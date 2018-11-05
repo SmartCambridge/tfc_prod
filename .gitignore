@@ -19,7 +19,6 @@ build
 *.jar
 *.log
 *.swp
-monit/monitrc
 out
 .project
 Scratch.java

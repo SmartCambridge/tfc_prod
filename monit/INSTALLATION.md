@@ -10,6 +10,19 @@ Copy config file to prod directory:
 sudo cp monitrc /etc/monit/
 ```
 
+Get a copy of `httpd-server.conf` from an already-configured server and copy it to
+`/etc/monit`
+
+Copy TFC monitoring configurations into conf-available:
+```
+sudo cp conf-available/* /etc/monit/conf-available
+```
+
+Link required ones into conf-available, e.g.:
+```
+sudo ln -s /etc/conf-available/tfc_web_servers /etc/conf-enabled/tfc_web_servers
+```
+
 Check status of running monit:
 ```
 sudo monit status
