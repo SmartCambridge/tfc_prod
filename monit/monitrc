@@ -130,6 +130,7 @@
 ## service defined in this file has errors. Alerts may be restricted on 
 ## events by using a filter as in the second example below.
 #
+  #set alert admin@smartcambridge.org not on { instance, action } 
   set alert jw35@cam.ac.uk not on { instance, action } 
 #
 ## Do not alert when Monit starts, stops or performs a user initiated action.
@@ -291,9 +292,19 @@ include /etc/monit/httpd-server.conf
 ##
 #  check file testfile with path /home/ijl20/test_monit
 #    if timestamp > 1 minutes then alert
-    
-  check file data_monitor_json with path /media/tfc/cloudamber/sirivm/data_monitor_json/post_data.json
-    if timestamp > 3 minutes then alert
+
+  check file vix_data_monitor_json with path /media/tfc/vix/data_monitor_json/post_data.json
+      if timestamp > 30 minutes then alert
+      # Fudge to suppress timestamp alerts to admin@smartcambridge.org
+      # (a 'timestamp' check never generates 'checksum')
+      alert admin@xsmartcambridge.org only on { checksum }
+      alert jw35@cam.ac.uk only on { checksum } 
+      alert jw35@cl.cam.ac.uk
+
+  # While in theory we get at least a few of these a minuite, there are occasional
+  # pauses which aren't worth reporting
+  check file cloudamber_data_monitor_json with path /media/tfc/cloudamber/sirivm/data_monitor_json/post_data.json
+    if timestamp > 30 minutes then alert
 
 #
 # Filesystem space checks
