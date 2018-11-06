@@ -21,6 +21,8 @@ sudo cp conf-available/* /etc/monit/conf-available
 Link required ones into conf-available, e.g.:
 ```
 sudo ln -s /etc/conf-available/tfc_web_servers /etc/conf-enabled/tfc_web_servers
+sudo ln -s /etc/conf-available/tfc_web_cronjobs /etc/conf-enabled/tfc_web_cronjobs
+
 ```
 
 Check status of running monit:
