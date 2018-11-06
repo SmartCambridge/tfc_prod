@@ -2,7 +2,7 @@
 # a redirect) and to https with a certificate isn't about to
 # expire
 
-check host smartcambridge.org address smartcambridge.org
+check host smartcambridge-webserver address smartcambridge.org
 if failed
     port 80
     protocol http
@@ -14,7 +14,7 @@ if failed
     and certificate valid > 25 days
 then alert
 
-check host tfc-app1.cl.cam.ac.uk address tfc-app1.cl.cam.ac.uk
+check host tfc-app1-webserver address tfc-app1.cl.cam.ac.uk
 if failed
     port 80
     protocol http
@@ -26,7 +26,7 @@ if failed
     and certificate valid > 25 days
 then alert
 
-check host tfc-app2.cl.cam.ac.uk address tfc-app2.cl.cam.ac.uk
+check host tfc-app2-webserver address tfc-app2.cl.cam.ac.uk
 if failed
     port 80
     protocol http
@@ -38,7 +38,7 @@ if failed
     and certificate valid > 25 days
 then alert
 
-check host tfc-app3.cl.cam.ac.uk address tfc-app3.cl.cam.ac.uk
+check host tfc-app3-webserver address tfc-app3.cl.cam.ac.uk
 if failed
     port 80
     protocol http
@@ -51,7 +51,7 @@ if failed
     and certificate valid > 25 days
 then alert
 
-check host tfc-app4.cl.cam.ac.uk address tfc-app4.cl.cam.ac.uk
+check host tfc-app4-webserver address tfc-app4.cl.cam.ac.uk
 if failed
     port 80
     protocol http
