@@ -2,8 +2,8 @@
 
 # Bus stops updated every month
 check file update_bus_stops with path /var/log/tfc_prod/update_bus_stops.timestamp
-    if timestamp > 32 days then alert
+    if mtime > 32 days then alert
 
 # Time table info updated every week
 check file update_bus_info with path /var/log/tfc_prod/update_bus_info.timestamp
-    if timestamp > 8 days then alert
+    if mtime > 8 days then alert
