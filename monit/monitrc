@@ -304,7 +304,7 @@ include /etc/monit/httpd-server.conf
   # While in theory we get at least a few of these a minuite, there are occasional
   # pauses which aren't worth reporting
   check file cloudamber_data_monitor_json with path /media/tfc/cloudamber/sirivm/data_monitor_json/post_data.json
-    if timestamp > 30 minutes then alert
+    if timestamp > 60 minutes then alert
 
 #
 # Filesystem space checks
