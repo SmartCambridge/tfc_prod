@@ -301,9 +301,15 @@ include /etc/monit/httpd-server.conf
       alert jw35@cam.ac.uk only on { checksum }
       alert ijl20@cam.ac.uk
 
-  # While in theory we get at least a few of these a minuite, there are occasional
-  # pauses which aren't worth reporting
+  # 1) The process that writes the post_data.json moves an existing one
+  #    out of the way before writing a new one so there's a short window
+  #    in each update when post_data.json doesn't exist. USe 'for 5 cycles'
+  #    to lower the chance of this triggering an alert
+  # 2) While in theory post_data.json will be updated several time a
+  #    minute, there are occasional pauses which aren't worth reporting
+  #    so set a long timeout
   check file cloudamber_data_monitor_json with path /media/tfc/cloudamber/sirivm/data_monitor_json/post_data.json
+    if does not exist for 5 cycles then alert
     if timestamp > 60 minutes then alert
 
 #
