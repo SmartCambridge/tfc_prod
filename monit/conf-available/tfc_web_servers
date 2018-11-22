@@ -3,61 +3,61 @@
 # expire
 
 check host smartcambridge-webserver address smartcambridge.org
-if failed
+if failed for 2 cycles
     port 80
     protocol http
     status = 301
 then alert
-if failed
+if failed for 2 cycles
     port 443
     protocol https
     and certificate valid > 25 days
 then alert
 
 check host tfc-app1-webserver address tfc-app1.cl.cam.ac.uk
-if failed
+if failed for 2 cycles
     port 80
     protocol http
     status = 301
 then alert
-if failed
+if failed for 2 cycles
     port 443
     protocol https
     and certificate valid > 25 days
 then alert
 
 check host tfc-app2-webserver address tfc-app2.cl.cam.ac.uk
-if failed
+if failed for 2 cycles
     port 80
     protocol http
     status = 301
 then alert
-if failed
+if failed for 2 cycles
     port 443
     protocol https
     and certificate valid > 25 days
 then alert
 
 check host tfc-app3-webserver address tfc-app3.cl.cam.ac.uk
-if failed
+if failed for 2 cycles
     port 80
     protocol http
     # Redirect check commented - tfc-app2 doesn't do this
     #status = 301
 then alert
-if failed
+if failed for 2 cycles
     port 443
     protocol https
     and certificate valid > 25 days
 then alert
 
 check host tfc-app4-webserver address tfc-app4.cl.cam.ac.uk
-if failed
+if failed for 2 cycles
     port 80
     protocol http
     status = 301
 then alert
-if failed
+if failed for 2 cycles
    port 443
    protocol https
    and certificate valid > 25 days
