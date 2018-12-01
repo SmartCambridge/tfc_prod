@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '5.03';
+var VERSION = '5.04';
+            // 5.04 updated to use rtmonitor_api 3.0 (register & connect methods)
             // 5.03 added transport/stops API to retrieve stops within bounding box
             // 5.02 remove local rt socket code and use RTMonitorAPI from tfc_web
             // 5.01 move bus tracking code into ../rt_tracking, generalize API for tracking
@@ -252,6 +253,8 @@ var poly_mid_marker_close; // edge midpoint for closing line to select zone fini
 // *********************************************************************************
 var RTMONITOR_API = null;
 
+var rt_mon; // rtmonitor_api client object
+
 // *********************************************************************************
 // *********************************************************************************
 // ********************  INIT RUN ON PAGE LOAD  ************************************
@@ -382,11 +385,9 @@ function init()
 
     RTMONITOR_API = new RTMonitorAPI(CLIENT_DATA);
 
-    RTMONITOR_API.onconnect(rtmonitor_connected);
+    rt_mon = RTMONITOR_API.register(rtmonitor_connected,rtmonitor_disconnected);
 
-    RTMONITOR_API.ondisconnect(rtmonitor_disconnected);
-
-    RTMONITOR_API.init();
+    rt_mon.connect();
 
 } // end init()
 
@@ -2040,14 +2041,14 @@ function get_msg_date(msg)
 function rt_connect()
 {
     log('** connecting rtmonitor **');
-    RTMONITOR_API.connect();
+    rt_mon.connect();
 }
 
 // user has clicked the 'close' button
 function rt_disconnect()
 {
     log('** disconnecting rtmonitor **');
-    RTMONITOR_API.disconnect();
+    rt_mon.close();
 }
 
 function rtmonitor_disconnected()
@@ -2079,7 +2080,7 @@ function rt_send_raw(str_msg)
     // write msg into scratchpad textarea
     document.getElementById('rt_scratchpad').value = str_msg;
 
-    RTMONITOR_API.raw_request(JSON.parse(str_msg), handle_records);
+    rt_mon.raw(JSON.parse(str_msg), handle_records);
 }
 
 // ****************************************************************************************
@@ -2478,13 +2479,13 @@ function request_latest_records()
 {
     //sock_send_str('{ "msg_type": "rt_request", "request_id": "A", "options": [ "latest_records" ] }');
     var msg = {  options: [ 'latest_records' ] };
-    RTMONITOR_API.request(CLIENT_DATA.rt_client_id,'A',msg,handle_records);
+    rt_mon.request('A',msg,handle_records);
 }
 
 // issue a subscription to server for all records
 function subscribe_all()
 {
-    RTMONITOR_API.subscribe(CLIENT_DATA.rt_client_id,'A',{},handle_records);
+    rt_mon.subscribe('A',{},handle_records);
     //sock_send_str('{ "msg_type": "rt_subscribe", "request_id": "A" }');
 }
 
@@ -2780,7 +2781,7 @@ function subscribe_to_sensor(sensor_id)
                     filters: [ { test: "=", key: "VehicleRef", value: sensor_id } ]
                   };
     //sock_send_str(JSON.stringify(msg_obj));
-    RTMONITOR_API.subscribe(CLIENT_DATA.rt_client_id, sensor_id, msg_obj, handle_records);
+    rt_mon.subscribe(sensor_id, msg_obj, handle_records);
 }
 
 // user clicked on 'more' in sensor popup

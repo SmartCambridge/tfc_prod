@@ -3,66 +3,91 @@
 //
 function RTMonitorAPI(client_data) {
 
-    // client_data will passed to rt_monitor at connect time
-    // to help identify/validate the client.
-    // client_data = { rt_client_id: <unique id for this client>
-    //                 rt_client_name: <some descriptive name, e.g. display name>
-    //                 rt_client_url: <location.href of this connecting web page client>
-    //                 rt_token: <token to be passed to rt_monitor in the connection to validate>
-    //               }
+var VERSION = '3.2';
+// 3.2  added raw() and request() methods to rtmonitor api client (for rtroute.js)
+// 3.1  restructure of rtmonitor API, .register(..) returns api object (.connect, .subscribe, .unsubscribe)
+// 3.0  move most this.X -> var X
+// 2.0  restructure to Object + methods
+// 1.0  initial working version RTMonitor JS Proxy
+//
+// client_data will passed to rt_monitor at connect time
+// to help identify/validate the client.
+// client_data = { rt_client_id: <unique id for this client>
+//                 rt_client_name: <some descriptive name, e.g. display name>
+//                 rt_client_url: <location.href of this connecting web page client>
+//                 rt_token: <token to be passed to rt_monitor in the connection to validate>
+//               }
 
-    this.RTMONITOR_URI = 'https://smartcambridge.org/rtmonitor/sirivm';
-    //this.RTMONITOR_URI = 'https://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
-    //this.RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/test/rtmonitor/sirivm';
+var RTMONITOR_URI = 'https://smartcambridge.org/rtmonitor/sirivm';
+//this.RTMONITOR_URI = 'https://tfc-app2.cl.cam.ac.uk/rtmonitor/sirivm';
+//this.RTMONITOR_URI = 'http://tfc-app2.cl.cam.ac.uk/test/rtmonitor/sirivm';
 
-    var self = this;
+var self = this;
 
-    this.VERSION = '2.30';
-    // 2.30     Tidy up unnecessary use of 'this' and 'self' for object globals
+//var DEBUG = 'rtmonitor_api_log';
 
-    var sock = {}; // the page's WebSocket
+if (client_data)
+{
+    self.client_data = client_data;
+}
+else
+{
+    self.client_data = {};
+    self.client_data.rt_client_id = 'unknown';
+    self.client_data.rt_token = 'unknown';
+    self.client_data.rt_client_name = 'rtmonitor_api.js V'+VERSION;
+}
+self.client_data.rt_client_url = location.href;
 
-    var sock_timer = {}; // intervalTimer we use for retries if socket has failed
+console.log('RTMonitorAPI V'+VERSION+' instantiation',self.client_data);
 
-    var sock_keepalive = true; // boolean whether we want to auto-reconnect on close
+var sock = {}; // the page's WebSocket
 
-    var connect_callbacks = []; // client callback functions for 'connect' method
+var sock_timer = {}; // intervalTimer we use for retries iif socket has failed
 
-    var disconnect_callbacks = []; // client callback functions for 'disconnect' method
+var dnr = false; // "Do Not Resuscitate" flag, 'true' disables 'reconnect' in sock.onclose callback
 
-    var request_callbacks = {}; // dictionary of request_id -> callback_function for requests and subscriptions
+//var connect_callbacks = [];
 
-    if (client_data)
+//var disconnect_callbacks = [];
+
+var requests = {}; // dictionary of request_id -> callback_function for requests and subscriptions
+
+// rt_connection_status - disconnected .. connecting .. connected
+var rt_connection_status = 'disconnected'; // whether the websocket is connected or not
+
+
+var clients = {}; // connected client dictionary
+
+var next_client_index = 0; // We will give each client a unique id
+
+// for debug, test socket disconnect with '#' key
+document.onkeydown = function(evt) {
+    evt = evt || window.event;
+    log('keydown '+evt.keyCode);
+    if (evt.keyCode == 222) // '#' keycode
     {
-        self.client_data = client_data;
+        test_disconnect();
+        //clearInterval(self.progress_timer);
+        return;
     }
-    else
+    if (evt.keyCode == 187) // '=' keycode
     {
-        self.client_data = {};
-        self.client_data.rt_client_id = 'unknown';
-        self.client_data.rt_token = 'unknown';
-        self.client_data.rt_client_name = 'rtmonitor_api.js V'+this.VERSION;
+        self.disconnect(); // disconnect but do not reconnect
+        return;
     }
-    self.client_data.rt_client_url = location.href;
+}; // end onkeydown
 
-    console.log('RTMonitorAPI V'+this.VERSION+' instantiation',client_data);
+/*
+this.init = function()
+{
+    log('RTMonitorAPI init()');
 
-    // listener to detect ESC 'keydown' while in map_only mode to escape back to normal
-    document.onkeydown = function(evt) {
-        evt = evt || window.event;
-        if (evt.keyCode == 27) // ESC to escape from map-only view
-        {
-            self.disconnect();
-            clearInterval(self.progress_timer);
-        }
-    }; // end onkeydown
+    self.connect();
+};
+*/
+this.init = function () {};
 
-    this.init = function()
-    {
-        log('RTMonitorAPI init()');
-
-        self.connect();
-    };
 
 // ***************************************************************************
 // *******************  WebSocket code    ************************************
@@ -73,14 +98,16 @@ function RTMonitorAPI(client_data) {
 // send { 'msg_type': 'rt_subscribe', 'request_id' : 'A' } which subsribes to ALL records.
 this.connect = function()
 {
-    log('connect()');
+    log('RTMonitorAPI connect()');
 
-    sock = new SockJS(this.RTMONITOR_URI);
+    dnr = false; // Do Not Resuscitate to 'off', i.e. an unexpected close will reconnect
+
+    sock = new SockJS(RTMONITOR_URI);
 
     sock.onopen = function() {
                 log('** socket open');
+
                 clearInterval(sock_timer); // delete reconnect timer if it's running
-                sock_keepalive = true;
 
                 var msg_obj = { msg_type: 'rt_connect',
                                 client_data: self.client_data
@@ -93,172 +120,310 @@ this.connect = function()
                 var msg = JSON.parse(e.data);
                 if (msg.msg_type != null && msg.msg_type == "rt_nok")
                 {
-                    log('rt_nok error return from RTMonitor '+e.data);
+                    log('RTMonitorAPI error '+e.data);
                     return;
                 }
                 if (msg.msg_type != null && msg.msg_type == "rt_connect_ok")
                 {
-                    log('RTMonitor connected OK ('+connect_callbacks.length+' clients)');
-                    for (var i=0; i<connect_callbacks.length; i++)
+                    log('RTMonitorAPI connected OK ('+Object.keys(clients).length+' clients)');
+
+                    rt_connection_status = 'connected';
+
+                    for (var client_id in clients)
                     {
-                        var caller = connect_callbacks[i]; // { caller: xx, callback: yy }
-                        caller.callback();
+                        if (clients.hasOwnProperty(client_id))
+                        {
+                            if ( clients[client_id].connected )
+                            {
+                                clients[client_id].connect_callback();
+                            }
+                        }
                     }
                     return;
                 }
 
                 if (msg.request_id)
                 {
-                    log('RTMonitor websocket message received for '+msg.request_id);
-                    //log(e.data);
+                    log('RTMonitorAPI websocket message received for '+msg.request_id);
+                    //self.log(e.data);
 
-                    var caller = request_callbacks[msg.request_id];
+                    var client_id = requests[msg.request_id].client_id;
 
-                    caller.callback(msg);
+                    if (!clients[client_id] || !clients[client_id].connected)
+                    {
+                        log('sock.onmessage','ignoring msg',msg.request_id,'client',client_id,'not connected');
+                        return;
+                    }
+
+                    var rq_info = requests[msg.request_id];
+
+                    rq_info.callback(msg);
                 }
                 else
                 {
-                    log('RTMonitor websocket message returned with no request_id'+e.data);
+                    log('RTMonitorAPI websocket message returned with no request_id'+e.data);
                 }
 
     };
 
     sock.onclose = function() {
-                log('socket closed');
+                log('sock.onclose','socket closed');
 
-                request_callbacks = {};
+                rt_connection_status = 'disconnected';
 
-                for (var i=0; i<disconnect_callbacks.length; i++)
+                requests = {};
+
+                // check to see if we have any connected clients, and warn if "Do Not Resuscitate"
+                var client_was_connected = false;
+
+                for (var client_id in clients)
                 {
-                    disconnect_callbacks[i].callback.call(disconnect_callbacks[i].caller)
+                    if (clients.hasOwnProperty(client_id))
+                    {
+                        if ( clients[client_id].connected )
+                        {
+                            client_was_connected = true;
+
+                            clients[client_id].disconnect_callback();
+                        }
+                    }
                 }
 
-                clearInterval(sock_timer);
-
-                if (sock_keepalive)
+                // if "Do Not Resuscitate" is true, and we have connected clients, then warn,
+                // or if !dnr then periodically try and reconnect
+                if (dnr)
                 {
-                    // start interval timer trying to reconnect
-                    log('starting reconnect timer');
-                    sock_timer = setInterval(function (rt) { return function () { rt.reconnect(); } }(self), 10000);
+                    if (client_was_connected)
+                    {
+                        console.log('RTMonitorAPI','sock.close','WARN - RTMonitorAPI.disconnect() called with connected clients');
+                    }
+                } else {
+                    console.log('RTMonitorAPI','sock.onclose','starting interval timer trying to reconnect');
+                    clearInterval(sock_timer);
+                    sock_timer = setInterval(reconnect, 10000);
                 }
     };
 };
 
-this.ondisconnect = function (callback)
+// Disconnect has been explicitly called, so do not resuscitate in 'sock.onclose' callback
+this.disconnect = function ()
 {
-    disconnect_callbacks.push({ callback: callback });
-    log('ondisconnect() callbacks called for '+disconnect_callbacks.length + ' client(s)');
-};
-
-this.onconnect = function(callback)
-{
-    connect_callbacks.push({ callback: callback });
-    log('onconnect() callbacks called for '+connect_callbacks.length + ' client(s)');
-};
-
-this.reconnect = function()
-{
-    log('reconnect() trying to connect');
-    self.connect();
-};
-
-this.connected = function()
-{
-    log('connected()');
-};
-
-this.disconnect = function()
-{
-    log('disconnect() ** closing socket...');
-    sock_keepalive = false;
+    dnr = true; // do not resuscitate
     sock.close();
-};
+}
 
-// Caller has issued a 'raw' request for sensor data, including 'msg_type' and 'request_id'
-// In this case it is the CALLER's responsibility to ensure the msg.requset_id is unique
-this.raw_request = function(msg, request_callback)
-{
-    log('raw_request() '+msg.request_id);
-
-    request_callbacks[msg.request_id] = { callback: request_callback } ;
-
-    return this.sock_send_str(JSON.stringify(msg));
-};
+// Register a client to RTMonitorAPI
+// will return an object with connect, close, request, subscribe methods
+this.register = function (connect_callback, disconnect_callback) {
+    var client_id = 'rt_'+(next_client_index++);
+    log('this.register','registering client',client_id);
+    var client = { client_id: client_id,
+                   connected: false,
+                   connect_callback: connect_callback,
+                   disconnect_callback: disconnect_callback,
+                   // client methods
+                   subscribe: subscribe(client_id),
+                   unsubscribe: unsubscribe(client_id),
+                   request: request(client_id),
+                   raw: raw(client_id),
+                   connect: function () {
+                                this.connected = true;
+                                if (rt_connection_status == 'connected')
+                                {
+                                    log('client.connect',client_id,'RTMonitorAPI already connected, so calling connect_callback()');
+                                    this.connect_callback();
+                                }
+                                else if (rt_connection_status == 'disconnected')
+                                {
+                                    log('client.connect',client_id,'RTMonitorAPI disconnected, so calling RTMonitorAPI.connect()');
+                                    rt_connection_status = 'connecting';
+                                    self.connect();
+                                }
+                            },
+                   close: function () { close(client_id); }
+                 };
+    clients[client_id] = client;
+    return client;
+}
 
 // Caller has issued a request for one-time return of sensor data
-this.request = function(caller_id, request_id, msg, request_callback)
+function request(client_id)
 {
-    var caller_request_id = caller_id+'_'+request_id;
-    msg.msg_type = 'rt_request';
-    msg.request_id = caller_request_id;
+    return function(request_id, msg_obj, callback)
+        {
+            var request_id = client_id+'_'+request_id;
+            msg_obj.msg_type = 'rt_request';
+            msg_obj.request_id = request_id;
 
-    log('request() '+caller_request_id);
+            log('request()', request_id);
 
-    return this.raw_request(msg, request_callback);
-};
+            var msg = JSON.stringify(msg_obj);
 
-// Caller has issued subscription for regular real-time return of sensor data
-this.subscribe = function(caller_id, request_id, msg, request_callback)
+            requests[request_id] = { client_id: client_id,
+                                     callback: callback
+                                   } ;
+
+            return self.sock_send_str(msg);
+               //return subscribe(client_id+'_'+request_id, msg_obj, callback);
+    };
+}
+
+// Caller has issued a request for one-time return of sensor data
+//function request(request_id, msg_obj, request_callback)
+//{
+//    log('RTMonitorAPI request request_id '+request_id);
+//
+//    requests[request_id] = { callback: request_callback } ;
+//
+//    var msg = JSON.stringify(msg_obj);
+//
+//    return this.sock_send_str(msg);
+//};
+
+// Return a function that sends a message to the server 'raw', i.e. no mangling the request_id
+function raw(client_id)
 {
-    // Note that RTMonitorAPI builds the actual unique request_id that goes to the server
-    // as a concatenation of the caller_id and the request_id given by the caller.
-    var caller_request_id = caller_id+'_'+request_id;
-    msg.msg_type = 'rt_subscribe';
-    msg.request_id = caller_request_id;
+    return function(msg_obj, callback) {
+        var request_id = msg_obj.request_id;
+        log('raw() ', client_id, request_id);
 
-    log('subscribe()'+caller_request_id);
+        requests[request_id] = { client_id: client_id,
+                                 callback: callback
+                               } ;
 
-    return this.raw_request(msg, request_callback);
-};
+        var msg = JSON.stringify(msg_obj);
 
-this.unsubscribe = function(caller_id, request_id)
+        return self.sock_send_str(msg);
+    };
+}
+
+// rt_subscribe is a wrapper that returns a 'subscribe(...)' function with the client_id embedded
+function subscribe(client_id)
 {
-    // Note that RTMonitorAPI builds the actual unique request_id that goes to the server
-    // as a concatenation of the caller_id and the request_id given by the caller.
-    var caller_request_id = caller_id+'_'+request_id;
+    log('subscribe()','creating subscribe wrapper, client_id',client_id);
+    return function(client_request_id, msg_obj, callback) {
 
-    log('unsubscribe() '+caller_request_id);
+                var request_id = client_id+'_'+client_request_id;
 
-    this.sock_send_str( '{ "msg_type": "rt_unsubscribe", "request_id": "'+caller_request_id+'" }' );
-};
+                log('subscribe() '+request_id);
+                // Note that RTMonitorAPI builds the actual unique request_id that goes to the server
+                // as a concatenation of the caller_id and the request_id given by the caller.
+                //var caller_request_id = caller_id+'_'+request_id;
+
+                msg_obj.msg_type = 'rt_subscribe';
+                //msg_obj.request_id = caller_request_id;
+                msg_obj.request_id = request_id;
+
+                log('RTMonitorAPI subscribe request_id '+request_id);
+
+                var msg = JSON.stringify(msg_obj);
+
+                //requests[caller_request_id] = { callback: request_callback } ;
+                requests[request_id] = { client_id: client_id,
+                                         callback: callback
+                                       } ;
+
+                return self.sock_send_str(msg);
+               //return subscribe(client_id+'_'+request_id, msg_obj, callback);
+    };
+}
+
+// rt_unsubscribe is a wrapper that returns an 'unsubscribe(request_id)' function with the client_id embedded
+function unsubscribe(client_id)
+{
+    return function(request_id) {
+        log('unsubscribe '+request_id);
+        return self.sock_send_str( '{ "msg_type": "rt_unsubscribe", "request_id": "'+client_id+'_'+request_id+'" }' );
+    }
+}
 
 this.sock_send_str = function(msg)
 {
     if (sock == null)
     {
-	    log('<span style="color: red;">Socket not yet connected</span>');
+	    log('Socket not yet connected');
 	    return { status: 'rt_nok', reason: 'socket not connected' };
     }
     if (sock.readyState == SockJS.CONNECTING)
     {
-	    log('<span style="color: red;">Socket connecting...</span>');
+	    log('Socket connecting...');
 	    return { status: 'rt_nok', reason: 'socket still connecting' };
     }
     if (sock.readyState == SockJS.CLOSING)
     {
-	    log('<span style="color: red;">Socket closing...</span>');
+	    log('Socket closing...');
 	    return { status: 'rt_nok', reason: 'socket closing' };
     }
     if (sock.readyState == SockJS.CLOSED)
     {
-	    log('<span style="color: red;">Socket closed</span>');
+	    log('Socket closed');
 	    return { status: 'rt_nok', reason: 'socket closed' };
     }
 
-    log('sending: '+msg);
+    log('RTMonitorAPI sending: '+msg);
 
     sock.send(msg);
 
 	return { status: 'rt_ok', reason: 'sent message' };
 };
 
+function close(client_id)
+{
+    log('RTMonitorAPI close('+client_id+')');
+    if (clients[client_id])
+    {
+        clients[client_id].connected = false;
+        unsubscribe_client(client_id);
+    } else
+    {
+        console.log('RTMonitorAPI','close','client_id',client_id,'not found');
+    }
+}
+
+function unsubscribe_client(client_id)
+{
+    // client has called 'close(client_id)' method, so
+    // iterate through ALL the requests and send 'unsubscribes' for all requests outstanding for this client
+    for (var request_id in requests)
+    {
+        if (requests.hasOwnProperty(request_id))
+        {
+            if ( requests[request_id].client_id == client_id )
+            {
+                // NOTE the request_id used in the 'requests' dictionary is the FULL request_id used between
+                // this RTMonitorAPI and the server, so we do not mangle it to include the client_id as was
+                // done when the request was created.
+                log('unsubscribe_client()',client_id,request_id);
+                self.sock_send_str( '{ "msg_type": "rt_unsubscribe", "request_id": "'+request_id+'" }' );
+            }
+        }
+    }
+}
+
+function test_disconnect()
+{
+    log('TEST ** closing socket...');
+    sock.close();
+}
+
+function reconnect()
+{
+    log('sock_reconnect trying to connect');
+    self.connect();
+}
+
 function log(str)
 {
     if ((typeof DEBUG !== 'undefined') && DEBUG.indexOf('rtmonitor_api_log') >= 0)
     {
-        console.log('RTMonitorAPI',str);
+        var args = [].slice.call(arguments);
+        args.unshift('[RTMonitorAPI]');
+        console.log.apply(console, args);
     }
-};
+}
+
+// FINALLY, we connect to the server
+//this.connect();
 
 // END of 'class' RTMonitorAPI
 }
