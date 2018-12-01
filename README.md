@@ -206,7 +206,7 @@ See nginx/README.md
 
 ### Install Monit (?)
 
-PENDING
+See (monit/INSTALLATION.md)[monit/INSTALLATION.md]
 
 ### Create (non-sudo) tfc_prod user
 
@@ -345,12 +345,11 @@ git clone https://github.com/ijl20/tfc_web.git
 
 ### Configure email (for Monit alerts)
 
-Get the ```ssmtp.conf``` file (from tfc_prod@tfc-app2.cl.cam.ac.uk:~/tfc_prod/ssmtp/ssmtp.conf)
-
 Install/configure ssmtp:
 ```
 sudo apt install ssmtp
-sudo cp ssmtp.conf /etc/ssmtp
+sudo cp ssmtp/ssmtp.conf /etc/ssmtp
+sudo cp ssmtp/revaliases /etc/ssmtp
 ```
 Test by sending an email:
 ```
@@ -363,6 +362,28 @@ hello world?
 
 ```
 Note blank lines above, and finish email with CTRL-D.
+
+This ssmtp configuration does a reasonable job of getting
+email out of these systems. The envelope FROM address of mail sent by
+`root` and `tfc_prod` is re-written to `admin@smartcambridge.org`
+(and more local addresses can be added to this list in `revaliases`).
+The FROM address of all other
+mail has `@cam.ac.uk` appended. The envelope TO address of all mail for
+local users with UID < 1000 is rewritten to
+`admin@smartcambridge.org`, and for all other users has
+`@cam.ac.uk` appended.
+
+This works for almost everything except mail to the 'tfc_prod' local user
+which fails because `tfc_prod@cam.ac.uk` doesn't exist. ssmtp
+explicitly doesn't support aliasing destination addresses for
+UIDs >= 1000. Th only way around this is to explicitly send such mail
+to an address that does work, e.e. by including
+
+```
+MAILTO=admin@smartcambridge.org
+```
+
+at the start of tfc_prod's crontab file.
 
 ### Install/configure Monit
 Get the ```monitrc``` file  (from tfc_prod@tfc-app2.cl.cam.ac.uk:~/tfc_prod/monit/monitrc)
