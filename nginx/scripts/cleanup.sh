@@ -13,5 +13,5 @@ key="/root/acme-challenge-keys/acme-challenge-key"
 
 logger -p daemon.error -t cleanup.sh "Restarting nginx for ${CERTBOT_DOMAIN} certificate change"
 ls -lR /etc/letsencrypt/live/ | logger -p daemon.error -t cleanup.sh
-service nginx restart
+service nginx reload
 ls -lR /etc/letsencrypt/live/ | logger -p daemon.error -t cleanup.sh
