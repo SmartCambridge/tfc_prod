@@ -287,36 +287,6 @@ include /etc/monit/httpd-server.conf
 #
 
 ###############################################################################
-## tfc-app2 local checks (should move to conf.d)
-###############################################################################
-##
-#  check file testfile with path /home/ijl20/test_monit
-#    if timestamp > 1 minutes then alert
-
-  # 1) The process that writes the post_data.json moves an existing one
-  #    out of the way before writing a new one so there's a short window
-  #    in each update when post_data.json doesn't exist. USe 'for 5 cycles'
-  #    to lower the chance of this triggering an alert
-  # 2) While in theory post_data.json will be updated several time a
-  #    minute, there are occasional pauses which aren't worth reporting
-  #    so set a long timeout
-  check file cloudamber_data_monitor_json with path /media/tfc/cloudamber/sirivm/data_monitor_json/post_data.json
-    if does not exist for 5 cycles then alert
-    if timestamp > 90 minutes then alert
-
-#
-# Filesystem space checks
-#
-  check device root-filesystem with path /
-    if space usage > 80% then alert
-
-  check device boot-filesystem with path /boot
-    if space usage > 80% then alert
-
-  check device tfc-filesystem with path /mnt/sdb1
-    if space usage > 80% then alert
-
-###############################################################################
 ## Includes
 ###############################################################################
 ##
