@@ -8,7 +8,5 @@ key="/root/acme-challenge-keys/acme-challenge-key"
 ( echo "cleanup"
   echo "${CERTBOT_DOMAIN}"
   echo "${CERTBOT_TOKEN}"
-  echo "${CERTBOT_VALIATION}"
+  echo "${CERTBOT_VALIDATION}"
 ) | ssh -i "${key}" acme-challenge@"${CERTBOT_DOMAIN}" acme-challenge
-
-service nginx restart

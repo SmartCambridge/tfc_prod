@@ -22,11 +22,11 @@ wget -O- "http://localhost"
 We use a special account (`acme-challenge`) to transfer the challenges created by `certbot`
 so that we can apply for certificates on one machine while the domain is being services by another one.
 
-The _challenge_ is that letsencrypt will provide a file-name/file-content pair and the 
+The _challenge_ is that letsencrypt will provide a file-name/file-content pair and the
 certificate-requesting host is required to create a file with that name and content at
 the location `http://<hostname>/.well-known/acme-challenge/<file-name>`.
 
-For testing, we will place a test file accessible as 
+For testing, we will place a test file accessible as
 `http://<hostname>/.well-known/acme-challenge/test.html`.
 
 First collect the `acme-challenge` ssh keypair from a machine that already has them and
@@ -46,6 +46,13 @@ Set up the userv scripts to be triggered by a key-based logon to user `acme-chal
 sudo mkdir /usr/local/lib/userv/
 sudo cp ~tfc_prod/tfc_prod/nginx/scripts/acme-challenge.target /usr/local/lib/userv/
 sudo cp ~tfc_prod/tfc_prod/nginx/scripts/acme-challenge /etc/userv/services.d/
+```
+
+Setup a script that will be run following successful certificate renewal
+which will reload nginx
+
+```
+sudo cp ~tfc_prod/tfc_prod/nginx/scripts/deploy.sh /etc/letsencrypt/renewal-hooks/deploy/
 ```
 
 Create the user `acme-challenge`. The `authorized_keys` file will enforce the userv execution
@@ -209,8 +216,7 @@ DNS will actually recieve traffic for those hosts.
 
 ## Setup certificate renewals:
 
-Add the following line to root's crontab (`sudo crontab -e`):
-
-```
-15 3 * * * /usr/bin/certbot renew --quiet
-```
+The certbot package installs both a cronjob (`/etc/cron.d/certbot`) for non-systemd systems
+and a pair of systemd units (`certbot.service` and `certbot.timer`), one or other of which
+will automatically run `certbot --renew` twice a day to renew any certificates with less that
+30 days remaining life. Activity is logged to syslog.
