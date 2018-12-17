@@ -1,2 +1,7 @@
 User-agent: *
-Disallow: /
+Disallow: /transport/map/
+Disallow: /transport/timetable/
+Disallow: /traffic/zone/plot/
+Disallow: /parking/plot/
+Disallow: /aq/plot/
+Disallow: /api/
