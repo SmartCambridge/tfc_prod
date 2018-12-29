@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '5.04';
+var VERSION = '5.05';
+            // 5.05 bugfix for TIMETABLE_URI
             // 5.04 updated to use rtmonitor_api 3.0 (register & connect methods)
             // 5.03 added transport/stops API to retrieve stops within bounding box
             // 5.02 remove local rt socket code and use RTMonitorAPI from tfc_web
@@ -31,14 +32,14 @@ var VERSION = '5.04';
             // 2.00 initial development of 'progress vector'
             // 1.00 initial development of 'segment distance vector'
 
-// All supplied from rtmonitor_config.js
+// All supplied from rtroute_config.js
 // var RTMONITOR_URI = '';
-// var TIMETABLE_API = '';
+// var TIMETABLE_URI = '';
 // var STOP_API
 // var STOPS_API
 // var API_KEY = '';
 
-var DEBUG = 'rtmonitor_api_log';
+var DEBUG = '';
 
 var STOP_MAX_JOURNEYS = 20; // max # of journeys to request from transport api (i.e. nresults)
 
@@ -810,7 +811,7 @@ function get_api_stop_journeys(stop_id)
     qs += '&expand_journey=true';
     qs += '&nresults='+STOP_MAX_JOURNEYS;
 
-    var uri = TIMETABLE_API+'/journeys_by_time_and_stop/'+qs;
+    var uri = TIMETABLE_URI+'/journeys_by_time_and_stop/'+qs;
 
     console.log('get_api_stop_journeys: getting '+stop_id+
                 ' @ '+datetime_from);
@@ -961,7 +962,7 @@ function get_route(sensor, draw)
     qs += '&departure_time='+encodeURIComponent(departure_time);
     qs += '&expand_journey=true';
 
-    var uri = TIMETABLE_API+'/departure_to_journey/'+qs;
+    var uri = TIMETABLE_URI+'/departure_to_journey/'+qs;
 
     console.log('get_route: getting '+sensor.sensor_id+
                 ' route_profile '+stop_id+' @ '+hh_mm_ss(new Date(departure_time)));

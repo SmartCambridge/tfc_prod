@@ -40,7 +40,7 @@ else
 }
 self.client_data.rt_client_url = location.href;
 
-console.log('RTMonitorAPI V'+VERSION+' instantiation',self.client_data);
+log('RTMonitorAPI V'+VERSION+' instantiation',self.client_data);
 
 var sock = {}; // the page's WebSocket
 
