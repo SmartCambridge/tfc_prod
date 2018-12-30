@@ -4,7 +4,8 @@
 // ***************************************************************************
 // Constants
 
-var VERSION = '5.05';
+var VERSION = '5.06';
+            // 5.06 token support, set_uri added to RTMONITOR_API
             // 5.05 bugfix for TIMETABLE_URI
             // 5.04 updated to use rtmonitor_api 3.0 (register & connect methods)
             // 5.03 added transport/stops API to retrieve stops within bounding box
@@ -289,6 +290,7 @@ function init()
 
     rtmonitor_uri_input.addEventListener('blur', function (e) {
         RTMONITOR_URI = rtmonitor_uri_input.value;
+        RTMONITOR_API.set_uri(RTMONITOR_URI);
         log('RTMONITOR_URI changed to '+RTMONITOR_URI);
         rtmonitor_uri_input.style['background-color'] = '#ffffff'; //white
         return false;
@@ -298,6 +300,7 @@ function init()
         if (e.key === "Enter" || e.keyCode == 13 || e.which == 13)
         {
             RTMONITOR_URI = rtmonitor_uri_input.value;
+            RTMONITOR_API.set_uri(RTMONITOR_URI);
             log('RTMONITOR_URI changed to '+RTMONITOR_URI);
             rtmonitor_uri_input.blur();
             e.preventDefault();
@@ -384,7 +387,7 @@ function init()
 
     load_tests();
 
-    RTMONITOR_API = new RTMonitorAPI(CLIENT_DATA);
+    RTMONITOR_API = new RTMonitorAPI(CLIENT_DATA, RTMONITOR_URI);
 
     rt_mon = RTMONITOR_API.register(rtmonitor_connected,rtmonitor_disconnected);
 
