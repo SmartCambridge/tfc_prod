@@ -11,18 +11,27 @@ sudo cp monitrc /etc/monit/
 ```
 
 Get a copy of `httpd-server.conf` from an already-configured server and copy it to
-`/etc/monit`
+`/etc/monit` (contains the basic auth password protecting the admin web pages).
 
-Copy TFC monitoring configurations into conf-available:
+Copy the monitoring configurations into conf-available:
 ```
 sudo cp conf-available/* /etc/monit/conf-available
 ```
 
-Link required ones into conf-available, e.g.:
+Link required ones into conf-enabled, e.g.:
 ```
-sudo ln -s /etc/conf-available/tfc_web_servers /etc/conf-enabled/tfc_web_servers
-sudo ln -s /etc/conf-available/tfc_web_cronjobs /etc/conf-enabled/tfc_web_cronjobs
+cd /etc/conf-enabled/
+sudo ln -s ../conf-available/tfc_filespace .
+sudo ln -s ../conf-available/tfc-sirivm .
+sudo ln -s ../conf-available/tfc_web_cronjobs .
+sudo ln -s ../conf-available/tfc_web_servers .
+```
 
+If enabling the `tfc-sirivm` checks, add the following to root's crontab
+to suppress aggressive monitoring overnight when it will otherwise false-positive:
+```
+00 07 * * * /usr/bin/monit monitor cloudamber_data_monitor_json_fast
+00 22 * * * /usr/bin/monit unmonitor cloudamber_data_monitor_json_fast
 ```
 
 Check status of running monit:
@@ -34,17 +43,21 @@ also:
 sudo service monit status
 ```
 
-To add additional checks, edit tfc_prod/monit/monitrc and copy to /etc/monit
+To add additional checks, create a new fragment in `tfc_prod/monit/conf-available`, copy to
+`/etc/monit/conf-available` and link it into `/etc/monit/conf-enabled`
 
 To check monit configutation;
 ```
 sudo monit -t
 ```
 
-Restart monit with
+Reload monit configuration with
 ```
-sudo monit start all
+sudo monit reload
 ```
+
+Web console at https://smartcambridge.org/system/monitor/ - see
+`/etc/monit/httpd-server.conf` for the credentials
 
 Sample filesystem checks:
 ```
