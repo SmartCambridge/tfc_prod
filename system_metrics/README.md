@@ -19,8 +19,7 @@ sudo apt install nginx-extras
 sudo mkdir /etc/nginx/lua
 sudo cp prometheus.lua /etc/nginx/lua
 sudo cp lua-prometheus.conf /etc/nginx/conf.d/
-sudo cp prometheus-metrics.conf /etc/nginx/includes2/
-sudo cp prometheus-server.conf /etc/nginx/includes2/
+sudo cp prometheus-metrics.conf prometheus-server.conf grafana.conf /etc/nginx/includes2/
 ```
 
 `prometheus.lua` comes from https://github.com/knyar/nginx-lua-prometheus/
@@ -32,10 +31,11 @@ password you know, and add yourself as a user identified by your CrsID
 if you are not already in the file:
 
 ```
-sudo apr install apache2-utils
-sudo htpasswd /etc/nginx/tfc_admin_htpasswd
+sudo apt install apache2-utils
 sudo htpasswd /etc/nginx/tfc_admin_htpasswd admin
 sudo htpasswd /etc/nginx/tfc_admin_htpasswd <your crsid>
+sudo chown www-data:www-data /etc/nginx/tfc_admin_htpasswd
+sudo chmod go= /etc/nginx/tfc_admin_htpasswd
 ```
 
 Anyone who can authenticate against this file will have access to
@@ -74,7 +74,7 @@ in `/mnt/sdc1/prometheus` but links this to the expected location of
 sudo useradd --no-create-home --shell /bin/false prometheus
 sudo mkdir /etc/prometheus
 sudo mkdir /mnt/sdc1/prometheus
-sudo ln -s /var/lib/prometheus /var/lib/prometheus
+sudo ln -s /mnt/sdc1/prometheus /var/lib/prometheus
 sudo chown prometheus:prometheus /mnt/sdc1/prometheus
 ```
 
@@ -107,7 +107,6 @@ Prometheus.
 ```
 sudo cp node_exporter /usr/local/bin/
 sudo cp node_exporter.service /etc/systemd/system/
-
 ```
 
 node_exporter comes from the
@@ -123,7 +122,7 @@ statsd_exporter makes metrics exported vis the statds protocol (including
 metrics exported by Ginucorn) available to Prometheus.
 
 ```
-sudo cp statsd_exporter-0.8.1/statsd_exporter /usr/local/bin/
+sudo cp statsd_exporter /usr/local/bin/
 sudo cp statsd.yml /etc/prometheus
 sudo cp statsd_exporter.service /etc/systemd/system/
 ```
@@ -171,7 +170,7 @@ Ubuntu 16.04 comes with a very old Grafana package. We install a later
 one from a personal package archive:
 
 ```
-sudo echo 'deb https://packages.grafana.com/oss/deb stable main' > /etc/apt/sources.list.d/grafana.list
+sudosh -c "echo 'deb [arch=amd64] https://packages.grafana.com/oss/deb stable main' > /etc/apt/sources.list.d/grafana.list"
 sudo curl https://packages.grafana.com/gpg.key | sudo apt-key add -
 sudo apt-get update
 sudo apt-get install grafana
@@ -185,9 +184,9 @@ Then:
 
 ```
 sudo systemctl daemon-reload
-sudo systemctl start grafana
-sudo systemctl status grafana
-sudo systemctl enable grafana.service
+sudo systemctl start grafana-server
+sudo systemctl status grafana-server
+sudo systemctl enable grafana-server.service
 ```
 
 Visit `https://<hostname>/system/grafana`. If prompted for a username
