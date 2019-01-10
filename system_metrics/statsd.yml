@@ -1,0 +1,36 @@
+mappings:
+
+  # Map Gunicorn statdD metrics into something more 'promethen'
+  # https://docs.gunicorn.org/en/stable/instrumentation.html
+  # https://prometheus.io/docs/practices/naming/
+
+  # Drop this - duplicated elsewhere
+  - match: "*.gunicorn.requests"
+    action: drop
+    name: "gunicorn_request_rate"
+
+  - match: "*.gunicorn.request.duration"
+    help: "Request durations in millisecond"
+    name: "gunicorn_request_duration_milliseconds"
+    labels:
+      prefix: "$1"
+
+  - match: "*.gunicorn.request.status.*"
+    help: "Total requests"
+    name: "gunicorn_requests_total"
+    labels:
+      prefix: "$1"
+      status: "$2"
+
+  - match: "*.gunicorn.workers"
+    help: "Number of workers (guage)"
+    name: "gunicorn_workers"
+    labels:
+      prefix: "$1"
+
+  - match: "*.gunicorn.log.*"
+    help: "Total number of log messages"
+    name: "gunicorn_log_messages_total"
+    labels:
+      prefix: "$1"
+      severity: "$2"
