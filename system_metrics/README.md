@@ -6,6 +6,9 @@ to graph them. These instructions set up Prometheus to gather metrics about
 itself, the system it runs on, Nginx, and the Gunicorn process supporting
 tfc_web and to make them available in Grafana.
 
+See [TFC Server Monitoring Architecture](tfc_server_monitoring.pdf) for
+an overview of the eventual architecture.
+
 Configure Nginx
 ---------------
 
