@@ -10,7 +10,8 @@ Type=simple
 ExecStart=/usr/local/bin/node_exporter \
     --web.listen-address="127.0.0.1:9100" \
     --collector.processes \
-    --collector.systemd
+    --collector.systemd \
+    --collector.systemd.unit-whitelist=""
 
 [Install]
 WantedBy=multi-user.target
