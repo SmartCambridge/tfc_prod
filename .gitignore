@@ -133,4 +133,6 @@ secrets.py
 
 rtroute_config.js
 
+secrets.sh
+secrets/
 
