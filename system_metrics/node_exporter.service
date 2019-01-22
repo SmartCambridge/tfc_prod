@@ -9,6 +9,7 @@ Group=prometheus
 Type=simple
 ExecStart=/usr/local/bin/node_exporter \
     --web.listen-address="127.0.0.1:9100" \
+    --collector.textfile.directory="/var/lib/node_exporter/textfile_collector/" \
     --collector.processes \
     --collector.systemd \
     --collector.systemd.unit-whitelist=""

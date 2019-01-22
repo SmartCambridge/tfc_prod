@@ -79,6 +79,9 @@ sudo mkdir /etc/prometheus
 sudo mkdir /mnt/sdc1/prometheus
 sudo ln -s /mnt/sdc1/prometheus /var/lib/prometheus
 sudo chown prometheus:prometheus /mnt/sdc1/prometheus
+sudo mkdir -p /var/lib/node_exporter/textfile_collector/
+sudo chown -R prometheus:prometheus /var/lib/node_exporter/
+sudo chmod +t,go+rwx /var/lib/node_exporter/textfile_collector/
 ```
 
 Install Prometheus
