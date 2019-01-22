@@ -133,4 +133,6 @@ secrets.*
 
 rtroute_config.js
 
+secrets.sh
+secrets/
 
