@@ -44,6 +44,7 @@ gateway 128.232.98.1
 netmask 255.255.255.0
 dns-nameservers 128.232.1.1 128.232.1.2
 ```
+
 ### Apply immediate updates
 ```
 sudo apt-get update
@@ -67,7 +68,7 @@ sudo apt-get install emacs
 
 ### Add emacs/ssh config files
 
-If required, now is an opportunity to sftp .emacs.el and .ssh/authorized_keys from your other servers.
+If required, now is an opportunity to sftp `.emacs.el` and `.ssh/authorized_keys` from your other servers.
 
 ### Configure disks as LVM volumes
 
@@ -211,6 +212,16 @@ git clone https://github.com/SmartCambridge/tfc_prod.git
 ```
 
 From another server, sftp the current `tfc_prod/secrets/` directory and `tfc_prod/secrets.sh` file.
+
+### Update server `/etc/ssh/ssh_known_hosts`
+
+As a sudoer, run
+```
+~tfc_prod/tfc_prod/scripts/update_known_hosts.sh >ssh_known_hosts
+sudo mv ssh_known_hosts /etc/ssh/
+```
+If you inspect the ssh_known_hosts file, you should see an entry for each `tfc-appX` server followed
+by an identical entry with the `smartcambridge.org` hostname.
 
 ### Install Nginx
 
