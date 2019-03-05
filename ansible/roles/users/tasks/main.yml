@@ -1,6 +1,5 @@
 ---
 
-
 - name: tfc_prod user
   user:
     name: tfc_prod
@@ -14,18 +13,59 @@
     groups: sudo
   loop: "{{ admin_users }}"
 
-- name: Admin user .ssh directory
+- name: Admin .ssh directory
   file:
-    path: /home/"{{ item }}"/.ssh"
+    path: /home/{{ item }}/.ssh
     state: directory
-    mode: "u=rw,go="
-  loop: "{{ admin_users }}"
-
-- name: Admin user keys
-  copy:
-    src: "{{ item }}.pub"
-    dest: /home/"{{ item }}"/.ssh/authorized_keys
     owner: "{{ item }}"
     group: "{{ item }}"
-  when: "{{ item }}.pub is exists"
+    mode: "u+rw,go-w"
   loop: "{{ admin_users }}"
+
+- name: Check for 'mortal' authorized key files to copy
+  local_action:
+    module: stat
+    path: "{{ role_path }}/files/{{ item }}_mortal.pub"
+  loop: "{{ admin_users }}"
+  register: st
+
+- name: Install individual 'mortal' authorized keys
+  copy:
+    src: "{{ item.stat.path }}"
+    dest: ~{{ item.item }}/.ssh/authorized_keys
+    owner: "{{ item.item }}"
+    group: "{{ item.item }}"
+    mode: "u+rw,go="
+  loop: "{{ st.results }}"
+  when: item.stat.exists
+
+- name: Role .ssh directory
+  file:
+    path: ~{{ item }}/.ssh
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "u+rw,go-w"
+  loop:
+    - tfc_prod
+    - root
+
+- name: Install 'mortal' keys to tfc_prod authorized_keys
+  assemble:
+    remote_src: false
+    src: "{{ role_path }}/files/"
+    dest: ~tfc_prod/.ssh/authorized_keys
+    regexp: "[a-z0-9_]+_mortal.pub"
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u+rw,go="
+
+- name: Install 'priv' keys to root authorized_keys
+  assemble:
+    remote_src: false
+    src: "{{ role_path }}/files/"
+    dest: ~root/.ssh/authorized_keys
+    regexp: "[a-z0-9_]+_priv.pub"
+    owner: root
+    group: root
+    mode: "u+rw,go="
