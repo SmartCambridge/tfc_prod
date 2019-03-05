@@ -1,0 +1,31 @@
+---
+
+
+- name: tfc_prod user
+  user:
+    name: tfc_prod
+    comment: TFC production account
+    state: present
+
+- name: Admin users
+  user:
+    name: "{{ item }}"
+    state: present
+    groups: sudo
+  loop: "{{ admin_users }}"
+
+- name: Admin user .ssh directory
+  file:
+    path: /home/"{{ item }}"/.ssh"
+    state: directory
+    mode: "u=rw,go="
+  loop: "{{ admin_users }}"
+
+- name: Admin user keys
+  copy:
+    src: "{{ item }}.pub"
+    dest: /home/"{{ item }}"/.ssh/authorized_keys
+    owner: "{{ item }}"
+    group: "{{ item }}"
+  when: "{{ item }}.pub is exists"
+  loop: "{{ admin_users }}"

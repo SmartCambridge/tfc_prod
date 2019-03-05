@@ -1,0 +1,10 @@
+Pre-install requirements
+------------------------
+
+* Packages
+    * openssh-server
+    * python
+* ~root/.ssh/authorized_keys
+
+
+

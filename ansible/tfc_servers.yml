@@ -1,0 +1,7 @@
+---
+
+- hosts: tfc_servers
+  roles:
+    - common
+    - users
+    

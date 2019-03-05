@@ -1,0 +1,6 @@
+[tfc_servers]
+
+tfc-app1            ansible_host=tfc-app1.cl.cam.ac.uk
+tfc-app2            ansible_host=tfc-app2.cl.cam.ac.uk
+tfc_app3            ansible_host=tfc-app3.cl.cam.ac.uk
+tfc-app5            ansible_host=tfc-app5.cl.cam.ac.uk
