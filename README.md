@@ -4,6 +4,18 @@ These steps describe the process of getting from a bare brand new server to a ru
 platform. The specific machine comments, e.g. regarding iTrac relate to a Dell PowerEdge server.
 
 ### Install Ubuntu on the server
+
+These instructions assume you've downloaded the appropriate Ubuntu Server iso image, e.g. from
+```
+https://www.ubuntu.com/download/server
+```
+Note that the default download is the 'live' CD, using Subiquity which is *incompatible* with Dell iDrac.
+
+If this is a problem for you then install the download version available on the 'alternatives' page:
+```
+http://cdimage.ubuntu.com/releases/18.04.2/release/
+```
+
 Dell F11 - enter boot manager
 
 One-shot UEFI Boot
@@ -20,6 +32,18 @@ Install Ubuntu
 > London timezone
 + English (UK) Extended winkeys
 + Enter user details, e.g. for Computer Name use 'tfc-appN'
+
+## Networking
+
+Usually the IP parameters will be set during the boot process.
+
+Note the IP V4 parameters are as follows, with XXX as issued.
+```
+address 128.232.98.XXX (or 128.232.98.XXX/24 if requested)
+gateway 128.232.98.1
+netmask 255.255.255.0
+dns-nameservers 128.232.1.1 128.232.1.2
+```
 
 ### Apply immediate updates
 ```
@@ -44,7 +68,7 @@ sudo apt-get install emacs
 
 ### Add emacs/ssh config files
 
-Now is an opportunity to sftp .emacs.el and .ssh/authorized_keys from your other servers.
+If required, now is an opportunity to sftp `.emacs.el` and `.ssh/authorized_keys` from your other servers.
 
 ### Configure disks as LVM volumes
 
@@ -137,81 +161,40 @@ df -h
 ll /mnt/sdb1
 ```
 
-### Install Dell OpenManage
-
-On the management desktop:
-Dell OpenManage DRAC Tools, includes Racadm (64bit),v8.3
-http://www.dell.com/support/home/us/en/19/product-support/servicetag/3FJ5KF2/drivers?os=ws8r2
-
-On the linux server:
-https://oitibs.com/dell-openmanage-on-ubuntu-16-04/
-
-### set fixed IP
-
-```
-sudo emacs /etc/NetworkManager/NetworkManager.conf
-```
-
-```
-[main]
-plugins=ifupdown,keyfile
-#dns=dnsmasq
-
-[ifupdown]
-managed=false
-```
-
-```
-sudo emacs /etc/network/interfaces
-```
-
-```
-auto lo
-iface lo inet loopback
-
-auto eno1
-iface eno1 inet static
-address 128.232.98.198
-gateway 128.232.98.1
-netmask 255.255.255.0
-dns-nameservers 128.232.1.1 128.232.1.2
-```
-
-```
-sudo service network-manager restart
-sudo service networking restart
-sudo service resolvconf restart
-sudo ifdown eno1
-sudo ifup eno1
-```
-
-To confirm:
-```
-ip address list
-```
 ### Install Java 8 SDK (JRE?)
 
 ```
-sudo apt-get install default-jdk
+sudo apt-get install openjdk-8-jdk
 ```
 test with
 ```
 java -version
 ```
-You should see the SDK version 1.8.xxx or higher.
+You should see the SDK version 1.8.xxx.
 
-### Install Nginx
-
-See nginx/README.md
-
-### Install Monit (?)
-
-See (monit/INSTALLATION.md)[monit/INSTALLATION.md]
+Note that if multiple java versions are to be installed (e.g. on a development server)
+then the default can be set with
+```
+sudo update-alternatives --config java
+```
+and checked with
+```
+update-java-alternatives --list
+```
 
 ### Create (non-sudo) tfc_prod user
 
+with `tfc-appN` as the correct hostname:
+
 ```
 sudo adduser tfc_prod
+<reply to prompts>
+
+su tfc_prod
+<enter password>
+cd ~
+ssh-keygen -t rsa -b 4096 -C "tfc_prod@tfc-appN"
+<reply to prompts>
 ```
 
 ### Install git
@@ -225,28 +208,47 @@ sudo apt install git
 su tfc_prod
 cd ~
 
-git clone https://github.com/ijl20/tfc_prod.git
+git clone https://github.com/SmartCambridge/tfc_prod.git
 ```
 
-Alternatively, copy directly from tfc-app2.cl.cam.ac.uk:
+From another server, sftp the current `tfc_prod/secrets/` directory and `tfc_prod/secrets.sh` file.
 
-This requires access to the tfc_prod account on that server.
+### Update server `/etc/ssh/ssh_known_hosts`
+
+As a sudoer, run
 ```
-rsync -chavzP --stats tfc_prod@tfc-app2.cl.cam.ac.uk:tfc_prod /home/tfc_prod
+~tfc_prod/tfc_prod/scripts/update_known_hosts.sh >ssh_known_hosts
+sudo mv ssh_known_hosts /etc/ssh/
 ```
-Check with
-```
-ll tfc_prod
-```
+If you inspect the ssh_known_hosts file, you should see an entry for each `tfc-appX` server followed
+by an identical entry with the `smartcambridge.org` hostname.
+
+### Install Nginx
+
+See nginx/README.md
+
+### Install Monit (?)
+
+See (monit/INSTALLATION.md)[monit/INSTALLATION.md]
+
 
 ### Add the tfc_server JAR file to the tfc_prod directory
 
-Ideally, install the tfc_server source [https://github.com/ijl20/tfc_server](https://github.com/ijl20/tfc_server)
+Ideally, as a developer user (not tfc_prod), install the tfc_server source 
+[https://github.com/SmartCambridge/tfc_server](https://github.com/SmartCambridge/tfc_server)
 
 Run ```mvn clean package``` in the tfc_server directory to create the fat jar.
 
-Copy the fat jar file (such as ~/tfc_server/target/tfc_server-1.0-SNAPSHOT-fat.jar) to (say) ~/tfc_prod/tfc_2017-09-27.jar.
+Copy the fat jar file (such as ~/tfc_server/target/tfc_server-*-fat.jar) to (say) ~/tfc_prod/tfc_2017-09-27.jar.
 
+Alternatively you can simple collect the `tfc_prod/tfc_YYYY-MM-DD.jar` from another server
+
+In the `tfc_prod` directory, create a symlink to the jar file (use the actual name, not tfc_YYYY_MM_DD) with:
+
+```
+rm tfc.jar
+ln -s tfc_YYYY_MM_DD.jar tfc.jar
+```
 
 ### Create data directory links
 

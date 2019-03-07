@@ -187,13 +187,21 @@ For any machine that will or could run `carrier.csi.cam.ac.uk`:
 sudo ln -s /etc/nginx/sites-available/carrier.csi.cam.ac.uk.conf /etc/nginx/sites-enabled/
 ```
 
+Install default vhost config and a 'dummy' ssl key and certificate
+
+```
+sudo cp /home/tfc_prod/tfc_prod/nginx/dummy.key /etc/nginx/ssl/
+sudo cp /home/tfc_prod/tfc_prod/nginx/dummy.crt /etc/nginx/ssl/
+sudo ln -s /etc/nginx/sites-available/000-default.conf /etc/nginx/sites-enabled/
+```
+
 Check the file exists:
 
 ```
 /etc/letsencrypt/options-ssl-nginx.conf
 ```
 
-If not, then download from 
+If not, then download from
 [https://github.com/certbot/certbot/blob/master/certbot-nginx/certbot_nginx/options-ssl-nginx.conf](https://github.com/certbot/certbot/blob/master/certbot-nginx/certbot_nginx/options-ssl-nginx.conf)
 
 and then check and restart nginx:
