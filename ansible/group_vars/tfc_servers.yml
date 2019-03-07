@@ -5,3 +5,11 @@ admin_users:
   - jw35
   - ijl20
   - amc203
+
+file_systems:
+  - pvs: /dev/sdb
+    vg: sdb-vg
+    lv: sdb1
+    size: 3.5T
+    fstype: ext4
+    mountpoint: /mnt/sdb1

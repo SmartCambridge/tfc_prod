@@ -1,0 +1,29 @@
+---
+
+- name: Create volume groups
+  lvg:
+    vg: "{{ item.vg }}"
+    pvs: "{{ item.pvs }}}"
+    state: present
+  loop: "{{ file_systems }}"
+
+- name: Create logical volumes
+  lvol:
+    vg: "{{ item.vg }}"
+    lv: "{{ item.lv }}"
+    size: "{{ item.size }}"
+  loop: "{{ file_systems }}"
+
+- name: Create file file_systems
+  filesystem:
+    fstype: "{{ item.fstype }}"
+    dev: /dev/{{ item.vg }}/{{ item.lv }}
+  loop: "{{ file_systems }}"
+
+- name: Mount file file_systems
+  mount:
+    name: "{{ item.mountpoint }}"
+    src: /dev/mapper/{{ item.vg }}/{{ item.lv }}
+    fstype: "{{ item.fstype }}"
+    state: mounted
+  loop: "{{ file_systems }}"
