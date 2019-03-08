@@ -1,0 +1,2 @@
+pubring.gpg diff=gpgkeys
+*.asc diff=gpgrcpt
