@@ -80,7 +80,7 @@
     state: directory
     user: root
     group: root
-    mode: "u+rwx,go=rx"
+    mode: "u=rwx,go=rx"
 
 - name: acme-challenge.target
   copy:
@@ -88,7 +88,7 @@
     dest: /usr/local/lib/userv/
     user: root
     group: root
-    mode: "u+rw,go=r"
+    mode: "u=rw,go=r"
 
 - name: acme-challenge service definition
   copy:
@@ -96,7 +96,7 @@
     dest: /etc/userv/services.d/
     user: root
     group: root
-    mode: "u+rw,go=r"
+    mode: "u=rw,go=r"
 
 - name: certbot deploy.sh
   copy:
@@ -104,7 +104,7 @@
     dest: /etc/letsencrypt/renewal-hooks/deploy/
     user: root
     group: root
-    mode: "u+rwx,go=rx"
+    mode: "u=rwx,go=rx"
 
 - name: acme-challenge document root
   file:
@@ -112,7 +112,7 @@
     state: directory
     user: root
     group: root
-    mode: "u+rwx,go=rx"
+    mode: "u=rwx,go=rx"
 
 - name: acme-challenge test file
   copy:
@@ -120,7 +120,7 @@
     dest: /var/www/acme-challenge/
     user: root
     group: root
-    mode: "u+rw,go=r"
+    mode: "u=rw,go=r"
 
 # Nginx configuration
 
@@ -130,7 +130,7 @@
     dest: /etc/nginx/
     user: root
     group: root
-    mode: "u+rwx,go=rx"
+    mode: "u=rwx,go=rx"
 
 # Either
 #
@@ -149,7 +149,7 @@
     dest: /etc/nginx/sites-available/
     user: root
     group: root
-    mode: "u+rw,go=r"
+    mode: "u=rw,go=r"
     notify: "restart nginx"
 
 - name: Restart nginx if necessary
@@ -165,7 +165,7 @@
     state: directory
     user: root
     group: root
-    mode: "u+rwx,go=rx"
+    mode: "u=rwx,go=rx"
 
 - name: Dummy certificate/key for default host
   copy:
@@ -173,15 +173,26 @@
     dest: /etc/nginx/ssl/
     user: root
     group: root
-    mode: "u+rw,go=r"
+    mode: "u=rw,go=r"
   loop:
     - dummy.key
     - dummy.crt
 
-#sudo scp root@<other-server>:/etc/nginx/ssl/carrier.pem /etc/nginx/ssl
-#sudo scp root@<other-server>:/etc/nginx/ssl/carrier.key /etc/nginx/ssl
-#sudo chmod 600 /etc/nginx/ssl/*
-#sudo chmod 700 /etc/nginx/ssl
+- name: carrier.csx key
+  gpg_d:
+    src: carrier.key.asc
+    dest: /etc/nginx/ssl/carrier.key
+    user: root
+    group: root
+    mode: "u=rw,go="
+
+- name: carrier.csx certificate
+  copy:
+    src: carrier.pem
+    dest: /etc/nginx/ssl/carrier.pem
+    user: root
+    group: root
+    mode: "u=rw,go=r"
 
 #sudo rm /etc/nginx/sites-enabled/tls-bootstrap.conf
 
