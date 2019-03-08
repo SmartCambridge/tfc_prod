@@ -9,3 +9,16 @@
       - emacs
       - git
     state: present
+
+- name: System-wide ssh known_hosts file
+  copy:
+    src: ssh_known_hosts
+    dest: /etc/ssh
+
+- name: Copy update_known_hosts.ssh_known_hosts
+  copy:
+    src: update_known_hosts.sh
+    dest: /usr/local/bin
+    mode: "+x"
+
+
