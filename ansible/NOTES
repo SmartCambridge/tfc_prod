@@ -1,10 +1,31 @@
 Pre-install requirements
-------------------------
+========================
 
 * Packages
     * openssh-server
     * python
 * ~root/.ssh/authorized_keys
+
+User management
+===============
+
+Accounts are created for all userids listed in `admin_users`
+(see `group_vars/tfc_servers.yml`). These accounts don't have usable
+passwords.
+
+An account is created for tfc_prod. The tfc_prod_id keypair is
+installed as tfc_prod's `id_rsa`.
+
+All *_mortal.keys files are transferred to the corresponding user's
+.ssh/authorised_keys files.
+
+All *_mortal.keys are concatenated and transferred to
+~tfc_prod/.ssh/authorised_keys
+
+All *_priv.keys are concatenated and transferred to
+~root/.ssh/authorised_keys
+
+
 
 
 
