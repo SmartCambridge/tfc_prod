@@ -19,7 +19,7 @@
       - userv
     state: present
 
-- name: Set services to restart on reboot
+- name: Set services to start on reboot
   service:
     name: {{ item }}
     state: enabled
@@ -36,24 +36,43 @@
 
 - name: Create ~acme-challenge/.ssh
   file:
-    dest: /home/acme-challenge/.ssh
+    dest: ~acme-challenge/.ssh
     state: directory
     user: root
     group: root
-    mode: "u+rwx,go=rx"
+    mode: "u=rwx,go="
 
 - name: Copy acme-challenge authorized_keys
   copy:
     src: acme-challenge_authorized_keys
-    dest: /home/acme-challenge/.ssh/
+    dest: ~acme-challenge/.ssh/
     user: root
     group: root
-    mode: "u+rw,go=r"
+    mode: "u=rw,go="
 
-#sudo scp root@<other-server>:/root/acme-challenge-keys /root/acme-challenge-keys
-#sudo chmod 644 /root/acme-challenge-keys/*
-#sudo chmod 600 /root/acme-challenge-keys/acme-challenge-key
-#sudo chmod 755 /root/acme-challenge-keys
+- name: Create ~root/acme-challenge-keys
+  file:
+    dest: ~root/acme-challenge-keys
+    state: directory
+    user: root
+    group: root
+    mode: "u=rwx,go=rx"
+
+- name: Copy acme-challenge SSH private key
+  gpg_d:
+    src: acme-challenge-key.asc
+    dest: ~root/acme-challenge-keys/acme-challenge-key.asc
+    user: root
+    group: root
+    mode: "u=rw,go="
+
+- name: Copy acme-challenge SSH public key
+  copy:
+    src: acme-challenge-key.pub
+    dest: ~root/acme-challenge-keys/acme-challenge-key.pub
+    user: root
+    group: root
+    mode: "u=rw,go=r"
 
 - name: Create userv home
   file:
@@ -96,7 +115,7 @@
     mode: "u+rwx,go=rx"
 
 - name: acme-challenge test file
-  copy: 
+  copy:
     src: www-acme-challenge/
     dest: /var/www/acme-challenge/
     user: root
