@@ -1,15 +1,30 @@
 ---
 
+tfc_prod_branch: master
+
 # CrsIDs of users to be created
 admin_users:
   - jw35
   - ijl20
   - amc203
 
+# LVM config
 file_systems:
   - pvs: /dev/sdb
     vg: sdb-vg
     lv: sdb1
-    size: 3.5T
+    size: 3584G
     fstype: ext4
     mountpoint: /mnt/sdb1
+  - pvs: /dev/sdc
+    vg: sdc-vg
+    lv: sdc1
+    size: 3584G
+    fstype: ext4
+    mountpoint: /mnt/sdc1
+  - pvs: /dev/sdd
+    vg: sdd-vg
+    lv: sdd1
+    size: 3584G
+    fstype: ext4
+    mountpoint: /mnt/sdd1

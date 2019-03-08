@@ -3,7 +3,7 @@
 - name: Create volume groups
   lvg:
     vg: "{{ item.vg }}"
-    pvs: "{{ item.pvs }}}"
+    pvs: "{{ item.pvs }}"
     state: present
   loop: "{{ file_systems }}"
 
@@ -23,7 +23,7 @@
 - name: Mount file file_systems
   mount:
     name: "{{ item.mountpoint }}"
-    src: /dev/mapper/{{ item.vg }}/{{ item.lv }}
+    src: /dev/{{ item.vg }}/{{ item.lv }}
     fstype: "{{ item.fstype }}"
     state: mounted
   loop: "{{ file_systems }}"
