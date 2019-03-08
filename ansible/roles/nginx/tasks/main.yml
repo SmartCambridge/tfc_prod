@@ -1,0 +1,182 @@
+---
+
+# Packages
+
+- name: Add certbot ppa
+  apt_repository:
+    repo: ppa:certbot/certbot
+    update_cache: yes
+    state: present
+
+- name: Nginx software
+  apr:
+    update_cache: yes
+    cache_valid_time: 3600
+    name:
+      - software-properties-common
+      - nginx
+      - python-certbot-nginx
+      - userv
+    state: present
+
+- name: Set services to restart on reboot
+  service:
+    name: {{ item }}
+    state: enabled
+  loop:
+    - nginx
+    - userv
+
+# Acme challenge automation
+
+- name: Create acme-challenge user
+  user:
+    name: acme-challenge
+    state: present
+
+- name: Create ~acme-challenge/.ssh
+  file:
+    dest: /home/acme-challenge/.ssh
+    state: directory
+    user: root
+    group: root
+    mode: "u+rwx,go=rx"
+
+- name: Copy acme-challenge authorized_keys
+  copy:
+    src: acme-challenge_authorized_keys
+    dest: /home/acme-challenge/.ssh/
+    user: root
+    group: root
+    mode: "u+rw,go=r"
+
+#sudo scp root@<other-server>:/root/acme-challenge-keys /root/acme-challenge-keys
+#sudo chmod 644 /root/acme-challenge-keys/*
+#sudo chmod 600 /root/acme-challenge-keys/acme-challenge-key
+#sudo chmod 755 /root/acme-challenge-keys
+
+- name: Create userv home
+  file:
+    dest: /usr/local/lib/userv/
+    state: directory
+    user: root
+    group: root
+    mode: "u+rwx,go=rx"
+
+- name: acme-challenge.target
+  copy:
+    src: scripts/acme-challenge.target
+    dest: /usr/local/lib/userv/
+    user: root
+    group: root
+    mode: "u+rw,go=r"
+
+- name: acme-challenge service definition
+  copy:
+    src: scripts/acme-challenge
+    dest: /etc/userv/services.d/
+    user: root
+    group: root
+    mode: "u+rw,go=r"
+
+- name: certbot deploy.sh
+  copy:
+    src: scripts/deploy.sh
+    dest: /etc/letsencrypt/renewal-hooks/deploy/
+    user: root
+    group: root
+    mode: "u+rwx,go=rx"
+
+- name: acme-challenge document root
+  file:
+    dest: /var/www/acme-challenge
+    state: directory
+    user: root
+    group: root
+    mode: "u+rwx,go=rx"
+
+- name: acme-challenge test file
+  copy: 
+    src: www-acme-challenge/
+    dest: /var/www/acme-challenge/
+    user: root
+    group: root
+    mode: "u+rw,go=r"
+
+# Nginx configuration
+
+- name: nginx includes2 directory
+  copy:
+    src: includes2/
+    dest: /etc/nginx/
+    user: root
+    group: root
+    mode: "u+rwx,go=rx"
+
+# Either
+#
+# sudo cp /home/tfc_prod/tfc_prod/nginx/sites-available/* /etc/nginx/sites-available
+# sudo rm /etc/nginx/sites-enabled/*
+#
+# sudo ln -s /etc/nginx/sites-available/tls-bootstrap.conf /etc/nginx/sites-enabled/
+#
+# Or
+#
+# sudo cp ~tfc_prod/tfc_prod/nginx/includes/letsencrypt_port_80.conf /etc/nginx/includes/
+
+- name: nginx site definition files
+  copy:
+    src: sites-available/*
+    dest: /etc/nginx/sites-available/
+    user: root
+    group: root
+    mode: "u+rw,go=r"
+    notify: "restart nginx"
+
+- name: Restart nginx if necessary
+  meta:
+    flush_handlers
+
+#sudo ~tfc_prod/tfc_prod/nginx/scripts/request-certificate.sh
+#sudo ~tfc_prod/tfc_prod/nginx/scripts/request-smartcambridge-certificate.sh
+
+- name: nginx certificate directory
+  file:
+    dest: /etc/nginx/ssl
+    state: directory
+    user: root
+    group: root
+    mode: "u+rwx,go=rx"
+
+- name: Dummy certificate/key for default host
+  copy:
+    src: {{ item }}
+    dest: /etc/nginx/ssl/
+    user: root
+    group: root
+    mode: "u+rw,go=r"
+  loop:
+    - dummy.key
+    - dummy.crt
+
+#sudo scp root@<other-server>:/etc/nginx/ssl/carrier.pem /etc/nginx/ssl
+#sudo scp root@<other-server>:/etc/nginx/ssl/carrier.key /etc/nginx/ssl
+#sudo chmod 600 /etc/nginx/ssl/*
+#sudo chmod 700 /etc/nginx/ssl
+
+#sudo rm /etc/nginx/sites-enabled/tls-bootstrap.conf
+
+- name: Link site files
+  file:
+    src: /etc/nginx/sites-available/{{ item }}
+    dest: /etc/nginx/sites-enabled/
+    state: link
+  loop:
+    - tfc_prod2.conf
+    - smartcambridge.conf
+    - carrier.csi.cam.ac.uk.conf
+    - 000-default.conf
+  notify: "restart nginx"
+
+#/etc/letsencrypt/options-ssl-nginx.conf
+
