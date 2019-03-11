@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>databrowser::smartCAMBRIDGE</title>
+<style>
+body {
+   font-family: Tahoma, Verdana, Segoe, sans-serif;
+   background-image: url("images/background_blur.png");
+   font-size: 120%;
+}  
+
+img {
+   vertical-align: middle;
+}
+
+a:link { text-decoration: none; color: #505050; }
+a:visited { text-decoration:none; border-bottom:1px dotted #ddbfdc; color: #505050; }
+a:focus { color: #0072cf; outline: thin dotted; border-bottom:0 }
+a:hover { text-decoration:underline; border-bottom:0 }
+a:hover, a:active { outline: none; }
+a:active { text-decoration:none; border-bottom:0}
+
+.header_title {
+   color: #C0C0C0;
+}
+
+p {
+   color: #C0C0C0;
+}
+
+.cam_list_header {
+    border-bottom: 1px solid #e4e4e4;
+    line-height: 25px;
+    text-rendering: optimizelegibility;
+    margin: 0 0 10px 0;
+    vertical-align: baseline;
+    font-style: normal;
+    color: #C0C0C0;
+}
+
+.header_title a:link { color: #C0C0C0; }
+
+.header_title a:visited { color: #C0C0C0; }
+
+.backdoor_wrapper {
+    text-align: center;
+}
+
+.backdoor_button {
+    display: inline-block;
+    font-size: 200%;
+    border:2px solid;
+    border-radius:12px;
+    padding: 5px 20px;
+    background-color: white;
+    margin: 0 auto;
+}
+
+
+</style>
+</head>
+<body>
+<h1 class="header_title">
+<a href="/"><img src="images/smart_cambridge_logo_rounded.png"/></a>
+<a href=".">backdoor</a>::Data Browser
+</h1>
+<p>Here you can browse the 'raw' data that Rita consumes, produces and archives.
+In addition (coming soon) we will have a more 'programmatic' query tool that will allow you
+  to select specifically the data you are interested in, e.g. within a particular date range and geographic
+  region.
+</p>
+<p>IMPORTANT NOTE: these browser pages are NOT intended to be the channel by which you access large volumes of
+  data, or try to emulate real-time access by repeatedly polling these pages.  Rita is fundamentally architected to
+  be a real-time data collection, analysis and propagation platform and we will provide 'push' data feeds to support
+  that style of use in due course.
+</p>
+        <div class="cam_list_header">
+            <h2>Zones</h2>
+        </div>
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="dataserver/raw/day/zone">Browse Zone Transit Data</a>
+          </div>
+        </div>
+        
+        <div class="cam_list_header">
+            <h2>Latest positions snapshot</h2>
+        </div>
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="dataserver/raw/file/monitor_json/post_data.json">Latest bus positions in JSON format</a>
+          </div>
+        </div>
+        
+        <div class="cam_list_header">
+            <h2>Archived Vehicle Positions</h2>
+        </div>
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="dataserver/raw/day/bin_json">Vehicle position data in JSON format</a>
+          </div>
+        </div>
+        
+        <div class="backdoor_wrapper">
+          <div class="backdoor_button">
+            <a href="dataserver/raw/day/bin">Vehicle position data in GTFS-realtime format</a>
+          </div>
+        </div>
+</body>
+</html>
