@@ -37,6 +37,8 @@
     group: "{{ item.item }}"
     mode: "u=rw,go="
   loop: "{{ st.results }}"
+  loop_control:
+    label: "{{ item.item }}"
   when: item.stat.exists
 
 - name: Role account .ssh directories

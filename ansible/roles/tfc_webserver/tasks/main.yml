@@ -21,8 +21,9 @@
 
 - name: Disable the nginx package default site definition
   file:
-    path: /etc/nginx/sites-enabled/devault
+    path: /etc/nginx/sites-enabled/default
     state: absent
+  notify: "restart nginx"
 
 - name: Set services to start on reboot
   service:
@@ -41,42 +42,46 @@
 
 - name: acme-challenge directories
   file:
-    dest: {{ item.dest }}
+    dest: "{{ item.dest }}"
     state: directory
     owner: root
     group: root
-    mode: {{ item.mode | default("u=rwx,go=")}}
+    mode: "{{ item.mode | default('u=rwx,go=rx') }}"
   loop:
     - { dest: ~acme-challenge/.ssh }
-    - { dest: ~root/acme-challenge-keys, mode: "u=rwx,go=rx" }
-    - { dest: /usr/local/lib/userv/, mode: "u=rwx,go=rx" }
-    - { dest: /var/www/acme-challenge, mode: "u=rwx,go=rx" }
-    - { dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
+    - { dest: ~root/acme-challenge-keys, mode: "u=rwx,go=" }
+    - { dest: /usr/local/lib/userv/ }
+    - { dest: /var/www/acme-challenge }
+    - { dest: /etc/nginx/acme-challenge/bin }
+  loop_control:
+    label: "{{ item.dest }}"
 
 - name: acme-challenge files
   copy:
-    src: {{ item.src }}
-    dest: {{ item.dest }}
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
     owner: root
     group: root
-    mode: {{ item.mode | default("u=rw,go=") }}
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
   loop:
-    - { src: acme-challenge_authorized_keys, dest: ~acme-challenge/.ssh/ }
-    - { src: acme-challenge-key.pub, dest: ~root/acme-challenge-keys/acme-challenge-key.pub, mode: "u=rw,go=r" }
-    - { src: scripts/acme-challenge.target, dest: /usr/local/lib/userv/, mode: "u=rw,go=r" }
-    - { src: scripts/acme-challenge, dest: /etc/userv/services.d/, mode: "u=rw,go=r" }
+    - { src: acme-challenge_authorized_keys, dest: ~acme-challenge/.ssh/authorized_keys }
+    - { src: acme-challenge-key.pub, dest: ~root/acme-challenge-keys/acme-challenge-key.pub }
+    - { src: scripts/acme-challenge.target, dest: /usr/local/lib/userv/, mode: "u=rwx,go=rx" }
+    - { src: scripts/acme-challenge, dest: /etc/userv/services.d/ }
     - { src: scripts/deploy.sh, dest: /etc/letsencrypt/renewal-hooks/deploy/, mode: "u=rwx,go=rx" }
-    - { src: www-acme-challenge/, dest: /var/www/acme-challenge/, mode: "u=rw,go=r" }
+    - { src: www-acme-challenge/, dest: /var/www/acme-challenge/ }
     - { src: scripts/request-certificate.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
     - { src: scripts/request-smartcambridge-certificate.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
     - { src: scripts/request-test-certificate.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
     - { src: scripts/authenticator.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx" }
     - { src: scripts/cleanup.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx" }
+  loop_control:
+    label: "{{ item.dest }}"
 
 - name: acme-challenge SSH private key
   gpg_d:
     src: acme-challenge-key.asc
-    dest: ~root/acme-challenge-keys/acme-challenge-key.asc
+    dest: ~root/acme-challenge-keys/acme-challenge-key
     owner: root
     group: root
     mode: "u=rw,go="
@@ -90,6 +95,7 @@
     owner: root
     group: root
     mode: "u=rw,go=r"
+  notify: "restart nginx"
 
 - name: nginx site definition files
   copy:
@@ -100,60 +106,20 @@
     mode: "u=rw,go=r"
   notify: "restart nginx"
 
-- name: dhparams
-  command: openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
-  args:
-    creates: /etc/nginx/ssl/dhparam.pem 2048
+# Startup the tc_prod http config to support getting certificates
 
-# Certbot
-
-- name: letsencrypt nginx options
-  copy:
-    src: options-ssl-nginx.conf
-    dest: /etc/letsencrypt/
-    owner: root
-    group: root
-    mode: "u=rw,go=r"
-
-- name: Register with letsencrypt
-  command: /usr/bin/certbot register -m admin@smartcambridge.org --agree-tos --no-eff-email
-  args:
-    creates: /etc/letsencrypt/account
-
-- name: Production config running?
-  stat:
-    path: /etc/nginx/sites-enabled/tfc_prod2.conf
-  register: st
-
-- name: Install tls bootstrap if needed
+- name: tfc_prod over http
   file:
-    src: ../sites-available/tls-bootstrap.conf
-    path: /etc/nginx/sites-enabled/tfs-boootstrap.conf
+    src: ../sites-available/tfc_prod.conf
+    path: /etc/nginx/sites-enabled/tfc_prod.conf
     state: link
   notify: "restart nginx"
-  when: not st.stat.islink
 
 - name: Restart nginx if necessary
   meta:
     flush_handlers
 
-- name: host certificate
-  command: /usr/local/bin/request-certificate.sh
-  args:
-    creates: /etc/letsencrypt/live/tfc_prod
-
-- name: smartcambridge.orrg certificate
-  command: /usr/local/bin/request-smartcambridge-certificate.sh
-  args:
-    creates: /etc/letsencrypt/live/smartcambridge.org
-
-- name: Remove tls bootstrap
-  file:
-    path: /etc/nginx/sites-enabled/tfs-boootstrap.conf
-    state: absebt
-  notify: "restart nginx"
-
-# Other keys/certificates
+# Static keys/certificates
 
 - name: nginx certificate directory
   file:
@@ -165,7 +131,7 @@
 
 - name: SSL files
   copy:
-    src: {{ item }}
+    src: "{{ item }}"
     dest: /etc/nginx/ssl/
     owner: root
     group: root
@@ -183,6 +149,58 @@
     group: root
     mode: "u=rw,go="
 
+# Certbot
+
+- name: dhparams (may take some time!)
+  command: openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048
+  args:
+    creates: /etc/ssl/certs/dhparam.pem
+  notify: "restart nginx"
+
+- name: letsencrypt nginx options
+  copy:
+    src: options-ssl-nginx.conf
+    dest: /etc/letsencrypt/
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
+  notify: "restart nginx"
+
+# WARNING: this config makes some assumptions about the state of the
+# machine it is configuring:
+#
+# 1) If /etc/letsencrypt/accounts/ exists then it contains a Letsencrypt
+# account that can be used to request certificates
+#
+# 2) If /etc/letsencrypt/live/tfc_prod/ exists it contains a (possibly-expired)
+# certbot-issued Letsencrypt certificate for the host being configured
+#
+# 3) If /etc/letsencrypt/live/smartcambridge.org/ exists it contains a
+# (possibly-expired) certbot-issued Letsencrypt certificate for
+# {www.,}smartcambridge.org
+#
+# It should be safe to delete any or all of these and re-run Ansible if
+# these assumptions prove to be incorrect.
+
+- name: Register with letsencrypt
+  command: /usr/bin/certbot --quiet register -m admin@smartcambridge.org --agree-tos --no-eff-email
+  args:
+    creates: /etc/letsencrypt/accounts
+
+- name: host certificate (may take some time)
+  command: /etc/nginx/acme-challenge/bin/request-certificate.sh
+  args:
+    creates: /etc/letsencrypt/live/tfc_prod
+
+- name: smartcambridge.org certificate (may take some time)
+  command: /etc/nginx/acme-challenge/bin/request-smartcambridge-certificate.sh
+  args:
+    creates: /etc/letsencrypt/live/smartcambridge.org
+
+- name: Check for expired certificates
+  command: /usr/bin/certbot --quiet renew
+  changed_when: false
+
 # Production nginx config
 
 - name: Link site files
@@ -191,7 +209,7 @@
     path: /etc/nginx/sites-enabled/{{ item }}
     state: link
   loop:
-    - tfc_prod2.conf
+    - tfc_prod_ssl.conf
     - smartcambridge.conf
     - carrier.csi.cam.ac.uk.conf
     - 000-default.conf
@@ -201,9 +219,9 @@
 
 - name: Install static website files
   copy:
-    src: www
-    dest: /var/www/tfc_prod
+    src: www-tfc_prod/
+    dest: /var/www/tfc_prod/
     owner: root
     group: root
-    mode: "u=rw, go=r"
+    mode: "u=rw,go=r"
 

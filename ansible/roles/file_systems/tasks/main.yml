@@ -6,6 +6,8 @@
     pvs: "{{ item.pvs }}"
     state: present
   loop: "{{ file_systems }}"
+  loop_control:
+    label: "{{ item.vg }}"
 
 - name: Create logical volumes
   lvol:
@@ -13,12 +15,16 @@
     lv: "{{ item.lv }}"
     size: "{{ item.size }}"
   loop: "{{ file_systems }}"
+  loop_control:
+    label: "{{ item.lv }}"
 
 - name: Create file file_systems
   filesystem:
     fstype: "{{ item.fstype }}"
     dev: /dev/{{ item.vg }}/{{ item.lv }}
   loop: "{{ file_systems }}"
+  loop_control:
+    label: "/dev/{{ item.vg }}/{{ item.lv }}"
 
 - name: Mount file file_systems
   mount:
@@ -27,3 +33,5 @@
     fstype: "{{ item.fstype }}"
     state: mounted
   loop: "{{ file_systems }}"
+  loop_control:
+    label: "{{ item.mountpoint }}"
