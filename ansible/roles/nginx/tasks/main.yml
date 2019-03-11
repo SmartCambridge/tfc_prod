@@ -9,7 +9,7 @@
     state: present
 
 - name: Nginx software
-  apr:
+  apt:
     update_cache: yes
     cache_valid_time: 3600
     name:
@@ -19,10 +19,15 @@
       - userv
     state: present
 
+- name: Disable the nginx package default site definition
+  file:
+    path: /etc/nginx/sites-enabled/devault
+    state: absent
+
 - name: Set services to start on reboot
   service:
-    name: {{ item }}
-    state: enabled
+    name: "{{ item }}"
+    enabled: yes
   loop:
     - nginx
     - userv
@@ -34,172 +39,156 @@
     name: acme-challenge
     state: present
 
-- name: Create ~acme-challenge/.ssh
+- name: acme-challenge directories
   file:
-    dest: ~acme-challenge/.ssh
+    dest: {{ item.dest }}
     state: directory
-    user: root
+    owner: root
     group: root
-    mode: "u=rwx,go="
+    mode: {{ item.mode | default("u=rwx,go=")}}
+  loop:
+    - { dest: ~acme-challenge/.ssh }
+    - { dest: ~root/acme-challenge-keys, mode: "u=rwx,go=rx" }
+    - { dest: /usr/local/lib/userv/, mode: "u=rwx,go=rx" }
+    - { dest: /var/www/acme-challenge, mode: "u=rwx,go=rx" }
+    - { dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
 
-- name: Copy acme-challenge authorized_keys
+- name: acme-challenge files
   copy:
-    src: acme-challenge_authorized_keys
-    dest: ~acme-challenge/.ssh/
-    user: root
+    src: {{ item.src }}
+    dest: {{ item.dest }}
+    owner: root
     group: root
-    mode: "u=rw,go="
+    mode: {{ item.mode | default("u=rw,go=") }}
+  loop:
+    - { src: acme-challenge_authorized_keys, dest: ~acme-challenge/.ssh/ }
+    - { src: acme-challenge-key.pub, dest: ~root/acme-challenge-keys/acme-challenge-key.pub, mode: "u=rw,go=r" }
+    - { src: scripts/acme-challenge.target, dest: /usr/local/lib/userv/, mode: "u=rw,go=r" }
+    - { src: scripts/acme-challenge, dest: /etc/userv/services.d/, mode: "u=rw,go=r" }
+    - { src: scripts/deploy.sh, dest: /etc/letsencrypt/renewal-hooks/deploy/, mode: "u=rwx,go=rx" }
+    - { src: www-acme-challenge/, dest: /var/www/acme-challenge/, mode: "u=rw,go=r" }
+    - { src: scripts/request-certificate.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
+    - { src: scripts/request-smartcambridge-certificate.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
+    - { src: scripts/request-test-certificate.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx"}
+    - { src: scripts/authenticator.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx" }
+    - { src: scripts/cleanup.sh, dest: /etc/nginx/acme-challenge/bin, mode: "u=rwx,go=rx" }
 
-- name: Create ~root/acme-challenge-keys
-  file:
-    dest: ~root/acme-challenge-keys
-    state: directory
-    user: root
-    group: root
-    mode: "u=rwx,go=rx"
-
-- name: Copy acme-challenge SSH private key
+- name: acme-challenge SSH private key
   gpg_d:
     src: acme-challenge-key.asc
     dest: ~root/acme-challenge-keys/acme-challenge-key.asc
-    user: root
+    owner: root
     group: root
     mode: "u=rw,go="
-
-- name: Copy acme-challenge SSH public key
-  copy:
-    src: acme-challenge-key.pub
-    dest: ~root/acme-challenge-keys/acme-challenge-key.pub
-    user: root
-    group: root
-    mode: "u=rw,go=r"
-
-- name: Create userv home
-  file:
-    dest: /usr/local/lib/userv/
-    state: directory
-    user: root
-    group: root
-    mode: "u=rwx,go=rx"
-
-- name: acme-challenge.target
-  copy:
-    src: scripts/acme-challenge.target
-    dest: /usr/local/lib/userv/
-    user: root
-    group: root
-    mode: "u=rw,go=r"
-
-- name: acme-challenge service definition
-  copy:
-    src: scripts/acme-challenge
-    dest: /etc/userv/services.d/
-    user: root
-    group: root
-    mode: "u=rw,go=r"
-
-- name: certbot deploy.sh
-  copy:
-    src: scripts/deploy.sh
-    dest: /etc/letsencrypt/renewal-hooks/deploy/
-    user: root
-    group: root
-    mode: "u=rwx,go=rx"
-
-- name: acme-challenge document root
-  file:
-    dest: /var/www/acme-challenge
-    state: directory
-    user: root
-    group: root
-    mode: "u=rwx,go=rx"
-
-- name: acme-challenge test file
-  copy:
-    src: www-acme-challenge/
-    dest: /var/www/acme-challenge/
-    user: root
-    group: root
-    mode: "u=rw,go=r"
 
 # Nginx configuration
 
 - name: nginx includes2 directory
   copy:
     src: includes2/
-    dest: /etc/nginx/
-    user: root
+    dest: /etc/nginx/includes2/
+    owner: root
     group: root
-    mode: "u=rwx,go=rx"
-
-# Either
-#
-# sudo cp /home/tfc_prod/tfc_prod/nginx/sites-available/* /etc/nginx/sites-available
-# sudo rm /etc/nginx/sites-enabled/*
-#
-# sudo ln -s /etc/nginx/sites-available/tls-bootstrap.conf /etc/nginx/sites-enabled/
-#
-# Or
-#
-# sudo cp ~tfc_prod/tfc_prod/nginx/includes/letsencrypt_port_80.conf /etc/nginx/includes/
+    mode: "u=rw,go=r"
 
 - name: nginx site definition files
   copy:
-    src: sites-available/*
+    src: sites-available/
     dest: /etc/nginx/sites-available/
-    user: root
+    owner: root
     group: root
     mode: "u=rw,go=r"
-    notify: "restart nginx"
+  notify: "restart nginx"
+
+- name: dhparams
+  command: openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
+  args:
+    creates: /etc/nginx/ssl/dhparam.pem 2048
+
+# Certbot
+
+- name: letsencrypt nginx options
+  copy:
+    src: options-ssl-nginx.conf
+    dest: /etc/letsencrypt/
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
+
+- name: Register with letsencrypt
+  command: /usr/bin/certbot register -m admin@smartcambridge.org --agree-tos --no-eff-email
+  args:
+    creates: /etc/letsencrypt/account
+
+- name: Production config running?
+  stat:
+    path: /etc/nginx/sites-enabled/tfc_prod2.conf
+  register: st
+
+- name: Install tls bootstrap if needed
+  file:
+    src: ../sites-available/tls-bootstrap.conf
+    path: /etc/nginx/sites-enabled/tfs-boootstrap.conf
+    state: link
+  notify: "restart nginx"
+  when: not st.stat.islink
 
 - name: Restart nginx if necessary
   meta:
     flush_handlers
 
-#sudo ~tfc_prod/tfc_prod/nginx/scripts/request-certificate.sh
-#sudo ~tfc_prod/tfc_prod/nginx/scripts/request-smartcambridge-certificate.sh
+- name: host certificate
+  command: /usr/local/bin/request-certificate.sh
+  args:
+    creates: /etc/letsencrypt/live/tfc_prod
+
+- name: smartcambridge.orrg certificate
+  command: /usr/local/bin/request-smartcambridge-certificate.sh
+  args:
+    creates: /etc/letsencrypt/live/smartcambridge.org
+
+- name: Remove tls bootstrap
+  file:
+    path: /etc/nginx/sites-enabled/tfs-boootstrap.conf
+    state: absebt
+  notify: "restart nginx"
+
+# Other keys/certificates
 
 - name: nginx certificate directory
   file:
     dest: /etc/nginx/ssl
     state: directory
-    user: root
+    owner: root
     group: root
     mode: "u=rwx,go=rx"
 
-- name: Dummy certificate/key for default host
+- name: SSL files
   copy:
     src: {{ item }}
     dest: /etc/nginx/ssl/
-    user: root
+    owner: root
     group: root
     mode: "u=rw,go=r"
   loop:
     - dummy.key
     - dummy.crt
+    - carrier.pem
 
 - name: carrier.csx key
   gpg_d:
     src: carrier.key.asc
     dest: /etc/nginx/ssl/carrier.key
-    user: root
+    owner: root
     group: root
     mode: "u=rw,go="
 
-- name: carrier.csx certificate
-  copy:
-    src: carrier.pem
-    dest: /etc/nginx/ssl/carrier.pem
-    user: root
-    group: root
-    mode: "u=rw,go=r"
-
-#sudo rm /etc/nginx/sites-enabled/tls-bootstrap.conf
+# Production nginx config
 
 - name: Link site files
   file:
-    src: /etc/nginx/sites-available/{{ item }}
-    dest: /etc/nginx/sites-enabled/
+    src: ../sites-available/{{ item }}
+    path: /etc/nginx/sites-enabled/{{ item }}
     state: link
   loop:
     - tfc_prod2.conf
@@ -208,5 +197,13 @@
     - 000-default.conf
   notify: "restart nginx"
 
-#/etc/letsencrypt/options-ssl-nginx.conf
+# Static web site
+
+- name: Install static website files
+  copy:
+    src: www
+    dest: /var/www/tfc_prod
+    owner: root
+    group: root
+    mode: "u=rw, go=r"
 

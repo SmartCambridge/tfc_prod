@@ -12,5 +12,5 @@ certbot certonly \
     --manual \
     --cert-name tfc_prod \
     --domains "${domain}" \
-    --manual-auth-hook /home/tfc_prod/tfc_prod/nginx/scripts/authenticator.sh \
-    --manual-cleanup-hook /home/tfc_prod/tfc_prod/nginx/scripts/cleanup.sh
+    --manual-auth-hook /etc/nginx/acme-challenge/bin/authenticator.sh \
+    --manual-cleanup-hook /etc/nginx/acme-challenge/bin/cleanup.sh

@@ -5,5 +5,5 @@ certbot certonly \
     --manual \
     --cert-name smartcambridge.org \
     --domains www.smartcambridge.org,smartcambridge.org \
-    --manual-auth-hook /home/tfc_prod/tfc_prod/nginx/scripts/authenticator.sh \
-    --manual-cleanup-hook /home/tfc_prod/tfc_prod/nginx/scripts/cleanup.sh
+    --manual-auth-hook /etc/nginx/acme-challenge/bin/authenticator.sh \
+    --manual-cleanup-hook /etc/nginx/acme-challenge/bin/cleanup.sh
