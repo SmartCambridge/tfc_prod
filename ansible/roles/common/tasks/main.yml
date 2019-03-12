@@ -8,6 +8,7 @@
       - openssh-server
       - emacs
       - git
+      - openjdk-8-jdk
     state: present
 
 - name: System-wide ssh known_hosts file
