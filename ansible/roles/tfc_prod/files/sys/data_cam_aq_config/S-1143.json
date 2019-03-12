@@ -1,0 +1,23 @@
+{
+    "FeedID": "cam_aq",
+    "Latitude": 52.173,
+    "Name": "Adden Rosie",
+    "StationID": "S-1143",
+    "Longitude": 0.1402,
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
+}

@@ -8,3 +8,44 @@
     group: root
     mode: "u=rw,go=r"
 
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "{{ item.mode|default('u=rwx,go=rx') }}"
+  loop:
+    - { path: /var/log/tfc_prod, mode: "a=rwx" }
+    - { path: /mnt/sdb1/tfc }
+
+- name: Create tfc_prod data directories
+  file:
+    path: /mnt/sdb1/tfc/{{ item }}
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rwx,go=rx"
+  loop:
+    - vix
+    #- vix/data_bin
+    #- vix/data_bin_json
+    #- vix/data_zone
+    #- vix/data_cache
+    #- vix/data_monitor
+    #- vix/data_monitor_json
+    - sys
+    - cam_park_local
+    - cam_park_rss
+    - cam_aq
+
+- name: Link tfc_prod data directories
+  file:
+    src: /mnt/sdb1/tfc
+    path: /media/tfc
+    state: link
+
+- name: Copy data into tfc/sys
+  synchronize:
+    src: sys/
+    dest: /media/tfc/sys/

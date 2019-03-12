@@ -1,0 +1,23 @@
+{
+    "StationID": "S-1145",
+    "Latitude": 52.195,
+    "FeedID": "cam_aq",
+    "Longitude": 0.1313,
+    "Name": "Hills-Station",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-13"
+}

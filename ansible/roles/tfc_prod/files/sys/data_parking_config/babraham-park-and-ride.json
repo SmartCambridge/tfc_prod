@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "babraham-park-and-ride",
+    "parking_name": "P&R Babraham",
+    "parking_type": "park_and_ride",
+    "latitude": 52.1687,
+    "longitude": 0.1588,
+    "capacity": 1500
+}
+

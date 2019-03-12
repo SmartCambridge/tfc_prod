@@ -1,0 +1,23 @@
+{
+    "Name": "Hills-CherryH",
+    "FeedID": "cam_aq",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "StationID": "S-1137",
+    "Latitude": 52.189,
+    "Longitude": 0.136,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-25"
+}

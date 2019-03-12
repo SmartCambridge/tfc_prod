@@ -1,0 +1,23 @@
+{
+    "Longitude": 0.1396,
+    "Name": "Adden Richard Howe",
+    "FeedID": "cam_aq",
+    "StationID": "S-1153",
+    "SensorTypes": [
+        "CO",
+        "NO",
+        "NO2",
+        "O3",
+        "SO2",
+        "Temperature",
+        "Humidity",
+        "Pressure",
+        "PM1",
+        "PM2_5",
+        "PM10",
+        "TSP"
+    ],
+    "Latitude": 52.176,
+    "date_from": "2016-06-26",
+    "date_to": "2017-01-14"
+}

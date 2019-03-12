@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "queen-anne-terrace-car-park",
+    "parking_name": "Queen Anne Terrace",
+    "parking_type": "car_park",
+    "latitude": 52.2008,
+    "longitude": 0.1303,
+    "capacity": 540
+}
+

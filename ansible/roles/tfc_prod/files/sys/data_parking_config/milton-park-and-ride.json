@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "milton-park-and-ride",
+    "parking_name": "P&R Milton",
+    "parking_type": "park_and_ride",
+    "latitude": 52.2452,
+    "longitude": 0.1510,
+    "capacity": 800
+}
+

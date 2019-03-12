@@ -1,0 +1,10 @@
+{
+    "feed_id" : "cam_park_rss",
+    "parking_id": "grand-arcade-car-park",
+    "parking_name": "Grand Arcade",
+    "parking_type": "park_and_ride",
+    "latitude": 52.2038,
+    "longitude": 0.1207,
+    "capacity": 890
+}
+
