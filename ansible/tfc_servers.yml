@@ -2,9 +2,9 @@
 
 - hosts: tfc_servers
   roles:
-    - common
-    - users
-    - file_systems
-    - tfc_webserver
-    - tfc_prod
-    - monit
+    - { role: common,        tags: ["common"] }
+    - { role: users,         tags: ["users"] }
+    - { role: file_systems,  tags: ["file_systems"] }
+    - { role: tfc_webserver, tags: ["tfc_webservers"] }
+    - { role: tfc_prod,      tags: ["tfc_prod"] }
+    - { role: monit,         tags: ["monit"] }
