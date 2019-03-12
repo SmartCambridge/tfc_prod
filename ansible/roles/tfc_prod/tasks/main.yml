@@ -49,3 +49,6 @@
   synchronize:
     src: sys/
     dest: /media/tfc/sys/
+    archive: no
+    times: yes
+    recursive: yes
