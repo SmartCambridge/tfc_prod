@@ -89,21 +89,21 @@
 # Nginx configuration
 
 - name: nginx includes2 directory
-  copy:
+  synchronize:
     src: includes2/
     dest: /etc/nginx/includes2/
-    owner: root
-    group: root
-    mode: "u=rw,go=r"
+    archive: no
+    times: yes
+    recursive: yes
   notify: "restart nginx"
 
 - name: nginx site definition files
-  copy:
+  synchronize:
     src: sites-available/
     dest: /etc/nginx/sites-available/
-    owner: root
-    group: root
-    mode: "u=rw,go=r"
+    archive: no
+    times: yes
+    recursive: yes
   notify: "restart nginx"
 
 # Startup the tc_prod http config to support getting certificates
@@ -218,10 +218,9 @@
 # Static web site
 
 - name: Install static website files
-  copy:
+  synchronize:
     src: www-tfc_prod/
     dest: /var/www/tfc_prod/
-    owner: root
-    group: root
-    mode: "u=rw,go=r"
-
+    archive: no
+    times: yes
+    recursive: yes
