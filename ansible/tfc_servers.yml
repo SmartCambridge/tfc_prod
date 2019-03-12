@@ -6,3 +6,5 @@
     - users
     - file_systems
     - tfc_webserver
+    - tfc_prod
+    - monit

@@ -1,0 +1,61 @@
+---
+
+- name: Install monit
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    name:
+      - monit
+
+- name: Set monit to start at reboot
+  service:
+    name: monit
+    enabled: yes
+
+- name: Copy files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
+  loop:
+    - { src: monitrc, dest: /etc/monit/monitrc, mode: "o=rw,go=" }
+    - { src: conf-available/, dest: /etc/monit/conf-available/ }
+  notify: "restart monit"
+
+- name: Copy monit credentials
+  gpg_d:
+    src: httpd-server.conf.asc
+    dest: /etc/monit/httpd-server.conf
+    owner: root
+    group: root
+    mode: "u=rw,go="
+  notify: "restart monit"
+
+- name: Link required configurations
+  file:
+    src: ../conf-available/{{ item }}
+    path: /etc/monit/conf-enabled/{{ item }}
+    state: link
+  loop:
+    - tfc_filespace
+    #- tfc_sirivm
+    #- tfc_web_cronjobs
+    #- tfc_web_servers
+  notify: "restart monit"
+
+- name: Link config to monitor /boot fs if available
+  file:
+    src: ../conf-available/tfc_filespace_boot
+    path: /etc/monit/conf-enabled/tfc_filespace_boot
+    state: link
+  when: ansible_mounts|selectattr("mount", "equalto", "/boot")|list
+  notify: "restart monit"
+
+- name: ...and not if it isn't
+  file:
+    path: /etc/monit/conf-enabled/tfc_filespace_boot
+    state: absent
+  when: not ansible_mounts|selectattr("mount", "equalto", "/boot")|list
+  notify: "restart monit"

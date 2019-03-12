@@ -1,0 +1,11 @@
+check device root-filesystem with path /
+    if space usage > 80% then alert
+
+check device sdb1-filesystem with path /mnt/sdb1
+    if space usage > 80% then alert
+
+check device sdc1-filesystem with path /mnt/sdc1
+    if space usage > 80% then alert
+
+check device sdd1-filesystem with path /mnt/sdd1
+    if space usage > 80% then alert
