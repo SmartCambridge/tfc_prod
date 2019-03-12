@@ -4,6 +4,7 @@
   user:
     name: tfc_prod
     comment: TFC production account
+    system: yes
     state: present
 
 - name: Admin users
