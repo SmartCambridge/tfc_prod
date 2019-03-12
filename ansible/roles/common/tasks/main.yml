@@ -9,6 +9,7 @@
       - emacs
       - git
       - openjdk-8-jdk
+      - ssmtp
     state: present
 
 - name: System-wide ssh known_hosts file
@@ -16,10 +17,19 @@
     src: ssh_known_hosts
     dest: /etc/ssh
 
-- name: Copy update_known_hosts.ssh_known_hosts
+- name: update_known_hosts.sh
   copy:
     src: update_known_hosts.sh
     dest: /usr/local/bin
     mode: "+x"
 
-
+- name: Configure ssmtp
+  copy:
+    src: "{{ item }}"
+    dest: /etc/ssmtp
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
+  loop:
+    - ssmtp.conf
+    - revaliases
