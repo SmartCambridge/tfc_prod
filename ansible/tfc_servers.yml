@@ -8,6 +8,7 @@
     - { role: tfc_webserver, tags: ["tfc_webservers"] }
     - { role: tfc_prod,      tags: ["tfc_prod"] }
     - { role: monit,         tags: ["monit"] }
+    - { role: system_metrics, tags: ["system_metrics"] }
 
 - hosts: tfc_servers
   become: true

@@ -1,0 +1,16 @@
+[Unit]
+Description=StatsD Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/statsd_exporter \
+    --web.listen-address="127.0.0.1:9102" \
+    --statsd.mapping-config=/etc/prometheus/statsd.yml \
+    --log.level="debug"
+
+[Install]
+WantedBy=multi-user.target

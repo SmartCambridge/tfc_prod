@@ -1,0 +1,36 @@
+---
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+  listen: "reload systemd"
+
+- name: restart nginx
+  service:
+    name: nginx
+    state: restarted
+  listen: "restart nginx"
+
+- name: restart prometheus
+  service:
+    name: prometheus
+    state: restarted
+  listen: "restart prometheus"
+
+- name: restart node_exporter
+  service:
+    name: node_exporter
+    state: restarted
+  listen: "restart node_exporter"
+
+- name: restart statsd_exporter
+  service:
+    name: statsd_exporter
+    state: restarted
+  listen: "restart statsd_exporter"
+
+- name: restart grafana-server
+  service:
+    name: grafana-server
+    state: restarted
+  listen: "restart grafana-server"

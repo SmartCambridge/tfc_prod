@@ -1,0 +1,161 @@
+---
+
+- name: Create prometheus user
+  user:
+    name: prometheus
+    state: present
+    system: yes
+    shell: /bin/false
+    create_home: no
+
+- name: Add grafana repository key
+  apt_key:
+    url: https://packages.grafana.com/gpg.key
+    state: present
+
+- name: Add grafana repository
+  apt_repository:
+    repo: deb https://packages.grafana.com/oss/deb stable main
+    state: present
+    update_cache: yes
+
+- name: Install packages
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    name:
+      - nginx-extras
+      - grafana
+
+- name: Create directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner|default('root') }}"
+    group: "{{ item.group|default(item.owner)|default('root') }}"
+    mode: "{{ item.mode|default('o=rwx,go=rx') }}"
+  loop:
+    - { path: /etc/nginx/lua }
+    - { path: /etc/prometheus }
+    - { path: /mnt/sdc1/prometheus, owner: prometheus }
+    - { path: /var/lib/node_exporter/, owner: prometheus }
+    - { path: /var/lib/node_exporter/textfile_collector/, owner: prometheus, mode: "+t,go+rwx" }
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Link from /mnt/sdc1/prometheus to /var/lib/prometheus
+  file:
+    src: /mnt/sdc1/prometheus
+    path: /var/lib/prometheus
+    state: link
+
+- name: Copy systemd unit files
+  copy:
+    src: "{{ item }}"
+    dest: /etc/systemd/system/
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
+  loop:
+    - prometheus.service
+    - node_exporter.service
+    - statsd_exporter.service
+  notify: "reload systemd"
+
+- name: Reload systemd
+  meta:
+    flush_handlers
+
+- name: Copy nginx files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
+  loop:
+    - { src: prometheus.lua, dest: /etc/nginx/lua }
+    - { src: lua-prometheus.conf, dest: /etc/nginx/conf.d/ }
+    - { src: prometheus-metrics.conf, dest: /etc/nginx/includes2/ }
+    - { src: prometheus-server.conf, dest: /etc/nginx/includes2/ }
+    - { src: grafana.conf, dest: /etc/nginx/includes2/ }
+  loop_control:
+    label: "{{ item.src }}"
+  notify: "restart nginx"
+
+- name: Install htpasswd file
+  gpg_d:
+    src: tfc_admin_htpasswd.asc
+    dest: /etc/nginx/tfc_admin_htpasswd
+    owner: www-data
+    group: www-data
+    mode: "o=rw,go="
+
+- name: Copy prometheus files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
+  loop:
+    - { src: prometheus, dest: /usr/local/bin/, mode: "u=rwx,go=rx" }
+    - { src: promtool, dest: /usr/local/bin/, mode: "u=rwx,go=rx" }
+    - { src: consoles, dest: /etc/prometheus }
+    - { src: console_libraries, dest: /etc/prometheus }
+    - { src: prometheus.yml, dest: /etc/prometheus }
+  loop_control:
+    label: "{{ item.src }}"
+  notify: "restart prometheus"
+
+- name: Copy node_exporter files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
+  loop:
+    - { src: node_exporter, dest: /usr/local/bin/, mode: "u=rwx,go=rx" }
+  loop_control:
+    label: "{{ item.src }}"
+  notify: "restart node_exporter"
+
+- name: Copy statsd_exporter files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
+  loop:
+    - { src: statsd_exporter, dest: /usr/local/bin/, mode: "u=rwx,go=rx" }
+    - { src: statsd.yml, dest: /etc/prometheus }
+  loop_control:
+    label: "{{ item.src }}"
+  notify: "restart statsd_exporter"
+
+- name: Copy Grafafa files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('u=rw,go=r') }}"
+  loop:
+    - { src: grafana.ini, dest: /etc/grafana/ }
+    - { src: prometheus-datasource.yaml, dest: /etc/grafana/provisioning/datasources/ }
+  loop_control:
+    label: "{{ item.src }}"
+  notify: "restart grafana-server"
+
+- name: Set services to start on reboot
+  service:
+    name: "{{ item }}"
+    enabled: yes
+  loop:
+    - prometheus
+    - node_exporter
+    - statsd_exporter
+    - grafana-server
+
