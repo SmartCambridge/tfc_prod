@@ -53,6 +53,14 @@
     times: yes
     recursive: yes
 
+- name: Install tfc_server startup script
+  copy:
+    src: tfc_server_run.sh
+    dest: ~tfc_prod/run.sh
+    owner: root
+    group: root
+    mode: "o=rwx,go=rx"
+
 - name: Create database backup directories
   file:
     path: "{{ item.path }}"
