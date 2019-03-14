@@ -29,12 +29,6 @@
     src: ssh_known_hosts
     dest: /etc/ssh
 
-- name: update_known_hosts.sh
-  copy:
-    src: update_known_hosts.sh
-    dest: /usr/local/bin
-    mode: "+x"
-
 - name: Configure ssmtp
   copy:
     src: "{{ item }}"

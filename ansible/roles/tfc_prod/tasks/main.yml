@@ -1,12 +1,36 @@
 ---
 
+- name: ~tfc_prod/tfc_prod directory
+  file:
+    path: ~tfc_prod/tfc_prod
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rwx,go=rx"
+
 - name: tfc_prod secrets file
   gpg_d:
     src: secrets.py.asc
-    dest: ~tfc_prod/secrets.py
+    dest: ~tfc_prod/tfc_prod/secrets.py
     owner: root
     group: root
     mode: "u=rw,go=r"
+
+- name: Install tfc_server startup script
+  copy:
+    src: tfc_server_run.sh
+    dest: ~tfc_prod/tfc_prod/run.sh
+    owner: root
+    group: root
+    mode: "o=rwx,go=rx"
+
+- name: Install misc tfc_prod tools
+  copy:
+    src: tools
+    dest: ~tfc_prod/tfc_prod/
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "o=rwx,go=rx"
 
 - name: Create directories
   file:
@@ -18,6 +42,8 @@
   loop:
     - { path: /var/log/tfc_prod, mode: "a=rwx" }
     - { path: /mnt/sdb1/tfc }
+  loop_control:
+    label: "{{ item.path }}"
 
 - name: Create tfc_prod data directories
   file:
@@ -53,14 +79,6 @@
     times: yes
     recursive: yes
 
-- name: Install tfc_server startup script
-  copy:
-    src: tfc_server_run.sh
-    dest: ~tfc_prod/run.sh
-    owner: root
-    group: root
-    mode: "o=rwx,go=rx"
-
 - name: Create database backup directories
   file:
     path: "{{ item.path }}"
@@ -71,6 +89,8 @@
   loop:
     - { path: /backups, owner: postgres }
     - { path: /mnt/sdd1/smartcambridge.org/backup, owner: tfc_prod }
+  loop_control:
+    label: "{{ item.path }}"
 
 - name: Copy backup scripts
   copy:
