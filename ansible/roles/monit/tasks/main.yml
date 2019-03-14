@@ -59,3 +59,20 @@
     state: absent
   when: not ansible_mounts|selectattr("mount", "equalto", "/boot")|list
   notify: "restart monit"
+
+
+- name: Sart/stop cloudamber_data_monitor_json_fast monit task overnight (if enabled)
+  cron:
+    name: "{{ item.name }}"
+    state: present
+    user: root
+    job: "{{ item.job }}"
+    hour: "{{ item.hour }}"
+    minute: 0
+  loop:
+    - name: enable cloudamber_data_monitor_json_fast
+      hour: 7
+      job: "[ -e /etc/monit/conf-enabled/tfc_sirivm ] && /usr/bin/monit monitor cloudamber_data_monitor_json_fast"
+    - name: disable cloudamber_data_monitor_json_fast
+      hour: 22
+      job: "[ -e /etc/monit/conf-enabled/tfc_sirivm ] && /usr/bin/monit unmonitor cloudamber_data_monitor_json_fast"
