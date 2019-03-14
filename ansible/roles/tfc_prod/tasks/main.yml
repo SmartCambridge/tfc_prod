@@ -52,3 +52,52 @@
     archive: no
     times: yes
     recursive: yes
+
+- name: Create database backup directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group|default(item.owner) }}"
+    mode: "o=rwx,go=rw"
+  loop:
+    - { path: /backups, owner: postgres }
+    - { path: /mnt/sdd1/smartcambrdge.org/backup, owner: tfc_prod }
+
+- name: Copy backup scripts
+  copy:
+    src: "{{ item }}"
+    dest: /backups/{{ item }}
+    owner: root
+    group: root
+    mode: "o=rwx,go=rx"
+  loop:
+    - rsync.sh
+    - purge.sh
+
+- name: Database dump cronjob
+  cron:
+    name: database dump create
+    state: present
+    user: postgres
+    job: /usr/bin/pg_dumpall --clean | /bin/bzip2 > "/backups/database.$(date +\%Y.\%m.\%d).pgdumpall.bz2"
+    hour: 1
+    minute: 0
+
+- name: Database dump purge cronjob
+  cron:
+    name: database dump purge
+    state: present
+    user: root
+    job: /backups/purge.sh /backups >/var/log/tfc_prod/backup_purge.log 2>&1 && echo $(date --iso-8601=seconds) > /var/log/tfc_prod/backup_purge.timestamp
+    hour: 5
+    minute: 55
+
+- name: Production database dump copy cronjob
+  cron:
+    name: production database dump copy
+    state: present
+    user: tfc_prod
+    job: /mnt/sdd1/smartcambridge.org/backups/rsync.sh /mnt/sdd1/smartcambridge.org/backups/
+    hour: 5
+    minute: "{{ 59 | random(seed=inventory_hostname) }}"
