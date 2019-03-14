@@ -1,0 +1,32 @@
+---
+
+# Run as user postgres
+
+- name: Create tfcweb database
+  postgresql_db:
+    name: tfcweb
+
+- name: Create tfc_prod user
+  postgresql_user:
+    name: tfc_prod
+
+- name: Set tfc_web's connection parameters
+  command: psql
+  args:
+    stdin: |
+      ALTER ROLE tfc_prod SET client_encoding TO 'utf8';
+      ALTER ROLE tfc_prod SET timezone TO 'UTC';
+      ALTER ROLE tfc_prod SET timezone TO 'UTC';
+  changed_when: false
+
+- name: Grant tfc_prod access to tfcweb
+  postgresql_privs:
+    db: tfcweb
+    privs: ALL
+    type: database
+    role: tfc_prod
+
+- name: Add postgis extension
+  postgresql_ext:
+    name: postgis
+    db: tfcweb

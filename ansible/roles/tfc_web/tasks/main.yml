@@ -1,0 +1,50 @@
+---
+
+# Run as tfc_prod user
+
+- name: Create virtual env
+  command: python3 -m venv tfc_web_venv
+  args:
+    chdir: ~tfc_prod
+    creates: ~tfc_prod/tfc_web_venv
+
+- name: Snapshot the current tfc_web source
+  git:
+    repo: https://github.com/SmartCambridge/tfc_web
+    dest: ~tfc_prod/tfc_web
+    update: no
+
+- name: Install production secrets
+  gpg_d:
+    src: secrets.py.asc
+    dest: ~tfc_prod/tfc_web/tfc_web/tfc_web/secrets.py
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rw,go="
+
+# Ansible's 'pip' module doesn't seem to work...
+- name: Install Python dependancies
+  command: ~tfc_prod/tfc_web_venv/bin/pip install -r ~tfc_prod/tfc_web/tfc_web/requirements.txt
+  changed_when: false
+
+- name: Run migrations
+  command: ~tfc_prod/tfc_web_venv/bin/python manage.py migrate
+  args:
+    chdir: ~tfc_prod/tfc_web/tfc_web
+  changed_when: false
+
+- name: Collect static files
+  command: ~tfc_prod/tfc_web_venv/bin/python manage.py collectstatic --no-input
+  args:
+    chdir: ~tfc_prod/tfc_web/tfc_web
+  register: command_result
+  changed_when: command_result.stdout is search('Copying')
+
+- name: Setup the tfc_prod Django user
+  command: ~tfc_prod/tfc_web_venv/bin/python manage.py setup_tfc_prod
+  args:
+    chdir: ~tfc_prod/tfc_web/tfc_web
+  register: command_result
+  changed_when: command_result.stdout is search('token created')
+
+

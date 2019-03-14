@@ -5,6 +5,7 @@
     name: tfc_prod
     comment: TFC production account
     system: yes
+    shell: /bin/bash
     state: present
 
 - name: Admin users

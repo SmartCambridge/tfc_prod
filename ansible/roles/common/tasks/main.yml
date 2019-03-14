@@ -10,7 +10,19 @@
       - git
       - openjdk-8-jdk
       - ssmtp
+      - python3
+      - python3-pip
+      - python3-venv
+      - postgresql
+      - postgresql-contrib
+      - postgis
+      - python3-psycopg2
+      - python-psycopg2     # For Ansible!
     state: present
+
+- name: Upgrade pip3
+  command: python3 -m pip --version
+  changed_when: false
 
 - name: System-wide ssh known_hosts file
   copy:
