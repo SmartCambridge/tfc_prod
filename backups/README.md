@@ -4,43 +4,42 @@ These are the evolving scripts that backup data from smartcambridge.org to other
 
 ## Summary
 
-```amc203 script``` that makes /backups/*.bz2 daily backup files.
+* Cron job run by `postgres` that makes `/backups/*.bz2` daily backup files.
+* `/backups/purge.sh` daily cron job (root) that deletes some old backup files.
+* `/mnt/sdd1/smartcambridge.org/backups/rsync.sh` daily cron job (tfc_prod) that copies latest backups from smartcambridge.org.
 
-```/backups/purge.sh``` daily cron job (sudo) that deletes some old backup files.
+## On all servers
 
-```/backups/rsync.sh``` daily cron job on tfc-app2,3,4 (as tfc_prod) that copies backups from smartcambridge.org.
+A cronjob run by the `postgres` user puts a database backup .bz2 file into `/backups/` nightly at 01:00 local time:
 
-## On smartcambridge.org
-
-(to be updated) A script written by amc puts a database backup .bz2 file into /backups nightly (~1am - local time issue?)
-
-```~tfc_prod/.ssh/authorized_keys``` contains pub keys for ```tfc_prod``` user on tfc-app2, tfc-app3 and tfc-app4.
-
-Root, i.e. ```sudo crontab -e``` daily runs the script (by ijl20) ```/backups/purge.sh``` which clears old .bz2 backups
- out of the /backups directory. It keeps backups for 10 days, and keeps older backups one backup every 10 days.
-
-Usage is ```sudo purge.sh <backup directory>``` i.e. on smartcambridge.org is  
 ```
-sudo /backups/purge.sh /backups
+0 1 * * * /usr/bin/pg_dumpall --clean | /bin/bzip2 > "/backups/database.$(date +\%Y.\%m.\%d).pgdumpall.bz2"`
 ```
 
-## On tfc-app2,3,4
+A cronjob run by root runs the script `/backups/purge.sh` which clears old .bz2 backups
+from the /backups/ directory. It keeps backups for 10 days, and keeps older backups one backup every 10 days. Logs actions from last run to `/var/log/tfc_prod/backup_purge.log`.
 
-Each server contains a directory ```/mnt/sdd1/smartcambridge.org/backups```
-
-```(user tfc_prod) crontab -e``` daily runs the script (by ijl20) /mnt/sdd1/smartcambridge.org/backups/rsync.sh```
-to rsync the files from smartcambridge.org/backups to /mnt/sdd1/smartcambridge.org/backups
-
-Usage is ```rsync.sh <backup directory>``` i.e. in this case 
 ```
-/mnt/sdd1/smartcambridge.org/backups/rsync.sh /mnt/sdd1/smartcambridge.org/backups/
+55 05 * * * /backups/purge.sh /backups >/var/log/tfc_prod/backup_purge.log 2>&1 && echo $(date --iso-8601=seconds) > /var/log/tfc_prod/backup_purge.timestamp
+```
+
+A cronjob run by the tfc_prod user synchronises the files in the `/backups/` directory on whichever machine is acting as smartcambridge.org to the directory `mnt/sdd1/smartcambridge.org/backups`. The rsync is run with `--ignore-existing` so files already transferred won't be changed or deleted.
+
+```
+<xx> 05 * * * /mnt/sdd1/smartcambridge.org/backups/rsync.sh /mnt/sdd1/smartcambridge.org/backups/
 ```
 
 Note the backups directory parameter to rsync.sh *requires* a trailing slash.
 
-tfc-app2,3,4 (user tfc_prod) can also run ```purge.sh``` i.e.
-```
-/mnt/sdd1/smartcambridge.org/backups/purge.sh /mnt/sdd1/smartcambridge.org/backups
-```
-but this is currently manual rather than a regular cron job.
+This job is run at different minutes past the hour to spread the load on the smartcambridge.org machine:
 
+```
+tfc-app1: 23 mins
+tfc-app2: 05 mins
+tfc-app3: 33 mins
+tfc-app4: 13 mins
+```
+
+For this to work, `~tfc_prod/.ssh/authorized_keys` on the smartcambridge.org machine must contain the public keys for the `tfc_prod` user on all the machines, and every machine must have a correct 'known hosts' entry for smartcambridge.org.
+
+The purge script (`/mnt/sdd1/smartcambridge.org/backups/purge.sh`) can be run on any machine against `/mnt/sdd1/smartcambridge.org/backups` to clear out old backups. This is currently manual rather than a regular cron job.
