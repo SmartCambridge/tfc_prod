@@ -59,10 +59,10 @@
     state: directory
     owner: "{{ item.owner }}"
     group: "{{ item.group|default(item.owner) }}"
-    mode: "o=rwx,go=rw"
+    mode: "o=rwx,go=rx"
   loop:
     - { path: /backups, owner: postgres }
-    - { path: /mnt/sdd1/smartcambrdge.org/backup, owner: tfc_prod }
+    - { path: /mnt/sdd1/smartcambridge.org/backup, owner: tfc_prod }
 
 - name: Copy backup scripts
   copy:
@@ -98,6 +98,6 @@
     name: production database dump copy
     state: present
     user: tfc_prod
-    job: /mnt/sdd1/smartcambridge.org/backups/rsync.sh /mnt/sdd1/smartcambridge.org/backups/
+    job: /backups/rsync.sh /mnt/sdd1/smartcambridge.org/backups/
     hour: 5
     minute: "{{ 59 | random(seed=inventory_hostname) }}"
