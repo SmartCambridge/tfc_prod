@@ -1,5 +1,13 @@
 ---
 
+- name: tfc_prod user
+  user:
+    name: tfc_prod
+    comment: TFC production account
+    system: yes
+    shell: /bin/bash
+    state: present
+
 - name: ~tfc_prod/tfc_prod directory
   file:
     path: ~tfc_prod/tfc_prod
@@ -7,6 +15,14 @@
     owner: tfc_prod
     group: tfc_prod
     mode: "u=rwx,go=rx"
+
+- name: tfc_prod .ssh directory
+  file:
+    path: ~tfc_prod/.ssh
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rwx,go="
 
 - name: tfc_prod secrets file
   gpg_d:
@@ -16,7 +32,34 @@
     group: root
     mode: "u=rw,go=r"
 
-- name: Install tfc_server startup script
+- name: tfc_prod's private SSH key
+  gpg_d:
+    src: tfc_prod_id.asc
+    dest: ~tfc_prod/.ssh/id_rsa
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rw,go="
+
+- name: tfc_prod's public SSH key
+  copy:
+    src: tfc_prod_id.pub
+    dest: ~tfc_prod/.ssh/id_rsa.pub
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rw,go="
+
+# KEys are kept in the `users` role
+- name: Install admin user + tfc_prod's mortal keys into tfc_prod's authorized_keys
+  assemble:
+    remote_src: false
+    src: "{{ role_path }}/../users/files/"
+    dest: ~tfc_prod/.ssh/authorized_keys
+    regexp: "[a-z0-9_]+_mortal.keys"
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rw,go="
+
+- name: tfc_server startup script
   copy:
     src: tfc_server_run.sh
     dest: ~tfc_prod/tfc_prod/run.sh
@@ -24,7 +67,7 @@
     group: root
     mode: "o=rwx,go=rx"
 
-- name: Install misc tfc_prod tools
+- name: misc tfc_prod tools
   copy:
     src: tools
     dest: ~tfc_prod/tfc_prod/
@@ -45,7 +88,7 @@
   loop_control:
     label: "{{ item.path }}"
 
-- name: Create tfc_prod data directories
+- name: tfc_prod data directories
   file:
     path: /mnt/sdb1/tfc/{{ item }}
     state: directory
@@ -76,10 +119,10 @@
     src: sys/
     dest: /media/tfc/sys/
     archive: no
-    times: yes
+    times: no
     recursive: yes
 
-- name: Create database backup directories
+- name: Database backup directories
   file:
     path: "{{ item.path }}"
     state: directory
@@ -92,7 +135,7 @@
   loop_control:
     label: "{{ item.path }}"
 
-- name: Copy backup scripts
+- name: Backup scripts
   copy:
     src: "{{ item }}"
     dest: /backups/{{ item }}

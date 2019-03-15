@@ -1,13 +1,5 @@
 ---
 
-- name: tfc_prod user
-  user:
-    name: tfc_prod
-    comment: TFC production account
-    system: yes
-    shell: /bin/bash
-    state: present
-
 - name: Admin users
   user:
     name: "{{ item }}"
@@ -43,42 +35,13 @@
     label: "{{ item.item }}"
   when: item.stat.exists
 
-- name: Role account .ssh directories
+- name: root's .ssh directory
   file:
-    path: ~{{ item }}/.ssh
+    path: ~root/.ssh
     state: directory
-    owner: "{{ item }}"
-    group: "{{ item }}"
+    owner: root
+    group: root
     mode: "u=rwx,go="
-  loop:
-    - tfc_prod
-    - root
-
-- name: tfc_prod's private SSH key
-  gpg_d:
-    src: tfc_prod_id.asc
-    dest: ~tfc_prod/.ssh/id_rsa
-    owner: tfc_prod
-    group: tfc_prod
-    mode: "u=rw,go="
-
-- name: tfc_prod's public SSH key
-  copy:
-    src: tfc_prod_id.pub
-    dest: ~tfc_prod/.ssh/id_rsa.pub
-    owner: tfc_prod
-    group: tfc_prod
-    mode: "u=rw,go="
-
-- name: Install admin user + tfc_prod's mortal' keys into tfc_prod's authorized_keys
-  assemble:
-    remote_src: false
-    src: "{{ role_path }}/files/"
-    dest: ~tfc_prod/.ssh/authorized_keys
-    regexp: "[a-z0-9_]+_mortal.keys"
-    owner: tfc_prod
-    group: tfc_prod
-    mode: "u=rw,go="
 
 - name: Install admin user 'priv' keys into root authorized_keys
   assemble:
