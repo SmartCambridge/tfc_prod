@@ -7,10 +7,21 @@ Pre-install requirements
     * python
 * ~root/.ssh/authorized_keys for bootstrap user
 
+Post-install steps
+==================
+
+As things stand
+
+* Restore database
+* Copy /media/tfc content
+* Set user passwords
+* Start gunicorn
+* Install tfc_server
+
 Currently missing
 =================
 
-* Write README.md
+* README.md
 * Clone/build/install/start/restart tfc_server
 * Start/restart gunicorn
 * Checking out the right version of tfc_web (tfc_prod, tfc_server)
@@ -21,24 +32,26 @@ Currently missing
 * Restoring the database
 * Copying data files
 * Move Ansible-managed files out of user-writable directories
+* Further decouple roles ((make tfc_prod user in tfc_prod role, for example))
 
 Differences
 ===========
 
 * tfc_prod now a system user (uid < 1000)
+* Same tfc_prod keypair across all Ansible-installed hosts
 * ssh_known_hosts installed from Ansible
 * tfc_prod doc root at /var/www/tfc_prod
 * admin user keys in ~root/.ssh/authorized keys
-* Only a few bits of the tfc_prod repository apear in ~tfc_prod/tfc_prod
+* Only a few bits of the tfc_prod repository in ~tfc_prod/tfc_prod
 
 User management
 ===============
 
 Accounts are created for all userids listed in `admin_users`
 (see `group_vars/tfc_servers.yml`). These accounts don't have usable
-passwords.
+passwords, so can unly be used with keys and can't sudo.
 
-An account is created for tfc_prod. The tfc_prod_id keypair is
+An account is created for tfc_prod. A standard tfc_prod_id keypair is
 installed as tfc_prod's `id_rsa`.
 
 All *_mortal.keys files are transferred to the corresponding user's
@@ -50,4 +63,59 @@ All *_mortal.keys are concatenated and transferred to
 All *_priv.keys are concatenated and transferred to
 ~root/.ssh/authorised_keys
 
+Structure
+=========
 
+```
+.
+├── NOTES                    # This file
+├── ansible.cfg              # Ansible config file
+├── development              # Development server inventory (c.f. production below)
+├── gpg-preload.asc          # regpg support
+├── gpg-preload.yml          #      ""
+├── group_vars
+│   └── tfc_servers.yml      # Pre-defined variables for tfc_server group
+├── host_vars                # Pre-defined variables for individual hosts
+├── library
+│   └── gpg_d.py             # regpg support
+├── plugins
+│   ├── action
+│   │   ├── __pycache__
+│   │   └── gpg_d.py         # regpg support
+│   └── filter
+│       ├── __pycache__
+│       └── gpg_d.py         # regpg support
+├── production               # Production server inventory (c.f. development above)
+├── pubring.gpg              # regpg user keyring
+├── roles
+│   ├── common               # Common tasks for every server
+│   │   ├── files
+│   │   └── tasks
+│   ├── file_systems         # Disk & filesystem setup
+│   │   └── tasks
+│   ├── monit                # Monit monitoring
+│   │   ├── files
+│   │   ├── handlers
+│   │   └── tasks
+│   ├── system_metrics       # Prometheus/grafana metrics
+│   │   ├── files
+│   │   ├── handlers
+│   │   └── tasks
+│   ├── tfc_prod             # tfc_prod setup
+│   │   ├── files
+│   │   └── tasks
+│   ├── tfc_web              # tfc_web setup as tfc_prod
+│   │   ├── files
+│   │   └── tasks
+│   ├── tfc_web_postgres     # tfc_web setup as postgres
+│   │   └── tasks
+│   ├── tfc_webserver        # nginx setup for tfc servers
+│   │   ├── files
+│   │   ├── handlers
+│   │   └── tasks
+│   └── users                # user management
+│       ├── files
+│       └── tasks
+├── site.yml                 # playlist for *everything*
+└── tfc_servers.yml          # playlist for tfc servers (currently the only group)
+```
