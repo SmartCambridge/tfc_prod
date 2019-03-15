@@ -18,6 +18,7 @@ for n in 1 2 3 4 5;
 do
   name=tfc-app${n}.cl.cam.ac.uk
   entry=$(ssh-keyscan -t ecdsa $name)
+  ip=$(dig +short $name)
   #ssh-keyscan -t ecdsa $name
   entrylength=${#entry}
   if ((entrylength <= 20))
@@ -25,7 +26,6 @@ do
       echo bad exit for $name 1>&2
       continue
   fi
-  echo $entry
-  echo ${entry/$name/smartcambridge.org}
+  echo ${entry/$name/$name,smartcambridge.org,www.smartcambridge.org,$ip}
 done
 
