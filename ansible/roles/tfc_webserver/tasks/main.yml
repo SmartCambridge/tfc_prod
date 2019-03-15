@@ -93,7 +93,7 @@
     src: includes2/
     dest: /etc/nginx/includes2/
     archive: no
-    times: yes
+    checksum: yes
     recursive: yes
   notify: "restart nginx"
 
@@ -102,7 +102,7 @@
     src: sites-available/
     dest: /etc/nginx/sites-available/
     archive: no
-    times: yes
+    checksum: yes
     recursive: yes
   notify: "restart nginx"
 
@@ -222,5 +222,5 @@
     src: www-tfc_prod/
     dest: /var/www/tfc_prod/
     archive: no
-    times: yes
+    checksum: yes
     recursive: yes

@@ -119,7 +119,7 @@
     src: sys/
     dest: /media/tfc/sys/
     archive: no
-    times: no
+    checksum: yes
     recursive: yes
 
 - name: Database backup directories
