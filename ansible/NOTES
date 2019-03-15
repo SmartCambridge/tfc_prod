@@ -31,7 +31,7 @@ Currently missing
 * Restoring the database
 * Copying data files
 * Move Ansible-managed files out of user-writable directories
-* Further decouple roles ((make tfc_prod user in tfc_prod role, for example))
+* Further decouple roles (move some tfc_prod tasks to new tfc_server role, for example))
 
 Differences
 ===========
