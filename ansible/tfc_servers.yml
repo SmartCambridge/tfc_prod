@@ -5,8 +5,9 @@
     - { role: common,        tags: ["common"] }
     - { role: users,         tags: ["users"] }
     - { role: file_systems,  tags: ["file_systems"] }
-    - { role: tfc_webserver, tags: ["tfc_webserver"] }
-    - { role: tfc_prod,      tags: ["tfc_prod"] }
     - { role: monit,         tags: ["monit"] }
     - { role: system_metrics, tags: ["system_metrics"] }
+    - { role: tfc_webserver, tags: ["tfc_webserver"] }
+    - { role: tfc_prod,      tags: ["tfc_prod"] }
     - { role: tfc_web,       tags: ["tfc_web"] }
+    - { role: tfc_server,    tags: ["tfc_server"] }
