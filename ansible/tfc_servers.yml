@@ -9,15 +9,4 @@
     - { role: tfc_prod,      tags: ["tfc_prod"] }
     - { role: monit,         tags: ["monit"] }
     - { role: system_metrics, tags: ["system_metrics"] }
-
-- hosts: tfc_servers
-  become: true
-  become_user: postgres
-  roles:
-    - { role: tfc_web_postgres, tags: ["tfc_web_postgres"] }
-
-- hosts: tfc_servers
-  become: true
-  become_user: tfc_prod
-  roles:
-    - { role: tfc_web,        tags: ["tfc_web"] }
+    - { role: tfc_web,       tags: ["tfc_web"] }
