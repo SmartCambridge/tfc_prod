@@ -15,23 +15,18 @@ As things stand
 * Restore database
 * Copy /media/tfc content
 * Set user passwords
-* Start gunicorn
 * Install tfc_server
 
 Currently missing
 =================
 
 * README.md
-* Clone/build/install/start/restart tfc_server
-* Start/restart gunicorn
-* Checking out the right version of tfc_web (tfc_prod, tfc_server)
 * Enable most monit checks (would currently fail)
 * Move cronjobs (esp tfc_prod) to /etc/cron.d?
-* Configuring Grafana, creating admin users
+* Configuring Grafana, creating admin users, add initial dashboards
 * Restoring the database
 * Copying data files
-* Move Ansible-managed files out of user-writable directories
-* Further decouple roles (move some tfc_prod tasks to new tfc_server role, for example))
+* Move Ansible-managed files out of user-writable directories (esp. tfc_prod)
 
 Differences
 ===========
@@ -42,6 +37,7 @@ Differences
 * tfc_prod doc root at /var/www/tfc_prod
 * admin user keys in ~root/.ssh/authorized keys
 * Only a few bits of the tfc_prod repository in ~tfc_prod/tfc_prod
+* Copy of tfc_server checke out as ~tfc_prod/tfc-server
 
 User management
 ===============
@@ -87,32 +83,34 @@ Structure
 ├── production               # Production server inventory (c.f. development above)
 ├── pubring.gpg              # regpg user keyring
 ├── roles
-│   ├── common               # Common tasks for every server
+│   ├── common               # Common setup for every server
 │   │   ├── files
 │   │   └── tasks
-│   ├── file_systems         # Disk & filesystem setup
+│   ├── file_systems         # LVM and filesystem setup
+│   │   ├── defaults
 │   │   └── tasks
-│   ├── monit                # Monit monitoring
-│   │   ├── files
-│   │   ├── handlers
-│   │   └── tasks
-│   ├── system_metrics       # Prometheus/grafana metrics
+│   ├── monit                # monit
 │   │   ├── files
 │   │   ├── handlers
 │   │   └── tasks
-│   ├── tfc_prod             # tfc_prod setup
-│   │   ├── files
-│   │   └── tasks
-│   ├── tfc_web              # tfc_web setup as tfc_prod
-│   │   ├── files
-│   │   └── tasks
-│   ├── tfc_web_postgres     # tfc_web setup as postgres
-│   │   └── tasks
-│   ├── tfc_webserver        # nginx setup for tfc servers
+│   ├── system_metrics       # Custom metrics with Prometheus and Grafana
 │   │   ├── files
 │   │   ├── handlers
 │   │   └── tasks
-│   └── users                # user management
+│   ├── tfc_prod             # General tfc_prod user setup
+│   │   ├── files
+│   │   └── tasks
+│   ├── tfc_server           # Set up/build/install/start tfc_server
+│   │   ├── files
+│   │   └── tasks
+│   ├── tfc_web              # Set up/install/start tfc_web
+│   │   └── tasks
+│   ├── tfc_webserver        # Nginx supporting tfc_web & tfc_server
+│   │   ├── files
+│   │   ├── handlers
+│   │   └── tasks
+│   └── users                # Create users
+│       ├── defaults
 │       ├── files
 │       └── tasks
 ├── site.yml                 # playlist for *everything*
