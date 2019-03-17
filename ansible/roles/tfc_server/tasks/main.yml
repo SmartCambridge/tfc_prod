@@ -1,0 +1,100 @@
+---
+
+- name: Install packages
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    name:
+      - maven
+
+- name: Main data directory
+  file:
+    path: /mnt/sdb1/tfc
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rwx,go=rx"
+
+- name: tfc_prod data directories
+  file:
+    path: /mnt/sdb1/tfc/{{ item }}
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rwx,go=rx"
+  loop:
+    - vix
+    #- vix/data_bin
+    #- vix/data_bin_json
+    #- vix/data_zone
+    #- vix/data_cache
+    #- vix/data_monitor
+    #- vix/data_monitor_json
+    - sys
+    - cam_park_local
+    - cam_park_rss
+    - cam_aq
+
+- name: Link tfc_prod data directories
+  file:
+    src: /mnt/sdb1/tfc
+    path: /media/tfc
+    state: link
+
+- name: Setup tfc/sys
+  synchronize:
+    src: sys/
+    dest: /media/tfc/sys/
+    archive: no
+    checksum: yes
+    recursive: yes
+
+- name: tfc_server startup script
+  copy:
+    src: tfc_server_run.sh
+    dest: ~tfc_prod/tfc_prod/run.sh
+    owner: root
+    group: root
+    mode: "o=rwx,go=rx"
+
+- name: Tasks run as tfc_prod
+  block:
+
+  - name: Snapshot the current tfc_web source
+    git:
+      repo: https://github.com/SmartCambridge/tfc_server
+      dest: ~tfc_prod/tfc_server
+      update: no
+      register: git_checkout
+
+  - name: Build tfc_server on first checkout
+    block:
+
+    - name: Build tfc_server
+      command: mvn clean package
+      args:
+        chdir: ~tfc_prod/tfc_server
+      changed_when: false
+
+    - name: Move tfc_server .jar into place
+      command: mv tfc.jar ../tfc_prod/tfc.jar
+        args:
+      chdir: ~tfc_prod/tfc_server
+      changed_when: false
+
+    - name: Start tfc_server
+      command: /home/tfc_prod/tfc_prod/run.sh
+      changed_when: false
+
+  when: git_checkout.changed
+
+  - name: Set tfc_server to restart on reboot
+    cron:
+      name: Restart tfc_server
+      state: present
+      user: tfc_prod
+      job: "[ -e  /home/tfc_prod/tfc_prod/run.sh ] && /home/tfc_prod/tfc_prod/run.sh"
+      special_time: reboot
+
+  become: yes
+  become_user: tfc_prod

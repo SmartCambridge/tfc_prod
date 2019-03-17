@@ -8,14 +8,6 @@
     shell: /bin/bash
     state: present
 
-- name: ~tfc_prod/tfc_prod directory
-  file:
-    path: ~tfc_prod/tfc_prod
-    state: directory
-    owner: tfc_prod
-    group: tfc_prod
-    mode: "u=rwx,go=rx"
-
 - name: tfc_prod .ssh directory
   file:
     path: ~tfc_prod/.ssh
@@ -23,14 +15,6 @@
     owner: tfc_prod
     group: tfc_prod
     mode: "u=rwx,go="
-
-- name: tfc_prod secrets file
-  gpg_d:
-    src: secrets.py.asc
-    dest: ~tfc_prod/tfc_prod/secrets.py
-    owner: root
-    group: root
-    mode: "u=rw,go=r"
 
 - name: tfc_prod's private SSH key
   gpg_d:
@@ -48,7 +32,7 @@
     group: tfc_prod
     mode: "u=rw,go="
 
-# KEys are kept in the `users` role
+# Keys are kept in the `users` role
 - name: Install admin user + tfc_prod's mortal keys into tfc_prod's authorized_keys
   assemble:
     remote_src: false
@@ -59,15 +43,7 @@
     group: tfc_prod
     mode: "u=rw,go="
 
-- name: tfc_server startup script
-  copy:
-    src: tfc_server_run.sh
-    dest: ~tfc_prod/tfc_prod/run.sh
-    owner: root
-    group: root
-    mode: "o=rwx,go=rx"
-
-- name: misc tfc_prod tools
+- name: Misc tfc_prod tools
   copy:
     src: tools
     dest: ~tfc_prod/tfc_prod/
@@ -75,52 +51,29 @@
     group: tfc_prod
     mode: "o=rwx,go=rx"
 
-- name: Create directories
+- name: Log directory
   file:
-    path: "{{ item.path }}"
+    path: /var/log/tfc_prod
     state: directory
     owner: tfc_prod
     group: tfc_prod
-    mode: "{{ item.mode|default('u=rwx,go=rx') }}"
-  loop:
-    - { path: /var/log/tfc_prod, mode: "a=rwx" }
-    - { path: /mnt/sdb1/tfc }
-  loop_control:
-    label: "{{ item.path }}"
+    mode: "a=rwx"
 
-- name: tfc_prod data directories
+- name: ~tfc_prod/tfc_prod directory
   file:
-    path: /mnt/sdb1/tfc/{{ item }}
+    path: ~tfc_prod/tfc_prod
     state: directory
     owner: tfc_prod
     group: tfc_prod
     mode: "u=rwx,go=rx"
-  loop:
-    - vix
-    #- vix/data_bin
-    #- vix/data_bin_json
-    #- vix/data_zone
-    #- vix/data_cache
-    #- vix/data_monitor
-    #- vix/data_monitor_json
-    - sys
-    - cam_park_local
-    - cam_park_rss
-    - cam_aq
 
-- name: Link tfc_prod data directories
-  file:
-    src: /mnt/sdb1/tfc
-    path: /media/tfc
-    state: link
-
-- name: Copy data into tfc/sys
-  synchronize:
-    src: sys/
-    dest: /media/tfc/sys/
-    archive: no
-    checksum: yes
-    recursive: yes
+- name: tfc_prod secrets file
+  gpg_d:
+    src: secrets.py.asc
+    dest: ~tfc_prod/tfc_prod/secrets.py
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
 
 - name: Database backup directories
   file:
@@ -173,14 +126,4 @@
     hour: 5
     minute: "{{ 59 | random(seed=inventory_hostname) }}"
 
-- name: Start tfc_web/tfc_prod on reboot
-  cron:
-    name: Restart {{ item }}
-    state: present
-    user: tfc_prod
-    job: "[ -e {{ item }} ] && {{ item }}"
-    special_time: reboot
-  loop:
-    - /home/tfc_prod/tfc_prod/run.sh
-    - /home/tfc_prod/tfc_web/run.sh
 
