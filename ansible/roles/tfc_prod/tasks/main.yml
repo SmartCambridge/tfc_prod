@@ -69,8 +69,8 @@
 
 - name: tfc_prod secrets file
   gpg_d:
-    src: secrets.py.asc
-    dest: ~tfc_prod/tfc_prod/secrets.py
+    src: secrets.sh.asc
+    dest: ~tfc_prod/tfc_prod/secrets.sh
     owner: root
     group: root
     mode: "u=rw,go=r"
