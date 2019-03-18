@@ -2,6 +2,14 @@
 
 # Packages
 
+- name: software-properties-common
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    name:
+      - software-properties-common
+    state: present
+
 - name: Add certbot ppa
   apt_repository:
     repo: ppa:certbot/certbot
@@ -13,7 +21,6 @@
     update_cache: yes
     cache_valid_time: 3600
     name:
-      - software-properties-common
       - nginx
       - python-certbot-nginx
       - userv
