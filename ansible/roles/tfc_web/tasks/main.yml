@@ -68,6 +68,14 @@
       chdir: ~tfc_prod
       creates: ~tfc_prod/tfc_web_venv
 
+  - name: Snapshot the current tfc_web source
+    git:
+      repo: https://github.com/SmartCambridge/tfc_web
+      dest: ~tfc_prod/tfc_web
+      version: master
+      update: no
+    register: git_checkout
+
   - name: Install production secrets
     gpg_d:
       src: secrets.py.asc
@@ -75,14 +83,6 @@
       owner: tfc_prod
       group: tfc_prod
       mode: "u=rw,go="
-
-  - name: Snapshot the current tfc_web source
-    git:
-      repo: https://github.com/SmartCambridge/tfc_web
-      dest: ~tfc_prod/tfc_web
-      version: master
-      update: no
-      register: git_checkout
 
   - name: Setup tfc_web only if checked out this time
     block:
