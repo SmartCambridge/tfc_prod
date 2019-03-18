@@ -42,9 +42,9 @@
     state: link
   loop:
     - tfc_filespace
-    #- tfc_sirivm
-    #- tfc_web_cronjobs
-    #- tfc_web_servers
+    - tfc_sirivm
+    - tfc_web_cronjobs
+    - tfc_web_servers
   notify: "restart monit"
 
 - name: Link config to monitor /boot fs if available
