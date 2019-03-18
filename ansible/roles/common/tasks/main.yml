@@ -8,7 +8,7 @@
       - openssh-server
       - emacs
       - git
-      - openjdk-8-jdk
+
       - ssmtp
     state: present
 
