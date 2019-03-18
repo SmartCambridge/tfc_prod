@@ -18,9 +18,9 @@
 
 - name: Find admin user 'mortal' authorized keys to copy
   stat:
-    delegate_to: localhost
     path: "{{ role_path }}/files/{{ item }}_mortal.keys"
   loop: "{{ admin_users }}"
+  delegate_to: localhost
   register: st
 
 - name: Install admin user 'mortal' authorized keys
