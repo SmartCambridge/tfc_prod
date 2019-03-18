@@ -113,7 +113,7 @@
       changed_when: command_result.stdout is search('token created')
 
     - name: Start gunicorn
-      comamnd: ~tfc_prod/tfc_web/run.sh
+      command: ~tfc_prod/tfc_web/run.sh
       changed_when: false
 
     when: git_checkout.changed
