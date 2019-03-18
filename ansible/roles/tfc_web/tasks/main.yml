@@ -84,6 +84,15 @@
       group: tfc_prod
       mode: "u=rw,go="
 
+  - name: Highlight not updating tfc_web
+    debug:
+      msg: |
+        .
+        *****************************************************************
+        tfc_web already installed - this role doesn't update or manage it
+        *****************************************************************
+    when: not git_checkout.changed
+
   - name: Setup tfc_web only if checked out this time
     block:
 
