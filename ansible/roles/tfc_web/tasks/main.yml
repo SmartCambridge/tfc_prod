@@ -80,6 +80,7 @@
     git:
       repo: https://github.com/SmartCambridge/tfc_web
       dest: ~tfc_prod/tfc_web
+      version: master
       update: no
       register: git_checkout
 

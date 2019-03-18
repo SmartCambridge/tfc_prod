@@ -17,8 +17,8 @@
   loop: "{{ admin_users }}"
 
 - name: Find admin user 'mortal' authorized keys to copy
-  local_action:
-    module: stat
+  stat:
+    delegate_to: localhost
     path: "{{ role_path }}/files/{{ item }}_mortal.keys"
   loop: "{{ admin_users }}"
   register: st
