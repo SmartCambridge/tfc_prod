@@ -66,6 +66,7 @@
     git:
       repo: https://github.com/SmartCambridge/tfc_server
       dest: ~tfc_prod/tfc_server
+      version: master
       update: no
       register: git_checkout
 
@@ -80,15 +81,15 @@
 
     - name: Move tfc_server .jar into place
       command: mv tfc.jar ../tfc_prod/tfc.jar
-        args:
-      chdir: ~tfc_prod/tfc_server
+      args:
+        chdir: ~tfc_prod/tfc_server
       changed_when: false
 
     - name: Start tfc_server
       command: /home/tfc_prod/tfc_prod/run.sh
       changed_when: false
 
-  when: git_checkout.changed
+    when: git_checkout.changed
 
   - name: Set tfc_server to restart on reboot
     cron:
