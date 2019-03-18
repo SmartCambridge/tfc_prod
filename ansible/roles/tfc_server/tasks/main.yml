@@ -70,6 +70,15 @@
       update: no
       register: git_checkout
 
+  - name: Highlight not updating tfc_server
+    debug:
+      msg: |
+        .
+        ********************************************************************
+        tfc_server already installed - this role doesn't update or manage it
+        ********************************************************************
+    when: not git_checkout.changed
+
   - name: Build tfc_server on first checkout
     block:
 
