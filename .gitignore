@@ -6,7 +6,7 @@
 # General
 *[#]*
 *[#]*[#]
-bin
+
 build
 *.class
 .classpath
