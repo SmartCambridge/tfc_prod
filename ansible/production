@@ -1,4 +1,0 @@
-[tfc_servers]
-
-tfc-app4            ansible_host=tfc-app4.cl.cam.ac.uk
-

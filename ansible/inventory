@@ -1,0 +1,7 @@
+[tfc_servers]
+
+tfc-app5            ansible_host=tfc-app5.cl.cam.ac.uk
+
+[development]
+
+tfc-app5
