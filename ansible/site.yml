@@ -1,2 +1,4 @@
 ---
+
+- import_playbook: gpg-preload.yml
 - import_playbook: tfc_servers.yml
