@@ -20,6 +20,15 @@
   command: python3 -m pip install --upgrade pip
   changed_when: false
 
+- name: nginx includes2 directory
+  synchronize:
+    src: includes2/
+    dest: /etc/nginx/includes2/
+    archive: no
+    checksum: yes
+    recursive: yes
+  notify: "restart nginx"
+
 # Run as user postgres
 
 - name: Tasks run as postgres

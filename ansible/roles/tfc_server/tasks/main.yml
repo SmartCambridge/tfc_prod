@@ -51,6 +51,15 @@
     checksum: yes
     recursive: yes
 
+- name: nginx includes2 directory
+  synchronize:
+    src: includes2/
+    dest: /etc/nginx/includes2/
+    archive: no
+    checksum: yes
+    recursive: yes
+  notify: "restart nginx"
+
 - name: tfc_server startup script
   copy:
     src: tfc_server_run.sh
@@ -87,10 +96,6 @@
     args:
       chdir: ~tfc_prod/tfc_server
     changed_when: false
-
-  - command: ls -l target/
-    args:
-      chdir: ~tfc_prod/tfc_server
 
   - name: Move tfc_server .jar into place
     shell: mv target/tfc_server-*-fat.jar ../tfc_prod/tfc_{{ ansible_date_time.date }}.jar

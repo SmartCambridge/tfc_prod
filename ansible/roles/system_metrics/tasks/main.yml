@@ -81,7 +81,7 @@
     - { src: grafana.conf, dest: /etc/nginx/includes2/ }
   loop_control:
     label: "{{ item.src }}"
-  notify: "restart nginx metrics"
+  notify: "restart nginx"
 
 - name: Install htpasswd file
   gpg_d:
