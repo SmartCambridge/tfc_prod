@@ -21,11 +21,8 @@ Currently missing
 =================
 
 * README.md
-* Enable most monit checks (would currently fail)
 * Move cronjobs (esp tfc_prod) to /etc/cron.d?
 * Configuring Grafana, creating admin users, add initial dashboards
-* Restoring the database
-* Copying data files
 * Move Ansible-managed files out of user-writable directories (esp. tfc_prod)
 * Get initial bus stops
 * Get initial timetable information
