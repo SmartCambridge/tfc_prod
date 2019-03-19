@@ -36,9 +36,8 @@
 - name: Install admin user + tfc_prod's mortal keys into tfc_prod's authorized_keys
   assemble:
     remote_src: false
-    src: "{{ role_path }}/../users/files/"
+    src: "{{ role_path }}/../users/files/mortal_keys"
     dest: ~tfc_prod/.ssh/authorized_keys
-    regexp: "[a-z0-9_]+_mortal.keys"
     owner: tfc_prod
     group: tfc_prod
     mode: "u=rw,go="

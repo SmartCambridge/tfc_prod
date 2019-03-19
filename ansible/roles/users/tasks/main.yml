@@ -18,7 +18,7 @@
 
 - name: Find admin user 'mortal' authorized keys to copy
   stat:
-    path: "{{ role_path }}/files/{{ item }}_mortal.keys"
+    path: "{{ role_path }}/files/mortal_keys/{{ item }}"
   loop: "{{ admin_users }}"
   delegate_to: localhost
   register: st
@@ -43,12 +43,11 @@
     group: root
     mode: "u=rwx,go="
 
-- name: Install admin user 'priv' keys into root authorized_keys
+- name: Install 'priv' keys into root authorized_keys
   assemble:
     remote_src: false
-    src: "{{ role_path }}/files/"
+    src: "{{ role_path }}/files/priv_keys/"
     dest: ~root/.ssh/authorized_keys
-    regexp: "[a-z0-9_]+_priv.keys"
     owner: root
     group: root
     mode: "u=rw,go="
