@@ -110,7 +110,7 @@
 ## --8<--
  set mail-format {
    from:    admin@smartcambridge.org
-   subject: TFC alert -- $EVENT $SERVICE
+   subject: $HOST -- $EVENT $SERVICE
    message: $EVENT Service $SERVICE
             Date:        $DATE
             Action:      $ACTION
