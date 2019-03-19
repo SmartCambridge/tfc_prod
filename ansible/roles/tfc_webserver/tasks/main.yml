@@ -146,15 +146,6 @@
   loop:
     - dummy.key
     - dummy.crt
-    - carrier.pem
-
-- name: carrier.csx key
-  gpg_d:
-    src: carrier.key.asc
-    dest: /etc/nginx/ssl/carrier.key
-    owner: root
-    group: root
-    mode: "u=rw,go="
 
 # Certbot
 
@@ -218,7 +209,6 @@
   loop:
     - tfc_prod_ssl.conf
     - smartcambridge.conf
-    - carrier.csi.cam.ac.uk.conf
     - 000-default.conf
   notify: "restart nginx"
 
