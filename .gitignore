@@ -137,3 +137,5 @@ rtroute_config.js
 secrets.sh
 secrets/
 
+site.retry
+tfc_servers.retry
