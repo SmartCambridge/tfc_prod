@@ -1,0 +1,78 @@
+---
+
+- name: Create data directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: tfc_prod
+    group: tfc_prod
+    mode: "u=rwx,go=rx"
+  loop:
+    - /media/tfc/cam_tt_matching/json
+    - /media/tfc/tnds/sections
+
+- name: Copy nginx configuration
+  copy:
+    src: tt_matching.conf
+    dest: /etc/nginx/includes2/
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
+  notify: "restart nginx"
+
+# Run as user tfc_prod
+
+- name: Tasks run as tfc_prod
+  become: yes
+  become_user: tfc_prod
+  block:
+
+  - name: Snapshot the current tfc_web source
+    git:
+      repo: https://github.com/SmartCambridge/timetable_matching
+      dest: ~tfc_prod/timetable_matching
+      version: master
+      update: no
+    register: git_checkout
+
+  - name: Highlight not updating timetable_matching
+    debug:
+      msg: |
+        .
+        ******************************************************************
+        timetable_matching already installed - this role doesn't update it
+        ******************************************************************
+    when: not git_checkout.changed
+
+  - name: Install configuration
+    gpg_d:
+      src: setup_environment.asc
+      dest: ~tfc_prod/timetable_matching/setup_environment
+      owner: tfc_prod
+      group: tfc_prod
+      mode: "u=rw,go="
+
+  - name: Create virtual env
+    command: python3 -m venv venv
+    args:
+      chdir: ~tfc_prod/timetable_matching
+      creates: ~tfc_prod/timetable_matching/venv
+
+  # Ansible's 'pip' module doesn't seem to work...
+  - name: Install Python dependancies
+    command: ~tfc_prod/timetable_matching/venv/bin/pip install -r ~tfc_prod/timetable_matching/requirements.txt
+    changed_when: false
+
+  # END become_user: tfc_prod
+
+- name: timetable_matching cronjob
+  cron:
+    name: process yestardays journeys
+    state: present
+    user: tfc_prod
+    minute: 45
+    hour: 2
+    job: >
+      cd /home/tfc_prod/timetable_matching/ &&
+      ./process_day.sh >/var/log/tfc_prod/process_day.err 2>&1 &&
+      echo $(date --iso-8601=seconds) > /var/log/tfc_prod/process_day.timestamp

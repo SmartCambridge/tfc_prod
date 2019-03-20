@@ -11,3 +11,4 @@
     - { role: tfc_prod,      tags: ["tfc_prod"] }
     - { role: tfc_web,       tags: ["tfc_web"] }
     - { role: tfc_server,    tags: ["tfc_server"] }
+    - { role: timetable_matching, tags: ["timetable_matching"] }
