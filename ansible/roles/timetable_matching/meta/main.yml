@@ -1,6 +1,5 @@
 ---
 
 dependencies:
-  - role: common
   - role: tfc_prod
   - role: tfc_webserver
