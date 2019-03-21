@@ -22,9 +22,16 @@ Link required ones into conf-enabled, e.g.:
 ```
 cd /etc/conf-enabled/
 sudo ln -s ../conf-available/tfc_filespace .
-sudo ln -s ../conf-available/tfc-sirivm .
+sudo ln -s ../conf-available/tfc_sirivm .
 sudo ln -s ../conf-available/tfc_web_cronjobs .
-sudo ln -s ../conf-available/tfc_web_servers .
+sudo ln -s ../conf-available/tfc_servers .
+```
+
+also link the web server monitoring configuration for this particular server,
+replacing `<n>` as apropriate:
+
+```
+sudo ln -s ../conf-available/tfc-app<n>_web_servers .
 ```
 
 If enabling the `tfc-sirivm` checks, add the following to root's crontab
