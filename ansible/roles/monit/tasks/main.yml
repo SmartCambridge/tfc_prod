@@ -26,6 +26,15 @@
     label: "{{ item.src }}"
   notify: "restart monit"
 
+- name: Copy templates
+  template:
+    src: conf-available/tfc_web_servers.j2
+    dest: /etc/monit/conf-available/tfc_web_servers
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
+  notify: "restart monit"
+
 - name: Copy monit credentials
   gpg_d:
     src: httpd-server.conf.asc
