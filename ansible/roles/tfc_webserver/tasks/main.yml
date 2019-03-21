@@ -221,3 +221,8 @@
     archive: no
     checksum: yes
     recursive: yes
+
+- name: rtroute's config file
+  template:
+    src: rtroute_config.js.j2
+    dest: /var/www/tfc_prod/backdoor/rtroute/rtroute_config.js
