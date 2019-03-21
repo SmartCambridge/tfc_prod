@@ -50,6 +50,7 @@
     path: /etc/monit/conf-enabled/{{ item }}
     state: link
   loop:
+    - tfc_servers
     - tfc_filespace
     - tfc_sirivm
     - tfc_web_cronjobs
