@@ -1,0 +1,23 @@
+# Ansible managed
+
+# Check that all the expected servers are at least responding to ping
+
+check host tfc-app1.cl.cam.ac.uk address tfc-app1.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app2.cl.cam.ac.uk address tfc-app2.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app3.cl.cam.ac.uk address tfc-app3.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app4.cl.cam.ac.uk address tfc-app4.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app5.cl.cam.ac.uk address tfc-app5.cl.cam.ac.uk
+if failed ping
+then alert
