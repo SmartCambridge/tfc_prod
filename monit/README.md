@@ -20,7 +20,7 @@ sudo cp conf-available/* /etc/monit/conf-available
 
 Link required ones into conf-enabled, e.g.:
 ```
-cd /etc/conf-enabled/
+cd /etc/monit/conf-enabled/
 sudo ln -s ../conf-available/tfc_filespace .
 sudo ln -s ../conf-available/tfc_sirivm .
 sudo ln -s ../conf-available/tfc_web_cronjobs .
@@ -34,11 +34,27 @@ replacing `<n>` as apropriate:
 sudo ln -s ../conf-available/tfc-app<n>_web_servers .
 ```
 
+Create an empty file in `/etc/monit/conf.d`, so the default monitrc include
+doesn't complain:
+```
+sudo touch /etc/monit/conf.d/empty
+```
+
 If enabling the `tfc-sirivm` checks, add the following to root's crontab
 to suppress aggressive monitoring overnight when it will otherwise false-positive:
 ```
 00 07 * * * /usr/bin/monit monitor cloudamber_data_monitor_json_fast
 00 22 * * * /usr/bin/monit unmonitor cloudamber_data_monitor_json_fast
+```
+
+Check monit configuration:
+```
+sudo monit -t
+```
+
+Start or reload monit configuration with:
+```
+sudo monit reload
 ```
 
 Check status of running monit:
@@ -49,22 +65,15 @@ also:
 ```
 sudo service monit status
 ```
-
-To add additional checks, create a new fragment in `tfc_prod/monit/conf-available`, copy to
-`/etc/monit/conf-available` and link it into `/etc/monit/conf-enabled`
-
-To check monit configutation;
-```
-sudo monit -t
-```
-
-Reload monit configuration with
-```
-sudo monit reload
-```
-
 Web console at https://smartcambridge.org/system/monitor/ - see
 `/etc/monit/httpd-server.conf` for the credentials
+
+## Adding additional monit checks
+
+To add additional checks, create a new file in `tfc_prod/monit/conf-available`, copy to
+`/etc/monit/conf-available` and link it into `/etc/monit/conf-enabled`
+
+### Simple monit example checks
 
 Sample filesystem checks:
 ```
