@@ -2,3 +2,7 @@
 # canth.mac.cl.cam.ac.uk - work laptop
 #
 from="canth.mac.cl.cam.ac.uk,128.232.56.88" ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHvQO47D2fsMyc8qPnwWguuws6MwvckpBqlE/E+vpHtia+DwmZmcRcyO31hF6iHRAJvNnLwGJ/sCjuY8RuY1HY0327SRO0F1IGqpSR7ZAOZIGN7XoUqhc1oXoTF71KDsSLcEOaLjoszS4MxtzwQkqpJqxzvVMJjA0MzcnRmTIsYht3Q1xN6gqG58PbizxSHRmdSbi+g6N2ZG45157SGoYOEKKsoWIRomgr9wmu+BpPrMo2J/6TQMgv2yaADs0G3uU95kWA1VGGPqP4Z0PN5kg/lmAcGjHaYobK/7reqlJUsLc9BKHYIG8oXdeBLOvp/0n27eQncMd0N3Wj/cs7u4cP jw35@canth.mac.cl.cam.ac.uk
+#
+# ramoth - home mac
+#
+from="128.232.64.213,ely.cl.cam.ac.uk,82.13.74.242,*.cable.virginm.net" ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCdEvJ6gI+BMURocwSbAhpA7ZrCA0IYvFkz+NSQmFqaKTQ3Ha65YGRPkP8hgPLaiKFobFJ28V+Oh5+JoDs3DVNVsMOpufJbLcdj2Mq7gh+ES3elULKXdWHx7yaKKIg//EeAr0cnN2OoRTsFjCIA7UW/Ootv10I1xcgbuQSQ7A67VPKLneQnlxkHBBQKue3RnLpkpKUhs91Gwpe/FiNLzwMSHSYPrSxgFdvZ/xW82OLRl/8J8g+k1Mj6nPybvExTrv0Q3WtEyP5UXpZFlj1YbiTw85QWsHkIpklqnlJMMsVj5Ts0Hqy5oQyNaHLrPKQsimW+PJhvIgmxl3ANrVJKOUGl jon@ramoth.local
