@@ -1,0 +1,14 @@
+# Make sure we are receiving SIRI-VM data
+#
+# While most of the time data should be be recieved several time a
+# minute, there are occasional pauses overnight which aren't worth
+# reporting. To address this we run one monitor with a long timeout
+# and a second one with a shorter timeout that is turned off by cron
+# overnight.
+
+check directory cloudamber_sirivm_data_monitor_slow with path /media/tfc/cloudamber/sirivm/data_monitor
+    if timestamp > 120 minutes then alert
+
+check directory cloudamber_sirivm_data_monitor_fast with path /media/tfc/cloudamber/sirivm/data_monitor
+    if timestamp > 1 minutes then alert
+

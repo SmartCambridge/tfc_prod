@@ -2,6 +2,8 @@
 
 tfc_prod_branch: master
 
+production_server: tfc-app4
+
 # CrsIDs of users to be created
 admin_users:
   - jw35

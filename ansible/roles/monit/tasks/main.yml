@@ -26,6 +26,11 @@
     label: "{{ item.src }}"
   notify: "restart monit"
 
+- name: Remove obsolete files
+  file:
+    path: /etc/monit/conf-available/tfc_sirivm
+    state: absent
+
 - name: Copy templates
   template:
     src: conf-available/tfc_web_servers.j2
@@ -52,9 +57,15 @@
   loop:
     - tfc_servers
     - tfc_filespace
-    - tfc_sirivm
+    - tfc_sirivm_json
     - tfc_web_cronjobs
     - tfc_web_servers
+  notify: "restart monit"
+
+- name: Unlink un-required configurations
+  file:
+    path: /etc/monit/conf-enabled/tfc_sirivm
+    state: absent
   notify: "restart monit"
 
 - name: Link config to monitor /boot fs if available
@@ -72,7 +83,22 @@
   when: not ansible_mounts|selectattr("mount", "equalto", "/boot")|list
   notify: "restart monit"
 
-- name: Sart/stop cloudamber_data_monitor_json_fast monit task overnight (if enabled)
+- name: Link config to monitor incoming SIRIVM on production machine
+  file:
+    src: ../conf-available/tfc_cloudamber
+    path: /etc/monit/conf-enabled/tfc_cloudamber
+    state: link
+  when: ansible_hostname == production_server
+  notify: "restart monit"
+
+- name: ...and unlink elsewhere
+  file:
+    path: /etc/monit/conf-enabled/tfc_cloudamber
+    state: absent
+  when: not ansible_hostname == production_server
+  notify: "restart monit"
+
+- name: Sart/stop cloudamber_sirivm_data_monitor_fast monit task overnight (if enabled)
   cron:
     name: "{{ item.name }}"
     state: present
@@ -83,10 +109,11 @@
   loop:
     - name: enable cloudamber_data_monitor_json_fast
       hour: 7
-      job: "[ -e /etc/monit/conf-enabled/tfc_sirivm ] && /usr/bin/monit monitor cloudamber_data_monitor_json_fast"
+      job: "00 07 * * * [ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit monitor cloudamber_sirivm_data_monitor_fast
+"
     - name: disable cloudamber_data_monitor_json_fast
       hour: 22
-      job: "[ -e /etc/monit/conf-enabled/tfc_sirivm ] && /usr/bin/monit unmonitor cloudamber_data_monitor_json_fast"
+      job: "00 22 * * * [ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit unmonitor cloudamber_sirivm_data_monitor_fast"
   loop_control:
     label: "{{ item.name }}"
 
