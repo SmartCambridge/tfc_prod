@@ -109,11 +109,11 @@
   loop:
     - name: enable cloudamber_data_monitor_json_fast
       hour: 7
-      job: "00 07 * * * [ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit monitor cloudamber_sirivm_data_monitor_fast
+      job: "[ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit monitor cloudamber_sirivm_data_monitor_fast
 "
     - name: disable cloudamber_data_monitor_json_fast
       hour: 22
-      job: "00 22 * * * [ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit unmonitor cloudamber_sirivm_data_monitor_fast"
+      job: "[ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit unmonitor cloudamber_sirivm_data_monitor_fast"
   loop_control:
     label: "{{ item.name }}"
 
