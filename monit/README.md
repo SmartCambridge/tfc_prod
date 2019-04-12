@@ -22,7 +22,7 @@ Link required ones into conf-enabled, e.g.:
 ```
 cd /etc/monit/conf-enabled/
 sudo ln -s ../conf-available/tfc_filespace .
-sudo ln -s ../conf-available/tfc_sirivm .
+sudo ln -s ../conf-available/tfc_sirivm_json .
 sudo ln -s ../conf-available/tfc_web_cronjobs .
 sudo ln -s ../conf-available/tfc_servers .
 ```
@@ -34,17 +34,24 @@ replacing `<n>` as apropriate:
 sudo ln -s ../conf-available/tfc-app<n>_web_servers .
 ```
 
+also link the raw SIRIVM monitoring configuration on whichever server
+is running as smartcambridge.org (and unlink it on any server that isn't)
+
+```
+sudo ln -s ../conf-available/tfc_cloudamber .
+```
+
 Create an empty file in `/etc/monit/conf.d`, so the default monitrc include
 doesn't complain:
 ```
 sudo touch /etc/monit/conf.d/empty
 ```
 
-If enabling the `tfc-sirivm` checks, add the following to root's crontab
+If enabling the `tfc-cloudamber` checks, add the following to root's crontab
 to suppress aggressive monitoring overnight when it will otherwise false-positive:
 ```
-00 07 * * * /usr/bin/monit monitor cloudamber_data_monitor_json_fast
-00 22 * * * /usr/bin/monit unmonitor cloudamber_data_monitor_json_fast
+00 07 * * * [ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit monitor cloudamber_sirivm_data_monitor_fast
+00 22 * * * [ -e /etc/monit/conf-enabled/tfc_cloudamber ] && /usr/bin/monit unmonitor cloudamber_sirivm_data_monitor_fast
 ```
 
 Check monit configuration:

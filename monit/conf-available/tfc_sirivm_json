@@ -1,0 +1,5 @@
+# Make sure we are accumulating SIRI-VM data
+
+check directory sirivm_json_data_monitor with path /media/tfc/sirivm_json/data_monitor
+    if timestamp > 120 minutes then alert
+
