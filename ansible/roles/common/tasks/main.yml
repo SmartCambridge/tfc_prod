@@ -17,6 +17,41 @@
     src: ssh_known_hosts
     dest: /etc/ssh
 
+- name: Disable ssh ChallengeResponseAuthentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^ChallengeResponseAuthentication'
+    line: ChallengeResponseAuthentication no
+  notify: "restart sshd"
+
+- name: Disable ssh PasswordAuthentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PasswordAuthentication'
+    line: PasswordAuthentication no
+  notify: "restart sshd"
+
+- name: Enable ssh UsePAM
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^UsePAM'
+    line: UsePAM yes
+  notify: "restart sshd"
+
+- name: Set ssh PermitRootLogin to prohibit-password
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PermitRootLogin'
+    line: PermitRootLogin prohibit-password
+  notify: "restart sshd"
+
+- name: Enable ssh UseDNS
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^UseDNS'
+    line: UseDNS yes
+  notify: "restart sshd"
+
 - name: Configure ssmtp
   copy:
     src: "{{ item }}"
