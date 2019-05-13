@@ -56,6 +56,13 @@ sudo apt-get upgrade
 sudo apt-get install openssh-server
 ```
 
+Add or update the following two directives in `/etc/ssh/sshd_config`:
+
+```
+PermitRootLogin prohibit-password
+UseDNS yes
+```
+
 ### Create local ssh key
 ```
 ssh-keygen -t rsa -b 4096 -C "username@tfc-appN"

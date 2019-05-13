@@ -129,12 +129,14 @@ ENV/
 .idea
 .DS_Store
 *.sqlite3
+
 secrets.*
 !ansible/**/secrets.*
 
+
 rtroute_config.js
 
-secrets.sh
+secrets*
 secrets/
 
 site.retry
