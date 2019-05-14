@@ -83,7 +83,7 @@
     mode: "o=rwx,go=rx"
   loop:
     - { path: /backups, owner: postgres }
-    - { path: /mnt/sdd1/smartcambridge.org/backup, owner: tfc_prod }
+    - { path: /mnt/sdd1/smartcambridge.org/backups, owner: tfc_prod }
   loop_control:
     label: "{{ item.path }}"
 
