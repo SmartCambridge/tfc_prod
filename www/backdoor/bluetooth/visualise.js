@@ -82,10 +82,11 @@ function get_legend() {
     var legend = L.control({position: 'bottomleft'});
     legend.onAdd = function () {
         var div = L.DomUtil.create('div', 'info legend');
-        div.innerHTML = '<div class="leaflet-control-layers-expanded">' +
+        div.innerHTML = '<div class="leaflet-control-layers leaflet-control-layers-expanded">' +
             'GREEN: speed is at least 10% below normal<br>' +
             'RED: speed is at least 10% above normal<br>' +
-            'Trafic drives on the left' +
+            'GREY: no speed reported<br>' +
+            'Trafic drives on the left. Updates every 60s.' +
             '</div>';
         return div;
     };
