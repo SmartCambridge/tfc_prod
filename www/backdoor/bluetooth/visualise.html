@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;
+        charset=utf-8">
+
+    <!-- Leaflet -->
+    <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+        integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+        crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"
+        integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+        crossorigin=""></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+
+    <!-- Using a modified local copy that includes Thunderforest Neighbourhood -->
+    <!--
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-providers/1.7.0/leaflet-providers.min.js"
+        integrity="sha256-m+8KWGb6+QMNJLQxmAd70/JJ63YT404bAV+veSxYj1s=" crossorigin="anonymous"></script>
+    -->
+    <script type="text/javascript" src="leaflet-providers.js"></script>
+
+    <!-- Leaflet.PolylineOffst -->
+    <!-- https://github.com/bbecquet/Leaflet.PolylineOffset -->
+    <script type="text/javascript" src="leaflet.polylineoffset.js"></script>
+
+    <!-- Our scripts -->
+    <script type="text/javascript" src="setup_env.js"></script>
+    <script type="text/javascript" src="visualise.js"></script>
+
+    <title>Bluetruth data</title>
+
+  </head>
+
+  <body>
+
+    <div id="map" style="height: 1000px; border: 1px solid black;"></div>
+
+  </body>
+
+</html>
