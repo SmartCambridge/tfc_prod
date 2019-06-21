@@ -32,7 +32,7 @@ var map,                            // The Leaflet map object itself
     links_layer,                    // Layer containing the point to point links
     compound_routes_layer,          // Layer containing the compound routes
     layer_control,                  // The layer control
-    ledgend,                        // The legend
+    clock,                          // The clock control
     hilighted_line,                 // The currently highlighted link or route
     speed_display = 'actual',       // Line colour mode - 'actual', 'normal' or 'relative'
     line_map = {};                  // Lookup link/route id to displayed polyline
@@ -66,7 +66,7 @@ function setup_map() {
     map = L.map('map', {zoomControl: false});
 
     // Map legend
-    ledgend = get_legend().addTo(map);
+    get_legend().addTo(map);
 
     // Layer control
     var base_layers = {
@@ -82,6 +82,9 @@ function setup_map() {
 
     //  Zoom control (with non-default position)
     L.control.zoom({position: 'topright'}).addTo(map);
+
+    // Clock
+    clock = get_clock().addTo(map);
 
     // Handler to clear any highlighting caused by clicking lines
     map.on('click', clear_line_highlight);
@@ -184,6 +187,9 @@ function load_journey_times() {
 
             // Refresh the line colours
             update_line_colours();
+
+            // Reset the clock
+            clock.update();
 
             // Re-schedule for a minute in the future
             setTimeout(load_journey_times, 60000);
@@ -332,93 +338,80 @@ function line_popup(polyline) {
 
 }
 
+function get_clock() {
+    var clock = L.control({position: 'bottomleft'});
+    clock.onAdd = function () {
+        var div = L.DomUtil.create('div', 'leaflet-control-layers leaflet-control-layers-expanded clock');
+        div.innerHTML = '--:--:--';
+        return div;
+    };
+    clock.update = function() {
+        var datetime = new Date();
+        var hh = ('0'+datetime.getHours()).slice(-2);
+        var mm = ('0'+datetime.getMinutes()).slice(-2);
+        var ss = ('0'+datetime.getSeconds()).slice(-2);
+        clock.getContainer().innerHTML = hh+':'+mm+':'+ss;
+    };
+    return clock;
+}
+
 // Legend management
 function get_legend() {
     var legend = L.control({position: 'topleft'});
     legend.onAdd = function () {
         var div = L.DomUtil.create('div', 'leaflet-control-layers leaflet-control-layers-expanded ledgend');
-        if (speed_display === 'relative') {
-            div.innerHTML =
-                '<div class="head">Speed relative to normal</div>' +
-                '<div class="text">' +
-                `<span style="color: ${FAST_COLOUR}">GREEN</span>: speed is at least 20% above normal<br>` +
-                `<span style="color: ${NORMAL_COLOUR}">BLUE</span>: speed close to normal<br>` +
-                `<span style="color: ${SLOW_COLOUR}">RED</span>: speed is at least 20% below normal<br>` +
-                `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>` +
-                'Traffic drives on the left. Updates every 60s.' +
-                '</div>';
-            add_link(div, 'Show actual speed', display_actual);
-            add_link(div, 'Show \'normal\' speed', display_normal);
-        }
-        else if (speed_display === 'actual') {
-            div.innerHTML =
-                '<div class="head">Actual speed</div>' +
-                '<div class="text">' +
-                `<span style="color: ${FAST_COLOUR}">GREEN</span> above 20 mph<br>` +
-                `<span style="color: ${MEDIUM_COLOUR}">AMBER</span>: between 10 and 20 mph<br>` +
-                `<span style="color: ${SLOW_COLOUR}">RED</span>: between 5 and 10 mph<br>` +
-                `<span style="color: ${VERY_SLOW_COLOUR}">DARK RED</span>: below 5 mph <br>` +
-                `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>` +
-                'Traffic drives on the left. Updates every 60s.' +
-                '</div>';
-            add_link(div, 'Show \'normal\' speed', display_normal);
-            add_link(div, 'Show speed relative to \'normal\'', display_relative);
-        }
-        else if (speed_display === 'normal') {
-            div.innerHTML =
-                '<div class="head">Normal speed</div>' +
-                '<div class="text">' +
-                `<span style="color: ${FAST_COLOUR}">GREEN</span> above 20 mph<br>` +
-                `<span style="color: ${MEDIUM_COLOUR}">AMBER</span>: between 10 and 20 mph<br>` +
-                `<span style="color: ${SLOW_COLOUR}">RED</span>: between 5 and 10 mph<br>` +
-                `<span style="color: ${VERY_SLOW_COLOUR}">DARK RED</span>: below 5 mph <br>` +
-                `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>` +
-                'Traffic drives on the left. Updates every 60s.' +
-                '</div>';
-            add_link(div, 'Show actual speed', display_actual);
-            add_link(div, 'Show speed relative to \'normal\'', display_relative);
-        }
+        add_button(div, 'actual', 'Actual speed');
+        add_button(div, 'normal', 'Normal speed');
+        add_button(div, 'relative', 'Speed relative to normal');
+        var key = L.DomUtil.create('div', 'ledgend-key', div);
+        key.id = 'ledgend-key';
+        set_ledgend_key(key);
         return div;
     };
     return legend;
-
 }
 
-function add_link(parent, html, fn) {
-    var link = L.DomUtil.create('a', 'toggle', parent);
-    link.innerHTML = html;
-    link.href = '#';
-    link.title = html;
-    L.DomEvent.disableClickPropagation(link);
-    L.DomEvent.on(link, 'click', L.DomEvent.stop);
-    L.DomEvent.on(link, 'click', fn, this);
-}
-
-function display_actual() {
-    speed_display = 'actual';
-    reload_ledgend();
-    load_journey_times();
-}
-
-function display_normal() {
-    speed_display = 'normal';
-    reload_ledgend();
-    load_journey_times();
-}
-
-function display_relative() {
-    speed_display = 'relative';
-    reload_ledgend();
-    load_journey_times();
-}
-
-function reload_ledgend() {
-    if (ledgend) {
-        ledgend.remove();
+function add_button(parent, value, html) {
+    var label = L.DomUtil.create('label', 'ledgend-label', parent);
+    var button = L.DomUtil.create('input', 'ledgend-button', label);
+    button.type = 'radio';
+    button.name = 'display_type';
+    button.value = value;
+    if (speed_display === value) {
+        button.checked = 'checked';
     }
-    ledgend = get_legend().addTo(map);
+    var span = L.DomUtil.create('span', 'ledgend-button-text', label);
+    span.innerHTML = html;
+    L.DomEvent.disableClickPropagation(button);
+    L.DomEvent.on(button, 'click', display_select,  button);
 }
 
+function display_select() {
+    speed_display = this.value;
+    set_ledgend_key(document.getElementById('ledgend-key'));
+    update_line_colours();
+}
+
+function set_ledgend_key(element) {
+    var colours;
+    if (speed_display === 'relative') {
+        colours =
+            `<span style="color: ${FAST_COLOUR}">GREEN</span>: speed is at least 20% above normal<br>` +
+            `<span style="color: ${NORMAL_COLOUR}">BLUE</span>: speed close to normal<br>` +
+            `<span style="color: ${SLOW_COLOUR}">RED</span>: speed is at least 20% below normal<br>` +
+            `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported`;
+    }
+    else {
+        colours =
+            `<span style="color: ${FAST_COLOUR}">GREEN</span> above 20 mph<br>` +
+            `<span style="color: ${MEDIUM_COLOUR}">AMBER</span>: between 10 and 20 mph<br>` +
+            `<span style="color: ${SLOW_COLOUR}">RED</span>: between 5 and 10 mph<br>` +
+            `<span style="color: ${VERY_SLOW_COLOUR}">DARK RED</span>: below 5 mph <br>` +
+            `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>`;
+    }
+    element.innerHTML = '<div class="ledgend-colours">' + colours + '</div>' +
+        '<div class="ledgend-common">Traffic drives on the left. Updates every 60s.</div>';
+}
 
 // Find an object from a list of objects by matching each object's 'id'
 // attribute with the supplied 'id'. Could build/use lookup tables instead?
