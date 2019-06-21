@@ -7,22 +7,35 @@
 var TO_MPH = 2.23694;
 
 // Style options for markers and lines
-var SITE_OPTIONS = { color: 'black', fillColor: 'green', fill: true, fillOpacity: 0.5, radius: 7, pane: 'markerPane' };
-var NORMAL_COLOUR = '#3388ff';
-var SLOW_COLOUR = 'red';
-var QUICK_COLOUR = 'green';
-var BROKEN_COLOUR = 'grey';
+var SITE_OPTIONS = {
+    color: 'black',
+    fillColor: 'green',
+    fill: true,
+    fillOpacity: 0.8,
+    radius: 7,
+    pane: 'markerPane'
+};
 
 var NORMAL_LINE = { weight: 5, offset: -3 };
 var HIGHLIGHT_LINE = { weight: 10, offset: -6 };
 
-// Misc script globals
-var map, sites_layer, links_layer, compound_routes_layer, layer_control;
-var hilighted_line = null;
+var NORMAL_COLOUR = '#3388ff';
+var VERY_SLOW_COLOUR = '#9a111a';
+var SLOW_COLOUR = '#e00018';
+var MEDIUM_COLOUR = '#eb7F1b';
+var FAST_COLOUR = '#85cd50';
+var BROKEN_COLOUR = '#b0b0b0';
 
-
-// Map link and compoundRoute ids onto the polylines representing them
-var line_map = {};
+// Script state globals
+var map,                            // The Leaflet map object itself
+    sites_layer,                    // layer containing the sensor sites
+    links_layer,                    // Layer containing the point to point links
+    compound_routes_layer,          // Layer containing the compound routes
+    layer_control,                  // The layer control
+    ledgend,                        // The legend
+    hilighted_line,                 // The currently highlighted link or route
+    speed_display = 'actual',       // Line colour mode - 'actual', 'normal' or 'relative'
+    line_map = {};                  // Lookup link/route id to displayed polyline
 
 // Initialise
 $(document).ready(function () {
@@ -34,8 +47,6 @@ $(document).ready(function () {
 
 // Setup the map environment
 function setup_map() {
-
-    map = L.map('map');
 
     // Various feature layers
     sites_layer = L.featureGroup();
@@ -52,6 +63,11 @@ function setup_map() {
         apikey: TF_API_KEY
     });
 
+    map = L.map('map', {zoomControl: false});
+
+    // Map legend
+    ledgend = get_legend().addTo(map);
+
     // Layer control
     var base_layers = {
         'MapBox': mb,
@@ -62,35 +78,17 @@ function setup_map() {
         'Sites': sites_layer,
         'All links': links_layer,
     };
-    layer_control = L.control.layers(base_layers, overlay_layers, {collapsed: false}).addTo(map);
+    layer_control = L.control.layers(base_layers, overlay_layers, {collapsed: true}).addTo(map);
+
+    //  Zoom control (with non-default position)
+    L.control.zoom({position: 'topright'}).addTo(map);
 
     // Handler to clear any highlighting caused by clicking lines
     map.on('click', clear_line_highlight);
 
-    get_legend().addTo(map);
-
     // Centre on Cambridge and add default layers
     var cambridge = new L.LatLng(52.20038, 0.1197);
-    map.setView(cambridge, 15).addLayer(mb).addLayer(sites_layer).addLayer(links_layer);
-
-
-}
-
-
-function get_legend() {
-
-    var legend = L.control({position: 'bottomleft'});
-    legend.onAdd = function () {
-        var div = L.DomUtil.create('div', 'info legend');
-        div.innerHTML = '<div class="leaflet-control-layers leaflet-control-layers-expanded">' +
-            'GREEN: speed is at least 10% below normal<br>' +
-            'RED: speed is at least 10% above normal<br>' +
-            'GREY: no speed reported<br>' +
-            'Trafic drives on the left. Updates every 60s.' +
-            '</div>';
-        return div;
-    };
-    return legend;
+    map.setView(cambridge, 12).addLayer(mb).addLayer(sites_layer).addLayer(links_layer);
 
 }
 
@@ -182,8 +180,10 @@ function load_journey_times() {
                 // get corresponding (poly)line
                 var line = line_map[journey.id];
                 line.properties['journey'] = journey;
-                update_line_colour(line);
             }
+
+            // Refresh the line colours
+            update_line_colours();
 
             // Re-schedule for a minute in the future
             setTimeout(load_journey_times, 60000);
@@ -195,28 +195,71 @@ function load_journey_times() {
 
 // Set line's colour based on corresponding journey's travelTime and
 // normalTravelTime
-function update_line_colour(line) {
+function update_line_colours() {
 
-    if (line !== undefined) {
-        var journey = line.properties.journey;
-        // journeyTime missing
-        if (!journey.travelTime) {
-            line.setStyle({color: BROKEN_COLOUR});
-        }
-        // Worse than normal
-        else if (journey.travelTime > 1.1*journey.normalTravelTime) {
-            line.setStyle({color: SLOW_COLOUR});
-        }
-        // Better then normal
-        else if (journey.travelTime < 0.9*journey.normalTravelTime) {
-            line.setStyle({color: QUICK_COLOUR});
-        }
-        // Normal(ish)
-        else {
-            line.setStyle({color: NORMAL_COLOUR});
+    for (var id in line_map) {
+        if (line_map.hasOwnProperty(id)) {
+            var line = line_map[id];
+            if (speed_display === 'relative') {
+                update_relative_speed(line);
+            }
+            else {
+                update_actual_normal_speed(line);
+            }
         }
     }
+}
 
+
+// Set line colour based on travel time (aka speed) compared to normal
+function update_relative_speed(polyline) {
+
+    var journey = polyline.properties.journey;
+    var choice;
+    // Missing
+    if (!journey.travelTime) {
+        choice = BROKEN_COLOUR;
+    }
+    // Worse than normal
+    else if (journey.travelTime > 1.2*journey.normalTravelTime) {
+        choice = SLOW_COLOUR;
+    }
+    // Better then normal
+    else if (journey.travelTime < 0.8*journey.normalTravelTime) {
+        choice = FAST_COLOUR;
+    }
+    // Normal(ish)
+    else {
+        choice = NORMAL_COLOUR;
+    }
+    polyline.setStyle({color: choice});
+
+}
+
+// Set line colour based on actual or expected speed
+function update_actual_normal_speed(polyline) {
+
+    var journey = polyline.properties.journey;
+    var line = polyline.properties.line;
+    var time = speed_display === 'actual' ? journey.travelTime : journey.normalTravelTime;
+    var speed = (line.length / time) * TO_MPH;
+    var choice;
+    if (time === null) {
+        choice = BROKEN_COLOUR;
+    }
+    else if (speed < 5) {
+        choice = VERY_SLOW_COLOUR;
+    }
+    else if (speed < 10) {
+        choice = SLOW_COLOUR;
+    }
+    else if (speed < 20) {
+        choice = MEDIUM_COLOUR;
+    }
+    else {
+        choice = FAST_COLOUR;
+    }
+    polyline.setStyle({color: choice});
 }
 
 
@@ -235,7 +278,7 @@ function line_highlight(e) {
 // Clear any line highlight
 function clear_line_highlight() {
 
-    if (hilighted_line !== null) {
+    if (hilighted_line) {
         hilighted_line.setStyle(NORMAL_LINE)
             .setOffset(NORMAL_LINE.offset);
         hilighted_line  = null;
@@ -287,6 +330,93 @@ function line_popup(polyline) {
 
     return message;
 
+}
+
+// Legend management
+function get_legend() {
+    var legend = L.control({position: 'topleft'});
+    legend.onAdd = function () {
+        var div = L.DomUtil.create('div', 'leaflet-control-layers leaflet-control-layers-expanded ledgend');
+        if (speed_display === 'relative') {
+            div.innerHTML =
+                '<div class="head">Speed relative to normal</div>' +
+                '<div class="text">' +
+                `<span style="color: ${FAST_COLOUR}">GREEN</span>: speed is at least 20% above normal<br>` +
+                `<span style="color: ${NORMAL_COLOUR}">BLUE</span>: speed close to normal<br>` +
+                `<span style="color: ${SLOW_COLOUR}">RED</span>: speed is at least 20% below normal<br>` +
+                `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>` +
+                'Traffic drives on the left. Updates every 60s.' +
+                '</div>';
+            add_link(div, 'Show actual speed', display_actual);
+            add_link(div, 'Show \'normal\' speed', display_normal);
+        }
+        else if (speed_display === 'actual') {
+            div.innerHTML =
+                '<div class="head">Actual speed</div>' +
+                '<div class="text">' +
+                `<span style="color: ${FAST_COLOUR}">GREEN</span> above 20 mph<br>` +
+                `<span style="color: ${MEDIUM_COLOUR}">AMBER</span>: between 10 and 20 mph<br>` +
+                `<span style="color: ${SLOW_COLOUR}">RED</span>: between 5 and 10 mph<br>` +
+                `<span style="color: ${VERY_SLOW_COLOUR}">DARK RED</span>: below 5 mph <br>` +
+                `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>` +
+                'Traffic drives on the left. Updates every 60s.' +
+                '</div>';
+            add_link(div, 'Show \'normal\' speed', display_normal);
+            add_link(div, 'Show speed relative to \'normal\'', display_relative);
+        }
+        else if (speed_display === 'normal') {
+            div.innerHTML =
+                '<div class="head">Normal speed</div>' +
+                '<div class="text">' +
+                `<span style="color: ${FAST_COLOUR}">GREEN</span> above 20 mph<br>` +
+                `<span style="color: ${MEDIUM_COLOUR}">AMBER</span>: between 10 and 20 mph<br>` +
+                `<span style="color: ${SLOW_COLOUR}">RED</span>: between 5 and 10 mph<br>` +
+                `<span style="color: ${VERY_SLOW_COLOUR}">DARK RED</span>: below 5 mph <br>` +
+                `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>` +
+                'Traffic drives on the left. Updates every 60s.' +
+                '</div>';
+            add_link(div, 'Show actual speed', display_actual);
+            add_link(div, 'Show speed relative to \'normal\'', display_relative);
+        }
+        return div;
+    };
+    return legend;
+
+}
+
+function add_link(parent, html, fn) {
+    var link = L.DomUtil.create('a', 'toggle', parent);
+    link.innerHTML = html;
+    link.href = '#';
+    link.title = html;
+    L.DomEvent.disableClickPropagation(link);
+    L.DomEvent.on(link, 'click', L.DomEvent.stop);
+    L.DomEvent.on(link, 'click', fn, this);
+}
+
+function display_actual() {
+    speed_display = 'actual';
+    reload_ledgend();
+    load_journey_times();
+}
+
+function display_normal() {
+    speed_display = 'normal';
+    reload_ledgend();
+    load_journey_times();
+}
+
+function display_relative() {
+    speed_display = 'relative';
+    reload_ledgend();
+    load_journey_times();
+}
+
+function reload_ledgend() {
+    if (ledgend) {
+        ledgend.remove();
+    }
+    ledgend = get_legend().addTo(map);
 }
 
 
