@@ -1,6 +1,6 @@
 // Javascript functions for displaying Bluetruth data
 
-/* eslint no-console: "warn", max-lines-per-function: "off" */
+/* eslint no-console: "off" */
 /*global $, L, LOCATIONS_URL, JOURNEYS_URL, MB_ACCESS_TOKEN, TF_API_KEY */
 
 // m/sec to mph
@@ -26,39 +26,27 @@ var MEDIUM_COLOUR = '#eb7F1b';
 var FAST_COLOUR = '#85cd50';
 var BROKEN_COLOUR = '#b0b0b0';
 
-var DEFAULT_SPEED_DISPLAY = 'actual';
-var DEFAULT_BASELAYER = 'MapBox';
-
 // Script state globals
 var map,                            // The Leaflet map object itself
     sites_layer,                    // layer containing the sensor sites
     links_layer,                    // Layer containing the point to point links
     compound_routes_layer,          // Layer containing the compound routes
     layer_control,                  // The layer control
-    zoom_control,                   // The zoom control
     clock,                          // The clock control
-    legend,                         // The legend
-    highlighted_line_id = null,     // Id of the currently highlighted link or route
-    speed_display,                  // Line colour mode - 'actual', 'normal' or 'relative'
-    map_moved = false,              // Has the map been moved from its default
-    base_layers,                    // Mapping of names to available base layers
-    overlay_layers,                 // Mapping of names to available overlay layers
-    interactive = true,             // Include interactive controls?
+    hilighted_line,                 // The currently highlighted link or route
+    speed_display = 'actual',       // Line colour mode - 'actual', 'normal' or 'relative'
     line_map = {};                  // Lookup link/route id to displayed polyline
 
 // Initialise
 $(document).ready(function () {
 
-    init();
+    setup_map();
     load_data();
-
-    //  (Re-)set program state based on URL query parameters
-    window.addEventListener('popstate', set_state);
 
 });
 
-// Synchronous environment setup
-function init() {
+// Setup the map environment
+function setup_map() {
 
     // Various feature layers
     sites_layer = L.featureGroup();
@@ -67,10 +55,6 @@ function init() {
 
     // Various map providers
     var osm = L.tileLayer.provider('OpenStreetMap.Mapnik');
-    var mb = L.tileLayer.provider('MapBox', {
-        id: 'mapbox.streets',
-        accessToken: MB_ACCESS_TOKEN
-    });
     var tf = L.tileLayer.provider('Thunderforest.Neighbourhood', {
         apikey: TF_API_KEY
     });
@@ -78,52 +62,32 @@ function init() {
     map = L.map('map', {zoomControl: false});
 
     // Map legend
-    legend = get_legend().addTo(map);
+    get_legend().addTo(map);
 
     // Layer control
-    base_layers = {'MapBox': mb, 'ThunderForest': tf, 'OSM': osm };
-    overlay_layers = {'Sites': sites_layer, 'All links': links_layer};
+    var base_layers = {
+        'OSM': osm,
+        'ThunderForest': tf,
+    };
+    var overlay_layers = {
+        'Sites': sites_layer,
+        'All links': links_layer,
+    };
     layer_control = L.control.layers(base_layers, overlay_layers, {collapsed: true}).addTo(map);
 
     //  Zoom control (with non-default position)
-    zoom_control = L.control.zoom({position: 'topright'}).addTo(map);
+    L.control.zoom({position: 'topright'}).addTo(map);
 
     // Clock
     clock = get_clock().addTo(map);
 
-    // Initialise program state based on URL query parameters
-    set_state();
-
-    map.addLayer(sites_layer).addLayer(links_layer);
-
     // Handler to clear any highlighting caused by clicking lines
     map.on('click', clear_line_highlight);
 
-    // Handler to track movement
-    map.on('moveend', move_handler);
+    // Centre on Cambridge and add default layers
+    var cambridge = new L.LatLng(52.20038, 0.1197);
+    map.setView(cambridge, 12).addLayer(osm).addLayer(sites_layer).addLayer(links_layer);
 
-    // Handlers to manage changes to layers
-    map.on('baselayerchange', baselayerchange_handler);
-    //map.on('overlayadd', overlayadd_handler);
-    //map.on('overlayremove', overlayremove_handler);
-
-}
-
-function baselayerchange_handler() {
-    save_state();
-}
-
-
-// Clear any highlighted line
-function clear_line_highlight() {
-    highlight_line(null);
-}
-
-
-// Record map movement
-function move_handler() {
-    map_moved = true;
-    save_state();
 }
 
 
@@ -140,16 +104,9 @@ function load_data() {
             add_lines(locations.links, locations.sites, links_layer);
             add_lines(locations.compoundRoutes, locations.sites, compound_routes_layer);
 
-            // Scale map to fit without saving the result assuming it
-            // hasn't already been moved
-            if (!map_moved) {
-                map.off('moveend', move_handler);
-                map.off('baselayerchange', baselayerchange_handler);
-                var region = sites_layer.getBounds().extend(links_layer);
-                map.fitBounds(region);
-                map.on('baselayerchange', baselayerchange_handler);
-                map.on('moveend', move_handler);
-            }
+            // Scale map to fit
+            var region = sites_layer.getBounds().extend(links_layer);
+            map.fitBounds(region);
 
             // Load (and schedule for reload) journey times
             load_journey_times();
@@ -191,16 +148,9 @@ function add_lines(lines, sites, layer) {
         var polyline = L.polyline(points, NORMAL_LINE)
             .setStyle({color: NORMAL_COLOUR})
             .bindPopup(line_popup, {maxWidth: 500})
-            .on('click', highlight_line_handler)
+            .on('click', line_highlight)
             .addTo(layer);
         polyline.properties = { 'line': line };
-
-        // Update styling if this line is highlighted, which may
-        // have already happened based on URL parameters
-        if (line.id === highlighted_line_id) {
-            polyline.setStyle(HIGHLIGHT_LINE)
-                .setOffset(HIGHLIGHT_LINE.offset);
-        }
 
         // Remember the polyline for the future
         line_map[line.id] = polyline;
@@ -214,17 +164,11 @@ function add_lines(lines, sites, layer) {
 
 }
 
-// Handle line click
-function highlight_line_handler(e) {
-
-    var polyline = e.target;
-    highlight_line(polyline.properties.line.id);
-
-}
-
 
 // Load journey times, annotate links and compound routes, and schedule to re-run
 function load_journey_times() {
+
+    console.log('(Re-)loading journey times');
 
     $.get(JOURNEYS_URL)
         .done(function(journeys){
@@ -320,28 +264,27 @@ function update_actual_normal_speed(polyline) {
 }
 
 
-// Highlight the line identified by id. Save the resulting state if
-// do_save isn't explicitly false
-function highlight_line(id, do_save) {
+// Hilight a clicked line
+function line_highlight(e) {
 
-    // If anything actually needs to be done
-    if (id !== highlighted_line_id) {
-        // Clear existing
-        if (highlighted_line_id) {
-            var polyline = line_map[highlighted_line_id];
-            polyline.setStyle(NORMAL_LINE)
-                .setOffset(NORMAL_LINE.offset);
-        }
-        // Set new (if it exists)
-        if (id && line_map.hasOwnProperty(id)) {
-            line_map[id].setStyle(HIGHLIGHT_LINE)
-                .setOffset(HIGHLIGHT_LINE.offset);
-        }
-        highlighted_line_id = id;
-        if (do_save !== false) {
-            save_state();
-        }
+    var line = e.target;
+
+    clear_line_highlight();
+    line.setStyle(HIGHLIGHT_LINE)
+        .setOffset(HIGHLIGHT_LINE.offset);
+    hilighted_line = line;
+}
+
+
+// Clear any line highlight
+function clear_line_highlight() {
+
+    if (hilighted_line) {
+        hilighted_line.setStyle(NORMAL_LINE)
+            .setOffset(NORMAL_LINE.offset);
+        hilighted_line  = null;
     }
+
 }
 
 
@@ -409,25 +352,30 @@ function get_clock() {
 
 // Legend management
 function get_legend() {
-    var l = L.control({position: 'topleft'});
-    l.onAdd = function () {
-        var div = L.DomUtil.create('div', 'leaflet-control-layers leaflet-control-layers-expanded legend');
+    var legend = L.control({position: 'topleft'});
+    legend.onAdd = function () {
+        var div = L.DomUtil.create('div', 'leaflet-control-layers leaflet-control-layers-expanded ledgend');
         add_button(div, 'actual', 'Actual speed');
         add_button(div, 'normal', 'Normal speed');
         add_button(div, 'relative', 'Speed relative to normal');
-        L.DomUtil.create('div', 'legend-key', div);
+        var key = L.DomUtil.create('div', 'ledgend-key', div);
+        key.id = 'ledgend-key';
+        set_ledgend_key(key);
         return div;
     };
-    return l;
+    return legend;
 }
 
 function add_button(parent, value, html) {
-    var label = L.DomUtil.create('label', 'legend-label', parent);
-    var button = L.DomUtil.create('input', 'legend-button', label);
+    var label = L.DomUtil.create('label', 'ledgend-label', parent);
+    var button = L.DomUtil.create('input', 'ledgend-button', label);
     button.type = 'radio';
     button.name = 'display_type';
     button.value = value;
-    var span = L.DomUtil.create('span', 'legend-button-text', label);
+    if (speed_display === value) {
+        button.checked = 'checked';
+    }
+    var span = L.DomUtil.create('span', 'ledgend-button-text', label);
     span.innerHTML = html;
     L.DomEvent.disableClickPropagation(button);
     L.DomEvent.on(button, 'click', display_select,  button);
@@ -435,19 +383,11 @@ function add_button(parent, value, html) {
 
 function display_select() {
     speed_display = this.value;
-    set_legend();
+    set_ledgend_key(document.getElementById('ledgend-key'));
     update_line_colours();
-    save_state();
 }
 
-function set_legend() {
-    var legend_container = legend.getContainer();
-    legend_container.querySelectorAll('input[type=\'radio\']').forEach(function(el){
-        if (el.value === speed_display) {
-            el.checked = true;
-        }
-    });
-    var key = legend_container.querySelector('div.legend-key');
+function set_ledgend_key(element) {
     var colours;
     if (speed_display === 'relative') {
         colours =
@@ -464,131 +404,8 @@ function set_legend() {
             `<span style="color: ${VERY_SLOW_COLOUR}">DARK RED</span>: below 5 mph <br>` +
             `<span style="color: ${BROKEN_COLOUR}">GREY</span>: no speed reported<br>`;
     }
-    key.innerHTML = '<div class="legend-colours">' + colours + '</div>' +
-        '<div class="legend-common">Traffic drives on the left. Updates every 60s.</div>';
-}
-
-// Save current state to the URL
-function save_state() {
-
-    console.log('Saving...');
-
-    // Build a dict of non-default values
-    var params = new URLSearchParams();
-
-    // Speed display mode
-    if (speed_display !== DEFAULT_SPEED_DISPLAY) {
-        params.set('s', speed_display);
-    }
-
-    // Highlighted line
-    if (highlighted_line_id) {
-        params.set('h', highlighted_line_id);
-    }
-
-    // Position and zoom
-    if (map_moved) {
-        params.set('z', map.getZoom());
-        var center = map.getCenter();
-        params.set('la', center.lat.toFixed(5));
-        params.set('ln', center.lng.toFixed(5));
-    }
-
-    // Baselayer
-    var current_base;
-    for (var layer_name in base_layers) {
-        if (base_layers.hasOwnProperty(layer_name) && map.hasLayer(base_layers[layer_name])) {
-            current_base = layer_name;
-        }
-    }
-    if (current_base !== DEFAULT_BASELAYER) {
-        params.set('b', current_base);
-    }
-
-    // Interaction
-    if (!interactive) {
-        params.set('i', 'no');
-    }
-
-    var params_string = params.toString();
-    var uri = location.protocol + '//' + location.host + location.pathname;
-    if (params_string) {
-        uri += '?' + params_string;
-    }
-    window.history.pushState(null, '', uri);
-}
-
-
-// Change program state from URL parameters
-function set_state() {
-
-    console.log('Setting...');
-
-    var params = new URLSearchParams(window.location.search);
-
-    //speed display mode
-    speed_display = params.has('s') ? params.get('s') : DEFAULT_SPEED_DISPLAY;
-    set_legend();
-    update_line_colours();
-
-    // line highlight
-    var id = params.has('h') ? params.get('h') : null;
-    highlight_line(id, false);
-
-    // Position - 'z', 'la' and 'ln' always set together
-    if (params.has('z')) {
-        map.setView([params.get('la'), params.get('ln')], params.get('z'));
-        map_moved = true;
-    }
-
-    // Baselayer
-    var base_name = params.has('b') ? params.get('b') : DEFAULT_BASELAYER;
-    map.off('baselayerchange', baselayerchange_handler);
-    for (var layer_name in base_layers) {
-        if (base_layers.hasOwnProperty(layer_name)) {
-            if (layer_name === base_name) {
-                base_layers[layer_name].addTo(map);
-            }
-            else {
-                base_layers[layer_name].removeFrom(map);
-            }
-        }
-    }
-    map.on('baselayerchange', baselayerchange_handler);
-
-    // Interactive controls
-    hide_interaction(params.has('i') && params.get('i') === 'no');
-
-}
-
-
-function hide_interaction(hide) {
-
-    var legend_container = legend.getContainer();
-    if (hide) {
-        interactive = false;
-        zoom_control.remove();
-        layer_control.remove();
-        legend_container.querySelectorAll('label').forEach(function(label){
-            var button = label.querySelector('input[type=\'radio\']');
-            var text = label.querySelector('span');
-            button.hidden = true;
-            if (button.value !== speed_display) {
-                text.hidden = true;
-            }
-        });
-    }
-    else {
-        interactive = true;
-        layer_control.addTo(map);
-        zoom_control.addTo(map);
-        legend_container.querySelectorAll('label').forEach(function(label){
-            var button = label.querySelector('input[type=\'radio\']');
-            label.hidden = false;
-            button.hidden = false;
-        });
-    }
-
+    element.innerHTML = '<div class="ledgend-colours">' + colours + '</div>' +
+        '<div class="ledgend-common">Traffic drives on the left. Updates every 60s.</div>';
 }
 
 // Find an object from a list of objects by matching each object's 'id'
@@ -601,5 +418,6 @@ function find_object(list, id) {
             return object;
         }
     }
+    console.log('Failed to find object with id ', id);
     return undefined;
 }
