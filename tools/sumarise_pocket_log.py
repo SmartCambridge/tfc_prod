@@ -39,7 +39,7 @@ def read_data():
         # If we've crossed a bin boundary
         if current_bin != bin:
             if current_bin:
-                results.append([current_bin, active, inactive])
+                results.append([current_bin, active, inactive, len(last_seen)])
             seen = set()
             current_bin = bin
             active = 0
@@ -65,7 +65,7 @@ def read_data():
 
 def save_data():
     writer = csv.writer(sys.stdout)
-    writer.writerow(['Date', 'Active', 'Inactive'])
+    writer.writerow(['Date', 'Active', 'Inactive', 'Total'])
     writer.writerows(read_data())
 
 
