@@ -47,3 +47,8 @@ ln -sfn /mnt/sdb1/tfc/cam_aq /media/tfc/cam_aq
 # copy data into tfc/sys
 
 cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys
+
+# Create tfc_web log directories
+
+mkdir /var/log/tfc_prod/gunicorn
+mkdir /var/log/tfc_prod/pocket_log
