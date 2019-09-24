@@ -333,6 +333,11 @@ ln -s /mnt/sdb1/tfc/cam_park_rss /media/tfc/cam_park_rss
 # copy data into tfc/sys
 
 cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys
+
+# Create tfc_web log directories
+
+mkdir /var/log/tfc_prod/gunicorn
+mkdir /var/log/tfc_prod/pocket_log
 ```
 
 ### Test run Rita Console
@@ -350,6 +355,13 @@ Test by browsing to ```http://localhost:8081/console``` and ```http://localhost/
 ```
 git clone https://github.com/ijl20/tfc_web.git
 ```
+
+### Setup log rotation
+
+```
+sudo cp logrotate/tfc_prod /etc/logrotate.d/tfc_prod
+```
+
 ### See tfc_web/README.md
 
 ### Configure email (for Monit alerts)

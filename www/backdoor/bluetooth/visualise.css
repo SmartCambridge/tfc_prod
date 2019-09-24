@@ -1,0 +1,19 @@
+
+
+.legend-label {
+    font-size: 1.3em;
+    font-weight: bold;
+}
+
+.legend-colours, .legend-common {
+    margin-top: 0.5em;
+}
+
+.legend-button {
+    margin-right: 1em;
+}
+
+
+.clock {
+    font-size: 1.3em;
+}
