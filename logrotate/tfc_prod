@@ -3,7 +3,7 @@
 # Rotate tfc_web's gunicorn.err file and extract useful info
 
 /var/log/tfc_prod/gunicorn.err {
-    daily
+    weekly
     missingok
     nodateext
     rotate 12
@@ -22,7 +22,7 @@
 # Rotate tfc_web's gunicorn.log file
 
 /var/log/tfc_prod/gunicorn.log {
-    daily
+    weekly
     missingok
     nodateext
     rotate 12
