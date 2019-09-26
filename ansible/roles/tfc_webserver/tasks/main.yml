@@ -226,3 +226,11 @@
   template:
     src: rtroute_config.js.j2
     dest: /var/www/tfc_prod/backdoor/rtroute/rtroute_config.js
+
+- name: /backdoor/bluettooth's secrets file
+  gpg_d:
+    src: bluetooth_setup_env.js.asc
+    dest: /var/www/tfc_prod/backdoor/bluetooth/setup_env.js
+    owner: root
+    group: root
+    mode: "ugo=r"
