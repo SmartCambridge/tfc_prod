@@ -308,27 +308,38 @@ mkdir /mnt/sdb1/tfc/vix/data_monitor_json
 
 mkdir /media/tfc/vix
 
-ln -s /mnt/sdb1/tfc/vix/data_bin /media/tfc/vix/data_bin
-ln -s /mnt/sdb1/tfc/vix/data_bin_json /media/tfc/vix/data_bin_json
-ln -s /mnt/sdb1/tfc/vix/data_zone /media/tfc/vix/data_zone
-ln -s /mnt/sdb1/tfc/vix/data_cache /media/tfc/vix/data_cache
-ln -s /mnt/sdb1/tfc/vix/data_monitor /media/tfc/vix/data_monitor
-ln -s /mnt/sdb1/tfc/vix/data_monitor_json /media/tfc/vix/data_monitor_json
+ln -sfn /mnt/sdb1/tfc/vix/data_bin /media/tfc/vix/data_bin
+ln -sfn /mnt/sdb1/tfc/vix/data_bin_json /media/tfc/vix/data_bin_json
+ln -sfn /mnt/sdb1/tfc/vix/data_zone /media/tfc/vix/data_zone
+ln -sfn /mnt/sdb1/tfc/vix/data_cache /media/tfc/vix/data_cache
+ln -sfn /mnt/sdb1/tfc/vix/data_monitor /media/tfc/vix/data_monitor
+ln -sfn /mnt/sdb1/tfc/vix/data_monitor_json /media/tfc/vix/data_monitor_json
 
 # set up 'tfc/sys' directory
 
 mkdir /mnt/sdb1/tfc/sys
-ln -s /mnt/sdb1/tfc/sys /media/tfc/sys
+ln -sfn /mnt/sdb1/tfc/sys /media/tfc/sys
 
 # set up 'tfc/cam_park_local' directory
 
 mkdir /mnt/sdb1/tfc/cam_park_local
-ln -s /mnt/sdb1/tfc/cam_park_local /media/tfc/cam_park_local
+ln -sfn /mnt/sdb1/tfc/cam_park_local /media/tfc/cam_park_local
 
 # set up 'tfc/cam_park_rss' directory
 
 mkdir /mnt/sdb1/tfc/cam_park_rss
-ln -s /mnt/sdb1/tfc/cam_park_rss /media/tfc/cam_park_rss
+ln -sfn /mnt/sdb1/tfc/cam_park_rss /media/tfc/cam_park_rss
+
+# set up 'tfc/cam_aq' directory
+
+mkdir /mnt/sdb1/tfc/cam_aq
+ln -sfn /mnt/sdb1/tfc/cam_aq /media/tfc/cam_aq
+
+# Cambridge Sensor Network - LoraWAN TTN
+# set up 'tfc/csn_ttn' directory
+
+mkdir /mnt/sdb1/tfc/csn_ttn
+ln -sfn /mnt/sdb1/tfc/csn_ttn /media/tfc/csn_ttn
 
 # copy data into tfc/sys
 
@@ -339,6 +350,15 @@ cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys
 mkdir /var/log/tfc_prod/gunicorn
 mkdir /var/log/tfc_prod/pocket_log
 ```
+
+### Create ```tfc_prod/secrets``` directory
+
+As tfc_prod user:
+```
+mkdir ~/tfc_prod/secrets
+```
+
+Use sftp to populate ```tfc_prod/secrets``` contents from another server.
 
 ### Test run Rita Console
 
