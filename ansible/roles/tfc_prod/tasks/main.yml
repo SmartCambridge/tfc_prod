@@ -50,13 +50,25 @@
     group: tfc_prod
     mode: "o=rwx,go=rx"
 
-- name: Log directory
+- name: Log directories
   file:
-    path: /var/log/tfc_prod
+    path: "{{ item }}"
     state: directory
     owner: tfc_prod
     group: tfc_prod
     mode: "a=rwx"
+  loop:
+    - /var/log/tfc_prod/
+    - /var/log/tfc_prod/gunicorn
+    - /var/log/tfc_prod/pocket_log
+
+- name: Log rotation
+  copy:
+    src: logrotate.d/tfc_prod
+    dest: /etc/logrotate.date
+    owner: root
+    group: root
+    mode: "u=rw,go=r"
 
 - name: ~tfc_prod/tfc_prod directory
   file:
