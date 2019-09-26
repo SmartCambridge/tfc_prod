@@ -44,6 +44,12 @@ ln -sfn /mnt/sdb1/tfc/cam_park_rss /media/tfc/cam_park_rss
 mkdir /mnt/sdb1/tfc/cam_aq
 ln -sfn /mnt/sdb1/tfc/cam_aq /media/tfc/cam_aq
 
+# Cambridge Sensor Network - LoraWAN TTN
+# set up 'tfc/csn_ttn' directory
+
+mkdir /mnt/sdb1/tfc/csn_ttn
+ln -sfn /mnt/sdb1/tfc/csn_ttn /media/tfc/csn_ttn
+
 # copy data into tfc/sys
 
 cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys
@@ -52,3 +58,4 @@ cp -r /home/tfc_prod/tfc_prod/config/sys/* /media/tfc/sys
 
 mkdir /var/log/tfc_prod/gunicorn
 mkdir /var/log/tfc_prod/pocket_log
+
