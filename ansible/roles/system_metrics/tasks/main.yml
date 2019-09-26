@@ -140,8 +140,8 @@
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
     owner: root
-    group: root
-    mode: "{{ item.mode | default('u=rw,go=r') }}"
+    group: grafana
+    mode: "{{ item.mode | default('u=rw,g=r,o=') }}"
   loop:
     - { src: grafana.ini, dest: /etc/grafana/ }
     - { src: prometheus-datasource.yaml, dest: /etc/grafana/provisioning/datasources/ }
