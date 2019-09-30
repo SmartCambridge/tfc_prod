@@ -14,10 +14,10 @@ iso_format = '%Y-%m-%d %H:%M:%S'
 
 def truncate_to_bin(date):
     '''
-    Round date down to bin start date
+    Round date down to Sunday
     '''
-
-    return date - timedelta(days=date.weekday())
+    days_since_sunday = (date.weekday()+1)%7
+    return date - timedelta(days=days_since_sunday)
 
 
 def read_data():
@@ -57,8 +57,9 @@ def read_data():
         # Record seeing this client on this day
         last_seen[client] = date
 
-    # Explicitly ignore the 'in-process' bin at the end of the file
-    # because it (almost certainly) contains data for a partial period
+    # Flush counts for the current bin
+    if current_bin:
+        results.append([current_bin, active, inactive, len(last_seen)])
 
     return results
 
