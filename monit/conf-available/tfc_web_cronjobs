@@ -7,3 +7,7 @@ check file update_bus_stops with path /var/log/tfc_prod/update_bus_stops.timesta
 # Time table info updated every week
 check file update_bus_info with path /var/log/tfc_prod/update_bus_info.timestamp
     if timestamp > 8 days then alert
+
+# Download data updated every day
+check file build_download_data with path /var/log/tfc_prod/build_download_data.timestamp
+    if timestamp > 26 hours then alert
