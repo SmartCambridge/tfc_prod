@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from collections import defaultdict
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 
 import csv
 import fileinput
@@ -22,6 +22,8 @@ def truncate_to_bin(date):
 
 def read_data():
 
+    this_weeks_bin = truncate_to_bin(date.today())
+
     results = []
     current_bin = None
     active = 0
@@ -30,11 +32,14 @@ def read_data():
 
     for line in fileinput.input():
 
-        timestamp = uk_timezone.localize(datetime.strptime(line[1:20], iso_format))
-        date = timestamp.date()
+        record_timestamp = uk_timezone.localize(datetime.strptime(line[1:20], iso_format))
+        record_date = record_timestamp.date()
         client = line.split('|')[3]
 
-        bin = truncate_to_bin(date)
+        bin = truncate_to_bin(record_date)
+        # Ignore the partial bin for the current week
+        if bin >= this_weeks_bin:
+            continue
 
         # If we've crossed a bin boundary
         if current_bin != bin:
@@ -49,13 +54,13 @@ def read_data():
         if client not in seen:
             seen.add(client)
 
-            if client in last_seen and last_seen[client] >= date - timedelta(days=30):
+            if client in last_seen and last_seen[client] >= record_date - timedelta(days=30):
                 active += 1
             else:
                 inactive += 1
 
         # Record seeing this client on this day
-        last_seen[client] = date
+        last_seen[client] = record_date
 
     # Flush counts for the current bin
     if current_bin:
