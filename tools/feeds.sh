@@ -8,6 +8,8 @@ FEEDS=(
 /media/tfc/cam_park_rss/data_monitor_json
 /media/tfc/csn_ttn/data_monitor
 /media/tfc/google_traffic_map/cambridge/$TODAY
+/media/tfc/btjourney/journeytimes/data_monitor
+/media/tfc/btjourney/journeytimes/data_monitor_json
 )
 
 date
