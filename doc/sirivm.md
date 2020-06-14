@@ -1,8 +1,5 @@
 # Siri/VM feed support
 
-## Cloudamber
-
-
-## Ito World
+![real-time flow](sirivm_realtime.png)
 
 uk.ac.cam.tfc_server.feedmaker.B
