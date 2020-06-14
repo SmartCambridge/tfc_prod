@@ -42,31 +42,31 @@ nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server
 # #############################################################################################
 
 # SIRIVM FEEDMAKER FOR CLOUDAMBER SIRIVM AND SIRIVM_JSON DATA
-#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.A" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.A.err & disown
+nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.A" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.A.err & disown
 
 # SIRIVM ZONEMANAGER FOR CLOUDAMBER SIRIVM DATA
-#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.cloudamber.sirivm.err & disown
+nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.cloudamber.sirivm.err & disown
 
 # SIRIVM MSGFILER FOR CLOUDAMBER SIRIVM DATA
-#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.cloudamber.sirivm.err & disown
+nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.cloudamber.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.cloudamber.sirivm.err & disown
 
-#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.cloudamber" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.cloudamber.err & disown
+nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.cloudamber" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.cloudamber.err & disown
 
 # #############################################################################################
 # ################   ITOWORLD SIRIVM FEED         #############################################
 # #############################################################################################
 
 # SIRIVM FEEDMAKER FOR ITOWORLD SIRIVM AND SIRIVM_JSON DATA
-nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.B" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.B.err & disown
+#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.B" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.B.err & disown
 
 # SIRIVM ZONEMANAGER FOR ITOWORLD SIRIVM DATA
-nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.itoworld.err & disown
+#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.zonemanager.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/zonemanager.itoworld.err & disown
 
 # SIRIVM MSGFILER FOR ITOWORLD SIRIVM DATA
-nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.itoworld.err & disown
+#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.itoworld.err & disown
 
 # SIRIVM MSGROUTER FOR ITOWORLD SIRIVM DATA
-nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.itoworld.err & disown
+#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgrouter.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.itoworld.err & disown
 
 # #############################################################################################
 # ################   TTN MQTT FEED HANDLER        #############################################
@@ -86,8 +86,6 @@ nohup java -cp "$TFC_JAR" -Xmx100m -Xms10m -Xmn2m -Xss10m io.vertx.core.Launcher
 # ################   RTMONITOR                    #############################################
 # #############################################################################################
 
-# RTMONITOR.SIRIVM FOR CLOUDAMBER
-#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rtmonitor.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/rtmonitor.sirivm.err & disown
+# RTMONITOR.SIRIVM
+nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rtmonitor.sirivm" -cluster >/dev/null 2>>/var/log/tfc_prod/rtmonitor.sirivm.err & disown
 
-# RTMONITOR.ITOWORLD
-nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rtmonitor.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/rtmonitor.itoworld.err & disown
