@@ -1,9 +1,9 @@
 # Make sure we are accumulating SIRI-VM data
 
-# Make the interval a bit longer than the one on cloudamber_sirivm_data_monitor_slow
-# in tfc_cloudamber so that one triggers first if the feed dries up - this makes
+# Make the interval a bit longer than the one on itoworld_sirivm_data_monitor_slow
+# in tfc_itoworld so that one triggers first if the feed dries up - this makes
 # it a bit easier to interpret the alerts
 
-check directory sirivm_json_data_monitor with path /media/tfc/sirivm_json/data_monitor
+check directory sirivm_json_data_monitor with path /media/tfc/itoworld/sirivm_json/data_monitor
     if timestamp > 135 minutes then alert
 
