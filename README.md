@@ -44,6 +44,22 @@ gateway 128.232.98.1
 netmask 255.255.255.0
 dns-nameservers 128.232.1.1 128.232.1.2
 ```
+To add the DNS servers to the config (Ubuntu 22.04):
+
+Create a file:
+```
+sudo mkdir /etc/systemd/resolved.conf.d/
+sudo nano /etc/systemd/resolved.conf.d/dns_servers.conf
+```
+Add dns servers in this file:
+```
+[Resolve]
+DNS=182.232.1.1 128.232.1.2 8.8.8.8
+```
+Then restart systemd-resolved
+```
+sudo systemctl restart systemd-resolved
+```
 
 ### Apply immediate updates
 ```
