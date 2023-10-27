@@ -2,27 +2,6 @@
 
 # run as user tfc_prod
 
-# create tfc/vix directory and sub-dirs on sdb1
-
-mkdir -p /mnt/sdb1/tfc/vix
-
-mkdir -p /mnt/sdb1/tfc/vix/data_bin
-mkdir -p /mnt/sdb1/tfc/vix/data_bin_json
-mkdir -p /mnt/sdb1/tfc/vix/data_zone
-mkdir -p /mnt/sdb1/tfc/vix/data_cache
-mkdir -p /mnt/sdb1/tfc/vix/data_monitor
-mkdir -p /mnt/sdb1/tfc/vix/data_monitor_json
-
-# create links to all vix directories from /media/tfc
-
-mkdir -p /media/tfc/vix
-
-ln -sfn /mnt/sdb1/tfc/vix/data_bin /media/tfc/vix/data_bin
-ln -sfn /mnt/sdb1/tfc/vix/data_bin_json /media/tfc/vix/data_bin_json
-ln -sfn /mnt/sdb1/tfc/vix/data_zone /media/tfc/vix/data_zone
-ln -sfn /mnt/sdb1/tfc/vix/data_cache /media/tfc/vix/data_cache
-ln -sfn /mnt/sdb1/tfc/vix/data_monitor /media/tfc/vix/data_monitor
-ln -sfn /mnt/sdb1/tfc/vix/data_monitor_json /media/tfc/vix/data_monitor_json
 
 # set up 'tfc/sys' directory
 

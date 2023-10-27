@@ -14,7 +14,7 @@
 # delete bad entries from /etc/ssh/ssh_known_hosts and append new records from above.
 #
 
-for n in 1 2 3 4 5;
+for n in 1 2 3 4 5 6 7 8 9;
 do
   name=tfc-app${n}.cl.cam.ac.uk
   entry=$(ssh-keyscan -t ecdsa $name)
