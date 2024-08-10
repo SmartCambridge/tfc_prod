@@ -376,13 +376,20 @@ mkdir ~/tfc_prod/secrets
 
 Use sftp to populate ```tfc_prod/secrets``` contents from another server.
 
-### Test run Rita Console
+### Test run Status Console
 
 ```
 java -cp tfc.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster -cluster-port 10081 >/dev/null 2>>/var/log/tfc_prod/tfc_console.A.err &
 ```
 
-Test by browsing to ```http://localhost:8081/console``` and ```http://localhost/backdoor/console```.
+Test by browsing to 
+```
+https://servername/backdoor/
+```
+ and 
+```
+https://servername/backdoor/system_status.html
+```
 (Note for localhost you may use the remote server name if necessary).
 
 ## Install tfc_web

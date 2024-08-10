@@ -54,12 +54,6 @@ nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server
 nohup java -cp "$TFC_JAR:secrets" -Xmx100m -Xms10m -Xmn2m -Xss10m io.vertx.core.Launcher run "service:msgrouter.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/msgrouter.itoworld.err & disown
 
 # #############################################################################################
-# ################   TTN MQTT FEED HANDLER        #############################################
-# #############################################################################################
-
-nohup java -cp "$TFC_JAR:secrets" -Xmx100m -Xms10m -Xmn2m -Xss10m io.vertx.core.Launcher run "service:feedmqtt.ttn" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmqtt.ttn.err & disown
-
-# #############################################################################################
 # ################   DRAKEWELL BTJOURNEY FEED                ##################################
 # #############################################################################################
 
@@ -73,3 +67,4 @@ nohup java -cp "$TFC_JAR" -Xmx100m -Xms10m -Xmn2m -Xss10m io.vertx.core.Launcher
 
 # RTMONITOR.ITOWORLD
 nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.rtmonitor.itoworld" -cluster >/dev/null 2>>/var/log/tfc_prod/rtmonitor.itoworld.err & disown
+
