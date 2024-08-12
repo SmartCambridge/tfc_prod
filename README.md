@@ -257,7 +257,7 @@ See (monit/INSTALLATION.md)[monit/INSTALLATION.md]
 
 ### Add the tfc_server JAR file to the tfc_prod directory
 
-Ideally, as a developer user (not tfc_prod), install the tfc_server source 
+Ideally, as a developer user (not tfc_prod), install the tfc_server source
 [https://github.com/SmartCambridge/tfc_server](https://github.com/SmartCambridge/tfc_server)
 
 Run ```mvn clean package``` in the tfc_server directory to create the fat jar.
@@ -382,11 +382,11 @@ Use sftp to populate ```tfc_prod/secrets``` contents from another server.
 java -cp tfc.jar io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster -cluster-port 10081 >/dev/null 2>>/var/log/tfc_prod/tfc_console.A.err &
 ```
 
-Test by browsing to 
+Test by browsing to
 ```
 https://servername/backdoor/
 ```
- and 
+ and
 ```
 https://servername/backdoor/system_status.html
 ```
@@ -449,20 +449,4 @@ MAILTO=admin@smartcambridge.org
 
 at the start of tfc_prod's crontab file.
 
-### Install/configure Monit
-Get the ```monitrc``` file  (from tfc_prod@tfc-app2.cl.cam.ac.uk:~/tfc_prod/monit/monitrc)
-Note the monitrc file contains
-1. The email address alerts will be sent to (and from)
-2. The username/password for the web access
-
-```
-sudo apt install monit
-sudo cp monitrc /etc/monit
-sudo service monit restart
-```
-Note that monitrc contains the email address Alerts should be sent to, so check that.
-An alert should be set as soon as Monit is restarted (testfile does not exist) so check your inbox.
-Final test by visiting the local monit web page (note the username/password from monitrc):
-```
-https://tfc-appZ.cl.cam.ac.uk/system/monitor/
-```
+### See tfc_prod/monit/README.md
