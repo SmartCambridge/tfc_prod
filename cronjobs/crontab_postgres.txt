@@ -1,4 +1,6 @@
-# This is a cronjob for the postgres user
+# This is a cronjob for the postgres user, i.e.
+# sudo su postgres -c "crontab -e"
+
 # Once a day, at 1AM
 SHELL=/bin/bash
 0 1 * * * /usr/bin/pg_dumpall --clean | /bin/bzip2 > "/backups/database.$(date +\%Y.\%m.\%d).pgdumpall.bz2"

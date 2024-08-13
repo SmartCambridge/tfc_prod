@@ -1,7 +1,0 @@
-# Clear out unneeded daily .bz2 database backups in /backups/
-55 05 * * * /backups/purge.sh /backups >/var/log/tfc_prod/backup_purge.log 2>&1 && echo $(date --iso-8601=seconds) > /var/log/tfc_prod/backup_purge.timestamp
-
-# Disable cloudamber_data_monitor_json_fast monit task overnight
-# (when there are so few busses that it otherwise generates false positives)
-00 07 * * * /usr/bin/monit monitor cloudamber_data_monitor_json_fast
-00 22 * * * /usr/bin/monit unmonitor cloudamber_data_monitor_json_fast

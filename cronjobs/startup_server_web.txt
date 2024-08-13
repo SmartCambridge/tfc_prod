@@ -1,6 +1,0 @@
-# Enter as user tfc_prod via "crontab -e"
-
-@reboot /home/tfc_prod/tfc_prod/run.sh                                                                                                       
-                                                                                                                                             
-@reboot /home/tfc_prod/tfc_web/run.sh                                                                                                        
-  
