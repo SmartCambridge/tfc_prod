@@ -28,13 +28,14 @@ SECRETS_FILE=$SCRIPT_DIR/secrets.sh && test -f $SECRETS_FILE && source $SECRETS_
 nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.console.A" -cluster >/dev/null 2>>/var/log/tfc_prod/console.A.err & disown
 
 # #############################################################################################
-# ################  PARK_LOCAL_RSS FEEDMAKER  #################################################
+# ################  FEED_SWARCO PARKING       #################################################
 # #############################################################################################
 
-# FEEDMAKER TO SCRAPE CAR PARK WEB SITES
-nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.park_rss" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.park_rss.err & disown
+# FEEDSWARCO TO HTTP TOKEN/DYNAMIC API'S
+#nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.feedmaker.park_rss" -cluster >/dev/null 2>>/var/log/tfc_prod/feedmaker.park_rss.err & disown
+nohup java -cp "tfc.jar:secrets" -Xmx100m -Xms10m -Xmn2m -Xss10m io.vertx.core.Launcher run "service:feed_swarco" -cluster >/dev/null 2>>/var/log/tfc_prod/feed_swarco.err & disown
 
-# MSGFILER TO STORE MESSAGES FROM CAR PARKS FEEDMAKER (i.e. from feedmaker.park_local_rss)
+# MSGFILER TO STORE MESSAGES FROM CAR PARKS FEEDMAKER (i.e. from feed_swarco.json)
 nohup java -cp $TFC_JAR io.vertx.core.Launcher run "service:uk.ac.cam.tfc_server.msgfiler.cam.to_json" -cluster >/dev/null 2>>/var/log/tfc_prod/msgfiler.cam.to_json.err & disown
 
 # #############################################################################################
