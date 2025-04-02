@@ -21,3 +21,19 @@ then alert
 check host tfc-app5.cl.cam.ac.uk address tfc-app5.cl.cam.ac.uk
 if failed ping
 then alert
+
+check host tfc-app6.cl.cam.ac.uk address tfc-app6.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app7.cl.cam.ac.uk address tfc-app7.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app8.cl.cam.ac.uk address tfc-app8.cl.cam.ac.uk
+if failed ping
+then alert
+
+check host tfc-app9.cl.cam.ac.uk address tfc-app9.cl.cam.ac.uk
+if failed ping
+then alert

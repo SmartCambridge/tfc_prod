@@ -110,11 +110,11 @@
 ## --8<--
  set mail-format {
    from:    admin@smartcambridge.org
-   subject: $HOST -- $EVENT $SERVICE
+   subject: $HOST monit -- $EVENT $SERVICE
    message: $EVENT Service $SERVICE
             Date:        $DATE
             Action:      $ACTION
-            Host:        $HOST
+            Monit Host:  $HOST
             Description: $DESCRIPTION
  }
 ## --8<--

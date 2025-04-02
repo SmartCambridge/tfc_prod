@@ -1,8 +1,11 @@
-check device root-filesystem with path /
+check device filesystem_root with path /
     if space usage > 80% then alert
 
-check device boot-filesystem with path /boot
+check device filesystem_sdb1 with path /mnt/sdb1
     if space usage > 80% then alert
 
-check device tfc-filesystem with path /mnt/sdb1
+check device filesystem_sdc1 with path /mnt/sdc1
+    if space usage > 80% then alert
+
+check device filesystem_sdd1 with path /mnt/sdd1
     if space usage > 80% then alert

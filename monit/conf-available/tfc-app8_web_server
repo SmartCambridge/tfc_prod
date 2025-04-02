@@ -1,0 +1,27 @@
+# Check that smartcambridge.org and the local webserver are responding
+# to http (with a redirect) and to https with a certificate isn't about
+# to expire
+
+check host smartcambridge-webserver address smartcambridge.org
+if failed
+    port 80
+    protocol http
+    status = 301
+for 2 cycles then alert
+if failed
+    port 443
+    protocol https
+    and certificate valid > 25 days
+for 2 cycles then alert
+
+check host tfc-app8-webserver address tfc-app8.cl.cam.ac.uk
+if failed
+    port 80
+    protocol http
+    status = 301
+for 2 cycles then alert
+if failed
+    port 443
+    protocol https
+    and certificate valid > 25 days
+for 2 cycles then alert

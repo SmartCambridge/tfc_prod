@@ -31,7 +31,7 @@ also link the web server monitoring configuration for this particular server,
 replacing `<n>` as apropriate:
 
 ```
-sudo ln -s ../conf-available/tfc-app<n>_web_servers .
+sudo ln -s ../conf-available/tfc-app<n>_web_server .
 ```
 
 also link the raw SIRIVM monitoring configuration on whichever server
